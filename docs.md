@@ -69,6 +69,10 @@ It utilizes a lightweight background daemon (occupying <4MB RAM and ~0.1% CPU). 
 > *   **Auto-Sorting Override:** While the script is smart enough to sort files automatically, you can guarantee a specific order by prefixing numbers to your files (e.g., `1-Firmware.zip`, `2-ROM.zip`, `3-GApps.zip`).
 > *   **CRITICAL:** ALWAYS remove your PIN/Password/Pattern before triggering a flash to prevent FRP lock or decryption failures in recovery.
 
+### Video Demonstration
+
+https://github.com/user-attachments/assets/2c2907af-a701-4a03-b035-3566c4f68938
+
 ---
 
 ## 4. 💾 Live Partition Manager
