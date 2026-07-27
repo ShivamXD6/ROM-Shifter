@@ -393,7 +393,6 @@ process_steps() {
             done
             generate_ors
             sync; sleep 2; rm -f "$STEP_FLASH" "$PIDFILE" "$MASTER_LIST"
-            exit 0
             reboot recovery
         fi
     else
