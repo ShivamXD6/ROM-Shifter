@@ -2,6 +2,8 @@
 **The Ultimate All-in-One Custom ROM Migration & Flashing Utility by [@BuildBytes](https://telegram.me/BuildBytes)**
 
 [![Downloads](https://img.shields.io/github/downloads/ShivamXD6/ROM-Shifter/total?color=green&style=for-the-badge)](https://github.com/ShivamXD6/ROM-Shifter/releases/latest)
+[![Join Build Bytes](https://img.shields.io/badge/Join-Build%20Bytes-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytes)
+[![Join Chat](https://img.shields.io/badge/Join%20Chat-Build%20Bytes%20Discussion-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytesDiscussion)
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android)](#)
 [![Shell](https://img.shields.io/badge/Language-Shell-4EAA25?style=for-the-badge&logo=gnu-bash)](#)
 [![Root](https://img.shields.io/badge/Requires-Root-red?style=for-the-badge)](#)
