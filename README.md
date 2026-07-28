@@ -19,8 +19,9 @@
 
 ### 📦 Faster & Lighter App Migrator (Beats Swift Backup)
 Powered by [DataBackup](https://github.com/ShivamXD6/Data-Backup) Module, ROM Shifter achieves mind-blowing speeds and better compression than premium alternatives.
-*   **Insane Speed (≈3× Faster):** Backups reach up to **~811.42 MB in just 10 seconds** (Internal Storage, 1 App) and **~509 MB in 34 seconds** (SD Card, 2 Apps).
-*   **Superior Compression:** Unlike Swift Backup, it compresses APK + Splits alongside the data. This yields sizes **~3% smaller for a single app** and **~15%+ smaller for bulk backups**.
+* **Insane Speed:** Achieves mind-blowing benchmarks—ranging from **~811.42 MB in 10 seconds** (Internal Storage, eMMC, 1 App) to **52.77 GB in just 7m 28s** (Internal Storage, UFS, 312 Apps), and **~509 MB in 34 seconds** (SD Card, 2 Apps).
+> **Note:** *Speeds automatically scale and optimize based on your device's hardware, delivering maximum possible I/O performance whether you use UFS, eMMC, or an SD Card*.
+* **Superior Compression:** Unlike Swift Backup, it completely compresses APKs + Splits alongside data. This yields backup sizes **~3% smaller for a single app** and **15%+ smaller for bulk backups** compared to the competition.
 *   **Comprehensive Selection:** Gives you granular control to backup App (Base/Splits), Data, ExtData (`Android/data`), Media, OBB, and Android ID (SSAID) in one single go. Also supports **system apps**.
 *   **Smart Restore Logic:** Automatically grants necessary runtime permissions, restores original UID/GID, and clears GMS tracking to prevent crash loops upon booting.
 *   **Zero Installation:** Operates entirely as a script. It leaves no trace in your app drawer and auto-removes its background caches once operations are complete.
