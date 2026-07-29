@@ -368,7 +368,7 @@ process_steps() {
     
     if screenlock_removed; then
         if [ "$SETTINGS_OPENED" -eq 1 ]; then
-            sleep 1; SETTINGS_OPENED=0; input keyevent 4; input keyevent 4
+            sleep 1; SETTINGS_OPENED=0;
         fi
         LOCK_OK=1
     else
