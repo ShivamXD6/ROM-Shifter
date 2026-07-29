@@ -374,7 +374,7 @@ process_steps() {
     else
         LOCK_OK=0
         if [ "$VALID_ZIPS" -gt 0 ] && [ "$SETTINGS_OPENED" -eq 0 ]; then
-            sleep 1; am start -a android.settings.SECURITY_SETTINGS >/dev/null 2>&1
+            sleep 1; am start --user 0 -a android.settings.SECURITY_SETTINGS >/dev/null 2>&1
             SETTINGS_OPENED=1
         fi
     fi
@@ -398,10 +398,11 @@ process_steps() {
     else
         FLASH_READY_STATE=0
         [ -f "$STEP_FLASH" ] && rm -f "$STEP_FLASH"
-        [ "$VALID_ZIPS" -eq 0 ] && \
+        if [ "$VALID_ZIPS" -eq 0 ]; then
             notify "Auto Flash" "Waiting for ZIPs...\nCopy files to: $FLASH"
-        [ "$LOCK_OK" -eq 0 ] && \
+        elif [ "$LOCK_OK" -eq 0 ]; then
             notify "Auto Flash" "Please remove screen lock before flashing."
+        fi
     fi
 }
 
