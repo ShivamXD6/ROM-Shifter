@@ -8,7 +8,7 @@
 [![Shell](https://img.shields.io/badge/Language-Shell-4EAA25?style=for-the-badge&logo=gnu-bash)](#)
 [![Root](https://img.shields.io/badge/Requires-Root-red?style=for-the-badge)](#)
 
-**ROM Shifter** is a highly advanced, pure shell-based utility designed to make Android custom ROM migrations painless, fast, and completely automated. Whether you want to backup apps with their exact states, flash multiple ZIPs automatically in a broken recovery, or manage live partitions, ROM Shifter does it all without needing an internet connection.
+**ROM Shifter** is a highly advanced, pure shell-based utility designed to make Android custom ROM migrations painless, fast, and completely automated. Whether you want to backup apps with their exact states, flash multiple ZIPs automatically in a broken recovery, or manage live partitions, ROM Shifter does it all without needing an internet connection. Also small in size ~1.3MB.
 
 ### 📖 [Read the Detailed Documentation Here!](docs.md)
 *Check out the documentation for a deep dive into every feature and video tutorials!*
