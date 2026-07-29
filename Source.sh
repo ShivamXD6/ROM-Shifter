@@ -1,5 +1,7 @@
 #!/system/bin/sh
 
+## Don't try to modify final ROM-Shifter.sh Script, it is highly sensitive to modifications, modifying it will break the script ##
+
 # ==========================================
 # ROM Shifter
 # by @BuildBytes
@@ -11,6 +13,8 @@ CACHE_DIR="$BIN_DIR/.cache"
 CONFIG_FILE="$BIN_DIR/.config"
 PORYGONZ="$BIN_DIR/porygonz"
 ZAPDOS="$BIN_DIR/zapdos"
+PORYGONZ_HASH="9f8461331e803e1170fde7df4c7ffd79b00f6252c0bce934f53b7c2ffc0400fb"
+ZAPDOS_HASH="a03b08f73703daf906c1c56316394dd22be8d5b63bec79dfddd430c8bce6af9c"
 JOBS=$(nproc 2>/dev/null || echo 4)
 
 AM_TMP="/data/local/tmp/appmgr_tmp"
@@ -29,26 +33,43 @@ banner() {
 EOF
 }
 
-ensure_root() {
-    [ "$(id -u)" != "0" ] && { echo "[-] Please run as root."; exit 1; }
-    mkdir -p "$BIN_DIR" "$CACHE_DIR" "$AM_TMP" "$AF_TMP"
-    
+verify_binaries() {
+    local actual_porygonz=$(sha256sum "$BIN_DIR/porygonz" 2>/dev/null | awk '{print $1}')
+    local actual_zapdos=$(sha256sum "$BIN_DIR/zapdos" 2>/dev/null | awk '{print $1}')
+
+    if [ "$actual_porygonz" != "$PORYGONZ_HASH" ]; then
+        echo "[-] ERROR: 'porygonz' binary is corrupted or tampered!" >&2
+        rm -f "$BIN_DIR/porygonz"
+        exit 1
+    fi
+
+    if [ "$actual_zapdos" != "$ZAPDOS_HASH" ]; then
+        echo "[-] ERROR: 'zapdos' binary is corrupted or tampered!" >&2
+        rm -f "$BIN_DIR/zapdos"
+        exit 1
+    fi
+}
+
+extract_binaries() {
     if [ ! -x "$BIN_DIR/porygonz" ]; then
-        echo -e "[+] Extracting 'porygonz' to core directory..."
-        echo "$PORYGONZ_B64" | base64 -d > "$BIN_DIR/porygonz" 2>/dev/null
+        echo -e "[+] Extracting 'porygonz'..."
+        awk '/^__PORYGONZ__/{flag=1; next} /^__ZAPDOS__/{flag=0} flag' "$0" | base64 -d | busybox gzip -d > "$BIN_DIR/porygonz" 2>/dev/null
         chmod +x "$BIN_DIR/porygonz"
     fi
 
     if [ ! -x "$BIN_DIR/zapdos" ]; then
-        echo -e "[+] Extracting 'zapdos' to core directory..."
-        echo "$ZAPDOS_B64" | base64 -d > "$BIN_DIR/zapdos" 2>/dev/null
+        echo -e "[+] Extracting 'zapdos'..."
+        awk '/^__ZAPDOS__/{flag=1; next} flag' "$0" | base64 -d | busybox gzip -d > "$BIN_DIR/zapdos" 2>/dev/null
         chmod +x "$BIN_DIR/zapdos"
     fi
-    
-    if [ ! -x "$BIN_DIR/porygonz" ] || [ ! -x "$BIN_DIR/zapdos" ]; then
-        echo "[-] Error: Failed to extract binaries. Check Base64 strings."
-        exit 1
-    fi
+
+    verify_binaries
+}
+
+ensure_root() {
+    [ "$(id -u)" != "0" ] && { echo "[-] Please run as root."; exit 1; }
+    mkdir -p "$BIN_DIR" "$CACHE_DIR" "$AM_TMP" "$AF_TMP"
+    extract_binaries
 }
 
 select_directory() {
@@ -1595,3 +1616,4 @@ while true; do
         *) echo "[-] Invalid option." ; sleep 1 ;;
     esac
 done
+
