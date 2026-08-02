@@ -38,7 +38,8 @@ ensure_root() {
 }
 
 init_shifter() {
-    MAIN_DIR="${1:-/sdcard/#Shifter}"
+    # Hardcoded to bypass scoped storage passing broken arguments from Android
+    MAIN_DIR="/sdcard/#Shifter"
     BACKUP_BASE="$MAIN_DIR/Data-Migrated"
     LP_DIR="$MAIN_DIR/Live-Partition"
     mkdir -p "$BACKUP_BASE" "$LP_DIR"
@@ -146,10 +147,13 @@ do_rom_backup() {
     echo "ACTION:INFO|MSG:Generating Meta lock..."
     getprop ro.build.display.id > "$DIR/meta_rom.txt"
 
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Backing up XML Settings..."; cp /data/system/users/0/settings_*.xml "$DIR/" 2>/dev/null; }
-    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Call Ringtones..."; cp /data/system_ce/0/ringtones/* "$DIR/ringtones/" 2>/dev/null; }
-    [ "$5" = "1" ] && { echo "ACTION:INFO|MSG:Backing up SMS Ringtones..."; cp /data/system_ce/0/notifications/* "$DIR/notifications/" 2>/dev/null; }
-    [ "$6" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Wallpaper..."; cp /data/system/users/0/wallpaper* "$DIR/" 2>/dev/null; }
+    [ "$1" = "1" ] && { echo "ACTION:INFO|MSG:Backing up XML Settings..."; cp -f /data/system/users/0/settings_*.xml "$DIR/" 2>/dev/null; }
+
+    # Check both CE and DE paths for Ringtones on modern Android
+    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Call Ringtones..."; cp -f /data/system_ce/0/ringtones/* "$DIR/ringtones/" 2>/dev/null; cp -f /data/system_de/0/ringtones/* "$DIR/ringtones/" 2>/dev/null; }
+    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Backing up SMS Ringtones..."; cp -f /data/system_ce/0/notifications/* "$DIR/notifications/" 2>/dev/null; cp -f /data/system_de/0/notifications/* "$DIR/notifications/" 2>/dev/null; }
+
+    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Wallpaper..."; cp -f /data/system/users/0/wallpaper* "$DIR/" 2>/dev/null; }
 
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
 }
@@ -173,10 +177,12 @@ do_rom_restore() {
         return
     fi
 
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Restoring XML Settings..."; cp "$DIR"/settings_*.xml /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/settings_*.xml; chown system:system /data/system/users/0/settings_*.xml; }
-    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Call Ringtones..."; cp "$DIR/ringtones/"* /data/system_ce/0/ringtones/ 2>/dev/null; }
-    [ "$5" = "1" ] && { echo "ACTION:INFO|MSG:Restoring SMS Ringtones..."; cp "$DIR/notifications/"* /data/system_ce/0/notifications/ 2>/dev/null; }
-    [ "$6" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Wallpaper..."; cp "$DIR"/wallpaper* /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/wallpaper*; chown system:system /data/system/users/0/wallpaper*; }
+    [ "$1" = "1" ] && { echo "ACTION:INFO|MSG:Restoring XML Settings..."; cp -f "$DIR"/settings_*.xml /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/settings_*.xml; chown system:system /data/system/users/0/settings_*.xml; }
+
+    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Call Ringtones..."; cp -f "$DIR/ringtones/"* /data/system_ce/0/ringtones/ 2>/dev/null; cp -f "$DIR/ringtones/"* /data/system_de/0/ringtones/ 2>/dev/null; }
+    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Restoring SMS Ringtones..."; cp -f "$DIR/notifications/"* /data/system_ce/0/notifications/ 2>/dev/null; cp -f "$DIR/notifications/"* /data/system_de/0/notifications/ 2>/dev/null; }
+
+    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Wallpaper..."; cp -f "$DIR"/wallpaper* /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/wallpaper*; chown system:system /data/system/users/0/wallpaper*; }
 
     echo "ACTION:INFO|MSG:Please REBOOT to apply ROM settings."
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
@@ -475,7 +481,7 @@ do_restore() {
 }
 
 ensure_root
-init_shifter "$2"
+init_shifter
 
 case "$1" in
     --backup) do_backup "$3" ;;
