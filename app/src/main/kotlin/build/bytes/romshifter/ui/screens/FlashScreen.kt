@@ -276,11 +276,8 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
     } else {
         Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                SectionHeader("Auto Flash", "Queue and flash ZIPs automatically")
+                SectionHeader("Flash Utilities", "Queue ZIPs and read/write raw partition images")
                 MenuCard("Launch Wizard", Icons.Default.FlashOn, "Setup wipes and select ZIP files to flash") { viewModel.openFlashWizard() }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader("Live Partitions", "Read/Write raw images safely")
                 MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { selectedPartition = ""; showBackupDialog = true }
                 MenuCard("Flash Partitions", Icons.Default.SystemUpdateAlt, "Flash images directly to active slot") { backedUpImages = viewModel.getBackedUpImages(); selectedPartition = ""; customImgPath = ""; restoreMode = "backup"; showRestoreDialog = true }
             }

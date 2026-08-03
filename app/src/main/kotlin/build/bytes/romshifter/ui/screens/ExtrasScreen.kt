@@ -23,36 +23,9 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.SectionHeader
-import kotlinx.coroutines.launch
 
 @Composable
 fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
-    var metaInstalled by remember { mutableStateOf(true) }
-    var showMetaWarningDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        metaInstalled = viewModel.isMetaModuleInstalled()
-    }
-
-    if (showMetaWarningDialog) {
-        AlertDialog(
-            onDismissRequest = { showMetaWarningDialog = false },
-            title = { Text("Meta-OverlayFS Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-            text = { Text("Modern KernelSU or APatch Android setups require the Meta module to mount apps systemlessly. Magisk mounts naturally, but you do not appear to be on Magisk. Please install Meta-OverlayFS.") },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.checkAndInstallMetaModule()
-                    showMetaWarningDialog = false
-                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
-                    Text("Install Module Now")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMetaWarningDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
 
     if (appState.migratorMode in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE)) {
         MigratorActionScreen(appState, viewModel)
@@ -61,18 +34,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 SectionHeader("Advanced Utilities", "Root tools and device modifications")
                 MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader("Systemizer", "Magisk systemless module generation")
-                MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely without resizing partitions") {
-                    scope.launch {
-                        if (viewModel.isMagisk() || metaInstalled) {
-                            viewModel.setMigratorMode(MigratorMode.SYSTEMIZE)
-                        } else {
-                            showMetaWarningDialog = true
-                        }
-                    }
-                }
+                MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") { viewModel.setMigratorMode(MigratorMode.SYSTEMIZE) }
             }
 
             AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically(), exit = shrinkVertically()) {

@@ -57,13 +57,6 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
     var doCall by remember { mutableStateOf(true) }
     var doContacts by remember { mutableStateOf(true) }
 
-    var showRomBackupDialog by remember { mutableStateOf(false) }
-    var showRomRestoreDialog by remember { mutableStateOf(false) }
-    var doSettings by remember { mutableStateOf(true) }
-    var doCallRing by remember { mutableStateOf(true) }
-    var doSmsRing by remember { mutableStateOf(true) }
-    var doWall by remember { mutableStateOf(true) }
-
     if (showPermissionWarning) {
         AlertDialog(
             onDismissRequest = {
@@ -159,102 +152,14 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    if (showRomBackupDialog) {
-        AlertDialog(
-            onDismissRequest = { showRomBackupDialog = false },
-            title = { Text("Backup ROM Specifics", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("Select items to securely export to storage:", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSettings = !doSettings }.fillMaxWidth()) {
-                        Checkbox(checked = doSettings, onCheckedChange = { doSettings = it })
-                        Text("ROM Settings & Config")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doCallRing = !doCallRing }.fillMaxWidth()) {
-                        Checkbox(checked = doCallRing, onCheckedChange = { doCallRing = it })
-                        Text("Custom Call Ringtones")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSmsRing = !doSmsRing }.fillMaxWidth()) {
-                        Checkbox(checked = doSmsRing, onCheckedChange = { doSmsRing = it })
-                        Text("Custom SMS/Alarm Ringtones")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doWall = !doWall }.fillMaxWidth()) {
-                        Checkbox(checked = doWall, onCheckedChange = { doWall = it })
-                        Text("Current Wallpaper")
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (doSettings || doCallRing || doSmsRing || doWall) viewModel.runRomDataOperation(isBackup = true, settings = doSettings, callRing = doCallRing, smsRing = doSmsRing, wall = doWall)
-                    showRomBackupDialog = false
-                }) { Text("Backup") }
-            },
-            dismissButton = { TextButton(onClick = { showRomBackupDialog = false }) { Text("Cancel") } }
-        )
-    }
-
-    if (showRomRestoreDialog) {
-        AlertDialog(
-            onDismissRequest = { showRomRestoreDialog = false },
-            title = { Text("Restore ROM Specifics", fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text("Select items to restore:", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSettings = !doSettings }.fillMaxWidth()) {
-                        Checkbox(checked = doSettings, onCheckedChange = { doSettings = it })
-                        Text("ROM Settings & Config")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doCallRing = !doCallRing }.fillMaxWidth()) {
-                        Checkbox(checked = doCallRing, onCheckedChange = { doCallRing = it })
-                        Text("Custom Call Ringtones")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSmsRing = !doSmsRing }.fillMaxWidth()) {
-                        Checkbox(checked = doSmsRing, onCheckedChange = { doSmsRing = it })
-                        Text("Custom SMS/Alarm Ringtones")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doWall = !doWall }.fillMaxWidth()) {
-                        Checkbox(checked = doWall, onCheckedChange = { doWall = it })
-                        Text("Current Wallpaper")
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (doSettings || doCallRing || doSmsRing || doWall) viewModel.runRomDataOperation(isBackup = false, settings = doSettings, callRing = doCallRing, smsRing = doSmsRing, wall = doWall)
-                    showRomRestoreDialog = false
-                }) { Text("Restore") }
-            },
-            dismissButton = { TextButton(onClick = { showRomRestoreDialog = false }) { Text("Cancel") } }
-        )
-    }
-
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            SectionHeader("Data & Apps Migrator", "Backup and restore your applications")
+            SectionHeader("Data & Apps Migrator", "Backup, restore, and manage your apps and telemetry data")
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup installed applications") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore apps from your migrated backups") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            SectionHeader("Native Telephony Data", "SMS and Call Logs")
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MenuCard("Backup Telephony Data", Icons.Default.CloudUpload, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
-                MenuCard("Restore Telephony Data", Icons.Default.RestorePage, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            SectionHeader("ROM Settings & Customization", "Wallpaper and System Settings")
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MenuCard("Backup ROM Data", Icons.Default.UploadFile, "Export Settings and Customizations") { showRomBackupDialog = true }
-                MenuCard("Restore ROM Data", Icons.Default.SettingsBackupRestore, "Import Customizations to new ROM") { showRomRestoreDialog = true }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            SectionHeader("Management", "Storage utilities")
+            MenuCard("Backup Telephony Data", Icons.Default.Sms, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
+            MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
             MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
-            MenuCard("Clear Native Data", Icons.Default.DeleteSweep, "Delete old SMS & Call Log backups from storage") { viewModel.clearNativeDataBackups(context) }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -375,7 +280,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Replace Hamburger with Select All icon for Restore Apps specifically
             if ((appState.migratorMode == MigratorMode.DEBLOAT && appState.isRestoreDebloatMode) || appState.migratorMode == MigratorMode.RESTORE_APPS) {
                 val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
                 FilledTonalIconButton(onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) }, modifier = Modifier.size(56.dp), shape = CircleShape) {

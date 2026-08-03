@@ -13,7 +13,6 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.models.ShifterEvent
 import build.bytes.romshifter.utils.BackendInstaller
-import build.bytes.romshifter.utils.ExtrasManager
 import build.bytes.romshifter.utils.FlashManager
 import build.bytes.romshifter.utils.MigratorManager
 import build.bytes.romshifter.utils.NativeTelephonyManager
@@ -170,49 +169,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) { Toast.makeText(context, "Native Backups Cleared", Toast.LENGTH_SHORT).show() }
         }
     }
-
-    fun runRomDataOperation(isBackup: Boolean, settings: Boolean, callRing: Boolean, smsRing: Boolean, wall: Boolean) {
-        _uiState.value = _uiState.value.copy(isRunning = true, currentAction = if (isBackup) "Backing up ROM Data..." else "Restoring ROM Data...", currentStep = "Requesting root shell...", logs = listOf("Starting ROM Data Migrator..."))
-        viewModelScope.launch(Dispatchers.IO) {
-            ExtrasManager.runRomDataOperation(isBackup, settings, callRing, smsRing, wall, _savedPath.value) { event ->
-                val currentLogs = _uiState.value.logs.toMutableList()
-                when (event) {
-                    is ShifterEvent.InfoStep -> { currentLogs.add("-> ${event.msg}"); _uiState.value = _uiState.value.copy(currentStep = event.msg, logs = currentLogs.takeLast(100)) }
-                    is ShifterEvent.GlobalDone -> {
-                        currentLogs.add("ROM operation successful!")
-                        _uiState.value = _uiState.value.copy(isRunning = false, currentAction = "Operation Completed!", progress = 100, currentStep = "Saved successfully.")
-                        autoHideProgress()
-                    }
-                    else -> {}
-                }
-            }
-        }
-    }
-
-    suspend fun isMagisk(): Boolean = withContext(Dispatchers.IO) {
-        Shell.cmd("su -c '[ -d /data/adb/magisk ] && echo YES'").exec().out.joinToString("").trim() == "YES"
-    }
-
-    fun checkAndInstallMetaModule() {
-        _uiState.value = _uiState.value.copy(isRunning = true, currentAction = "Installing Meta-OverlayFS...", currentStep = "Downloading module...", progress = 50, logs = listOf("Initiating install..."))
-        viewModelScope.launch(Dispatchers.IO) {
-            ExtrasManager.checkAndInstallMetaModule { event ->
-                val currentLogs = _uiState.value.logs.toMutableList()
-                when (event) {
-                    is ShifterEvent.InfoStep -> { currentLogs.add("-> ${event.msg}"); _uiState.value = _uiState.value.copy(currentStep = event.msg, logs = currentLogs.takeLast(100)) }
-                    // Crucial fix: Display the raw curl download logs live on the UI
-                    is ShifterEvent.RawLog -> { currentLogs.add(event.line); _uiState.value = _uiState.value.copy(logs = currentLogs.takeLast(100)) }
-                    is ShifterEvent.GlobalDone -> {
-                        _uiState.value = _uiState.value.copy(isRunning = false, currentAction = "Module Installed", progress = 100, currentStep = "Please Reboot.")
-                        autoHideProgress()
-                    }
-                    else -> {}
-                }
-            }
-        }
-    }
-
-    suspend fun isMetaModuleInstalled(): Boolean = ExtrasManager.isMetaModuleInstalled()
 
     fun toggleSystemApps() {
         val newState = !_uiState.value.showSystemApps
