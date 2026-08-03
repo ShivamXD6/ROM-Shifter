@@ -22,7 +22,9 @@ object ExtrasManager {
         val s3 = if (smsRing) "1" else "0"
         val s4 = if (wall) "1" else "0"
 
-        val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$savedPath' '$s1' '$s2' '$s3' '$s4'\""
+        // FIX: Changed "su -mm" to "su". Mount Master breaks Android's Binder IPC,
+        // which caused the 'Failed transaction (2147483646)' error for the settings command.
+        val command = "su -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$s1' '$s2' '$s3' '$s4'\""
 
         ShellEngine.executeShifterCommand(command).collect { event ->
             withContext(Dispatchers.Main) { onEvent(event) }
@@ -30,9 +32,17 @@ object ExtrasManager {
     }
 
     suspend fun checkAndInstallMetaModule(onEvent: (ShifterEvent) -> Unit) = withContext(Dispatchers.IO) {
-        val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --install-meta\""
-        ShellEngine.executeShifterCommand(command).collect { event ->
-            withContext(Dispatchers.Main) { onEvent(event) }
+        val command = "su -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --install-meta\""
+
+        try {
+            ShellEngine.executeShifterCommand(command).collect { event ->
+                withContext(Dispatchers.Main) { onEvent(event) }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                onEvent(ShifterEvent.RawLog("CRITICAL ERROR: ${e.message}"))
+                onEvent(ShifterEvent.GlobalDone("0", "0"))
+            }
         }
     }
 

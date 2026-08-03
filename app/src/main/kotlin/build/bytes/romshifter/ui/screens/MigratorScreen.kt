@@ -50,6 +50,9 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
     val context = LocalContext.current
     var showNativeBackupDialog by remember { mutableStateOf(false) }
     var showNativeRestoreDialog by remember { mutableStateOf(false) }
+    var showPermissionWarning by remember { mutableStateOf(false) }
+    var pendingNativeAction by remember { mutableStateOf<Pair<Boolean, Triple<Boolean, Boolean, Boolean>>?>(null) }
+
     var doSms by remember { mutableStateOf(true) }
     var doCall by remember { mutableStateOf(true) }
     var doContacts by remember { mutableStateOf(true) }
@@ -60,6 +63,31 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
     var doCallRing by remember { mutableStateOf(true) }
     var doSmsRing by remember { mutableStateOf(true) }
     var doWall by remember { mutableStateOf(true) }
+
+    if (showPermissionWarning) {
+        AlertDialog(
+            onDismissRequest = {
+                showPermissionWarning = false
+                Toast.makeText(context, "Permissions are required to process telephony data", Toast.LENGTH_SHORT).show()
+            },
+            title = { Text("Native Permissions Required", fontWeight = FontWeight.Bold) },
+            text = { Text("ROM Shifter will automatically grant the necessary native Android permissions via root to access SMS, Call Logs, or Contacts based on your selection. Do you want to continue?", style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                Button(onClick = {
+                    showPermissionWarning = false
+                    pendingNativeAction?.let { (isBackup, flags) ->
+                        viewModel.runNativeDataOperation(context, isBackup, flags.first, flags.second, flags.third)
+                    }
+                }) { Text("Yes, Start") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPermissionWarning = false
+                    Toast.makeText(context, "Permissions are required to process telephony data", Toast.LENGTH_SHORT).show()
+                }) { Text("No, Cancel") }
+            }
+        )
+    }
 
     if (showNativeBackupDialog) {
         AlertDialog(
@@ -85,7 +113,10 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             },
             confirmButton = {
                 Button(onClick = {
-                    if (doSms || doCall || doContacts) viewModel.runNativeDataOperation(context, isBackup = true, doSms = doSms, doCall = doCall, doContacts = doContacts)
+                    if (doSms || doCall || doContacts) {
+                        pendingNativeAction = Pair(true, Triple(doSms, doCall, doContacts))
+                        showPermissionWarning = true
+                    }
                     showNativeBackupDialog = false
                 }) { Text("Backup") }
             },
@@ -117,7 +148,10 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             },
             confirmButton = {
                 Button(onClick = {
-                    if (doSms || doCall || doContacts) viewModel.runNativeDataOperation(context, isBackup = false, doSms = doSms, doCall = doCall, doContacts = doContacts)
+                    if (doSms || doCall || doContacts) {
+                        pendingNativeAction = Pair(false, Triple(doSms, doCall, doContacts))
+                        showPermissionWarning = true
+                    }
                     showNativeRestoreDialog = false
                 }) { Text("Restore") }
             },
@@ -143,7 +177,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSmsRing = !doSmsRing }.fillMaxWidth()) {
                         Checkbox(checked = doSmsRing, onCheckedChange = { doSmsRing = it })
-                        Text("Custom SMS Ringtones")
+                        Text("Custom SMS/Alarm Ringtones")
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doWall = !doWall }.fillMaxWidth()) {
                         Checkbox(checked = doWall, onCheckedChange = { doWall = it })
@@ -179,7 +213,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSmsRing = !doSmsRing }.fillMaxWidth()) {
                         Checkbox(checked = doSmsRing, onCheckedChange = { doSmsRing = it })
-                        Text("Custom SMS Ringtones")
+                        Text("Custom SMS/Alarm Ringtones")
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doWall = !doWall }.fillMaxWidth()) {
                         Checkbox(checked = doWall, onCheckedChange = { doWall = it })
@@ -205,42 +239,16 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader("Native Telephony Data", "SMS and Call Logs")
-            Row(modifier = Modifier.fillMaxWidth()) {
-                ElevatedCard(modifier = Modifier.weight(1f).clickable { showNativeBackupDialog = true }, shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.CloudUpload, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Backup", fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                ElevatedCard(modifier = Modifier.weight(1f).clickable { showNativeRestoreDialog = true }, shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.RestorePage, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Restore", fontWeight = FontWeight.Bold)
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MenuCard("Backup Telephony Data", Icons.Default.CloudUpload, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
+                MenuCard("Restore Telephony Data", Icons.Default.RestorePage, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader("ROM Settings & Customization", "Wallpaper and System Settings")
-            Row(modifier = Modifier.fillMaxWidth()) {
-                ElevatedCard(modifier = Modifier.weight(1f).clickable { showRomBackupDialog = true }, shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.UploadFile, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Backup", fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                ElevatedCard(modifier = Modifier.weight(1f).clickable { showRomRestoreDialog = true }, shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.SettingsBackupRestore, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("Restore", fontWeight = FontWeight.Bold)
-                    }
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MenuCard("Backup ROM Data", Icons.Default.UploadFile, "Export Settings and Customizations") { showRomBackupDialog = true }
+                MenuCard("Restore ROM Data", Icons.Default.SettingsBackupRestore, "Import Customizations to new ROM") { showRomRestoreDialog = true }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -367,7 +375,8 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            if (appState.migratorMode == MigratorMode.DEBLOAT && appState.isRestoreDebloatMode) {
+            // Replace Hamburger with Select All icon for Restore Apps specifically
+            if ((appState.migratorMode == MigratorMode.DEBLOAT && appState.isRestoreDebloatMode) || appState.migratorMode == MigratorMode.RESTORE_APPS) {
                 val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
                 FilledTonalIconButton(onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) }, modifier = Modifier.size(56.dp), shape = CircleShape) {
                     Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
@@ -380,14 +389,14 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         if (appState.migratorMode == MigratorMode.DEBLOAT) {
                             DropdownMenuItem(
-                                text = { Text("Restore System Apps") },
+                                text = { Text("Restore Debloated Apps") },
                                 trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) },
                                 onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false }
                             )
                             HorizontalDivider()
                         }
 
-                        if (!appState.isRestoreDebloatMode) {
+                        if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.RESTORE_APPS) {
                             DropdownMenuItem(
                                 text = { Text("Show User Apps") },
                                 trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) },

@@ -4,8 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -100,7 +100,11 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
             )
         },
         bottomBar = {
-            AnimatedVisibility(visible = !showSettings && appState.flashWizardStep == 0 && appState.migratorMode == MigratorMode.MENU, enter = expandVertically(), exit = shrinkVertically()) {
+            AnimatedVisibility(
+                visible = !showSettings && appState.flashWizardStep == 0 && appState.migratorMode == MigratorMode.MENU,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 NavigationBar(tonalElevation = 8.dp) {
                     tabs.forEachIndexed { index, tab ->
                         NavigationBarItem(
@@ -165,7 +169,14 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 Spacer(Modifier.height(16.dp))
                 Text("ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. You can auto-detect an existing one or select manually.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(32.dp))
-                Button(onClick = { viewModel.autoDetectShifterFolder(); step = 3 }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Auto-Detect #Shifter Folder") }
+                Button(
+                    onClick = {
+                        viewModel.autoDetectShifterFolder { success ->
+                            if (success) step = 3
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)
+                ) { Text("Auto-Detect #Shifter Folder") }
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { launcher.launch(null) }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Select Folder Manually") }
             }

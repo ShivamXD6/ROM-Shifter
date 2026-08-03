@@ -9,7 +9,6 @@ import java.io.File
 
 object SettingsManager {
 
-    // Fixes the Hardcoded /sdcard/ warning
     fun getDefaultPath(): String {
         return "${Environment.getExternalStorageDirectory().absolutePath}/#Shifter"
     }
@@ -18,12 +17,12 @@ object SettingsManager {
         if (oldPath != newPath && oldPath.isNotBlank() && newPath.isNotBlank()) {
             Shell.cmd("su -mm -c \"mkdir -p '$newPath' && touch '$newPath/.shifter_dir'\"").exec()
             Shell.cmd("su -mm -c \"mv '$oldPath'/* '$newPath'/ 2>/dev/null; rm -rf '$oldPath'\"").exec()
-            prefs.edit { putString("base_path", newPath) } // Fixes SharedPreferences warning
+            prefs.edit { putString("base_path", newPath) }
         }
     }
 
     fun autoDetectFolder(prefs: SharedPreferences): String? {
-        val out = Shell.cmd("su -c \"find /sdcard -maxdepth 3 -type f -name '.shifter_dir' 2>/dev/null | head -n 1\"").exec().out.joinToString("").trim()
+        val out = Shell.cmd("su -mm -c \"find /storage /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name '.shifter_dir' 2>/dev/null | head -n 1\"").exec().out.joinToString("").trim()
         if (out.isNotEmpty()) {
             val detectedPath = out.substringBeforeLast("/")
             prefs.edit { putString("base_path", detectedPath) }

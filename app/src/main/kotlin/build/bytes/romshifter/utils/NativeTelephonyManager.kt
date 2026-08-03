@@ -33,8 +33,12 @@ object NativeTelephonyManager {
         val backupDir = "$savedPath/Native"
         Shell.cmd("su -c 'mkdir -p \"$backupDir\"'").exec()
 
-        val perms = listOf("READ_SMS", "WRITE_SMS", "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_CONTACTS", "WRITE_CONTACTS")
-        perms.forEach { Shell.cmd("su -c 'pm grant $pkg android.permission.$it'").exec() }
+        val permsToGrant = mutableListOf<String>()
+        if (doSms) permsToGrant.addAll(listOf("READ_SMS", "WRITE_SMS"))
+        if (doCall) permsToGrant.addAll(listOf("READ_CALL_LOG", "WRITE_CALL_LOG"))
+        if (doContacts) permsToGrant.addAll(listOf("READ_CONTACTS", "WRITE_CONTACTS"))
+
+        permsToGrant.forEach { Shell.cmd("su -c 'pm grant $pkg android.permission.$it'").exec() }
 
         if (isBackup) {
             if (doSms) {

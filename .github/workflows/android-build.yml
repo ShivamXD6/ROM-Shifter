@@ -17,16 +17,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle' # Speeds up future builds
+          cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ROM-Shifter-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: ROM-Shifter-Release
+          path: app/build/outputs/apk/release/*.apk

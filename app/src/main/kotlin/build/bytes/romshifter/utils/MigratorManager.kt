@@ -12,6 +12,8 @@ import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.models.ShifterEvent
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -19,64 +21,102 @@ import java.util.Locale
 
 object MigratorManager {
 
+    private var userAppsCache: List<AppInfo>? = null
+    private var sysAppsCache: List<AppInfo>? = null
+    private var uninstalledCache: List<AppInfo>? = null
+
+    fun clearCache() {
+        userAppsCache = null
+        sysAppsCache = null
+        uninstalledCache = null
+    }
+
     suspend fun fetchAppsList(context: Context, currentPath: String, type: String, append: Boolean, currentList: List<AppInfo>): List<AppInfo> = withContext(Dispatchers.IO) {
-        val apps = if (append) currentList.toMutableList() else mutableListOf()
+
+        if (!append) {
+            when (type) {
+                "User" -> userAppsCache?.let { return@withContext it }
+                "System" -> sysAppsCache?.let { return@withContext it }
+                "Uninstalled" -> uninstalledCache?.let { return@withContext it }
+            }
+        }
+
         val pm = context.packageManager
+        val apps = if (append) currentList.toMutableList() else mutableListOf()
 
         when (type) {
             "User", "System", "AllInstalled" -> {
-                val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                for (app in installedApps) {
-                    val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    if (type == "AllInstalled" || (type == "System" && isSys) || (type == "User" && !isSys)) {
-                        val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
-                        val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
-                        val icon = app.loadIcon(pm)
-                        val version = try { pm.getPackageInfo(app.packageName, 0).versionName?.replace("|", "")?.replace("\n", "")?.trim() ?: "" } catch(_: Exception) { "" }
-                        apps.add(AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, icon = icon))
+                val installedApps = pm.getInstalledApplications(0)
+                // Use parallel async to load apps instantly
+                val fetchedApps = installedApps.map { app ->
+                    async(Dispatchers.IO) {
+                        val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                        if (type == "AllInstalled" || (type == "System" && isSys) || (type == "User" && !isSys)) {
+                            val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
+                            val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
+                            val icon = try { app.loadIcon(pm) } catch(_: Exception) { null }
+                            val version = try { pm.getPackageInfo(app.packageName, 0).versionName?.replace("|", "")?.replace("\n", "")?.trim() ?: "" } catch(_: Exception) { "" }
+                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, icon = icon)
+                        } else null
                     }
-                }
+                }.awaitAll().filterNotNull()
+                apps.addAll(fetchedApps)
             }
             "Uninstalled" -> {
                 val allApps = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
                 val activeApps = pm.getInstalledApplications(0).map { it.packageName }.toSet()
-                for (app in allApps) {
-                    if (!activeApps.contains(app.packageName)) {
-                        val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
-                        val icon = try { app.loadIcon(pm) } catch(_: Exception) { null }
-                        apps.add(AppInfo(label = label, packageName = app.packageName, isSystem = isSys, icon = icon))
+
+                val fetchedApps = allApps.map { app ->
+                    async(Dispatchers.IO) {
+                        if (!activeApps.contains(app.packageName)) {
+                            val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                            val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
+                            val icon = try { app.loadIcon(pm) } catch(_: Exception) { null }
+                            AppInfo(label = label, packageName = app.packageName, isSystem = isSys, icon = icon)
+                        } else null
                     }
-                }
+                }.awaitAll().filterNotNull()
+                apps.addAll(fetchedApps)
             }
             "RestoreUser", "RestoreSystem", "AllBackups" -> {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
-
-                // Note: You might see minor yellow warnings on the next line about "escaped dollar characters".
-                // Ignore them! This is perfectly valid and fixes the compiler crash.
                 val command = "su -mm -c 'for f in \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt; do if [ -f \"\$f\" ]; then dir=\"\$(dirname \"\$f\")\"; sysType=\"\$(basename \"\$(dirname \"\$dir\")\")\"; echo \"\$sysType|\$(grep \"^Name=\" \"\$f\" | cut -d= -f2)|\$(grep \"^Package=\" \"\$f\" | cut -d= -f2)|\$(grep \"^Version=\" \"\$f\" | cut -d= -f2)|\$dir/Icon.png\"; fi done'"
 
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
-                result.out.forEach { line ->
-                    val parts = line.split("|")
-                    if (parts.size >= 4 && parts[1].isNotBlank() && parts[2].isNotBlank()) {
-                        val isSys = parts[0] == "System"
-                        val pkg = parts[2].replace("\n", "").trim()
-                        var icon: Drawable? = try { pm.getApplicationIcon(pkg) } catch (_: Exception) { null }
+                val deferredBackups = result.out.map { line ->
+                    async(Dispatchers.IO) {
+                        val parts = line.split("|")
+                        if (parts.size >= 4 && parts[1].isNotBlank() && parts[2].isNotBlank()) {
+                            val isSys = parts[0] == "System"
+                            val pkg = parts[2].replace("\n", "").trim()
+                            var icon: Drawable? = try { pm.getApplicationIcon(pkg) } catch (_: Exception) { null }
 
-                        if (icon == null && parts.size >= 5) {
-                            val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
-                            Shell.cmd("su -mm -c \"cp '${parts[4]}' '${cacheFile.absolutePath}' && chmod 644 '${cacheFile.absolutePath}'\"").exec()
-                            if (cacheFile.exists() && cacheFile.length() > 0) icon = Drawable.createFromPath(cacheFile.absolutePath)
-                        }
-                        apps.add(AppInfo(label = parts[1], packageName = pkg, version = parts[3], isSystem = isSys, icon = icon))
+                            if (icon == null && parts.size >= 5) {
+                                val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
+                                Shell.cmd("su -mm -c \"cp '${parts[4]}' '${cacheFile.absolutePath}' && chmod 644 '${cacheFile.absolutePath}'\"").exec()
+                                if (cacheFile.exists() && cacheFile.length() > 0) icon = Drawable.createFromPath(cacheFile.absolutePath)
+                            }
+                            AppInfo(label = parts[1], packageName = pkg, version = parts[3], isSystem = isSys, icon = icon)
+                        } else null
                     }
                 }
+                apps.addAll(deferredBackups.awaitAll().filterNotNull())
             }
         }
-        return@withContext apps.distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
+
+        val finalApps = apps.distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
+
+        if (!append) {
+            when (type) {
+                "User" -> userAppsCache = finalApps
+                "System" -> sysAppsCache = finalApps
+                "Uninstalled" -> uninstalledCache = finalApps
+            }
+        }
+
+        return@withContext finalApps
     }
 
     suspend fun runDynamicOperation(
@@ -138,7 +178,7 @@ object MigratorManager {
             if (state.migratorMode == MigratorMode.SYSTEMIZE) {
                 val modDir = "/data/adb/modules/romshifter_systemized"
                 Shell.cmd("su -c 'mkdir -p $modDir/system/priv-app'").exec()
-                Shell.cmd("su -c 'echo \"id=romshifter_systemized\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps un-uninstallable.\" > $modDir/module.prop'").exec()
+                Shell.cmd("su -c 'echo \"id=roms-shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps un-uninstallable.\" > $modDir/module.prop'").exec()
 
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Systemizing ${app.label}", "", ((index + 1) * 100) / selectedApps.size)
@@ -165,6 +205,8 @@ object MigratorManager {
 
             val operation = if (state.migratorMode.name.contains("RESTORE")) "--restore" else "--backup"
             val compsString = state.globalComponents.sorted().joinToString(" ")
+
+            // This invokes the shell script with proper parameters
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString'\""
 
             ShellEngine.executeShifterCommand(command).collect { event ->

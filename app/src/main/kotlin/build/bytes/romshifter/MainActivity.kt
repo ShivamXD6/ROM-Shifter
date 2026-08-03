@@ -37,7 +37,8 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("shifter_prefs", MODE_PRIVATE)
         setContent {
             val context = LocalContext.current
-            var isDarkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", false)) }
+            // Changed default from false to true to enforce Dark Theme initially
+            var isDarkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
             val colorScheme = when {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> { if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
                 isDarkTheme -> darkColorScheme()

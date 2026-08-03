@@ -48,12 +48,7 @@ init_shifter() {
 COOLDOWN() { while [ "$(jobs | grep -c 'Running')" -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
 SANITIZE() { echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'; }
 
-CHK() {
-    case " $APP_COMPS " in
-        *" $1 "*) return 0 ;;
-        *) return 1 ;;
-    esac
-}
+CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
 
 RAW_SIZE() {
     local sum=0
@@ -107,39 +102,67 @@ UNBUNDAPP() {
 
 # --- Systemizer Meta Module Installer ---
 install_meta_module() {
-    local DL_PATH="/sdcard/Download/meta-overlayfs.zip"
-    echo "ACTION:INFO|MSG:Downloading Meta-OverlayFS to Downloads..."
-
+    local DL_PATH="/sdcard/Download/meta-overlayfs-v1.3.1.zip"
     local URL="https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/download/v1.3.1/meta-overlayfs-v1.3.1.zip"
-    curl -k -L -f -o "$DL_PATH" "$URL" || wget --no-check-certificate -qO "$DL_PATH" "$URL"
 
+    mkdir -p /sdcard/Download
+
+    # 1. Verify existence before downloading
+    if [ -f "$DL_PATH" ]; then
+        local EXISTING_SIZE=$(stat -c%s "$DL_PATH" 2>/dev/null || echo 0)
+        if [ "$EXISTING_SIZE" -gt 100000 ]; then
+            echo "ACTION:RAW_LOG|MSG:Module zip already exists in Downloads ($EXISTING_SIZE bytes). Skipping download."
+        else
+            echo "ACTION:RAW_LOG|MSG:Existing file corrupted. Deleting..."
+            rm -f "$DL_PATH"
+        fi
+    fi
+
+    # 2. Download if it doesn't exist
+    if [ ! -f "$DL_PATH" ]; then
+        echo "ACTION:INFO|MSG:Downloading Meta-OverlayFS..."
+        echo "ACTION:RAW_LOG|MSG:Fetching zip via cURL..."
+        curl -k -L -f -v -o "$DL_PATH" "$URL" 2>&1 | while read -r line; do
+            echo "ACTION:RAW_LOG|MSG:$line"
+        done
+    fi
+
+    # 3. Final Verification
     local ZIP_SIZE=$(stat -c%s "$DL_PATH" 2>/dev/null || echo 0)
     if [ "$ZIP_SIZE" -lt 100000 ]; then
-        echo "ACTION:INFO|MSG:Download corrupted (9B). Check internet or GitHub status."
+        echo "ACTION:INFO|MSG:Download failed."
+        echo "ACTION:RAW_LOG|MSG:Download corrupted ($ZIP_SIZE bytes). Aborting."
         rm -f "$DL_PATH"
         echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
         return
     fi
 
-    echo "ACTION:INFO|MSG:Detecting Root Implementation..."
-    local ADBDIR="/data/adb"
-    local ROOT="Unknown"
-    local CMD=""
+    echo "ACTION:INFO|MSG:Ready to install. Detecting root manager..."
+    echo "ACTION:RAW_LOG|MSG:ZIP Verified successfully ($ZIP_SIZE bytes)."
 
-    if [ -d "$ADBDIR/magisk" ] && magisk -V >/dev/null 2>&1; then
+    local ROOT="Unknown"; local CMD=""
+    if [ -d "/data/adb/magisk" ] && magisk -V >/dev/null 2>&1; then
         ROOT="Magisk"; CMD="magisk --install-module"
-    elif [ -d "$ADBDIR/ksu" ] && ksud -V >/dev/null 2>&1; then
+    elif [ -d "/data/adb/ksu" ] && ksud -V >/dev/null 2>&1; then
         ROOT="KernelSU"; CMD="ksud module install"
-    elif [ -d "$ADBDIR/ap" ] && apd -V >/dev/null 2>&1; then
+    elif [ -d "/data/adb/ap" ] && apd -V >/dev/null 2>&1; then
         ROOT="APatch"; CMD="apd module install"
     fi
 
     if [ "$ROOT" = "Unknown" ]; then
-        echo "ACTION:INFO|MSG:Cannot determine root (Magisk/KSU/APatch not found)."
+        echo "ACTION:INFO|MSG:Root manager not found."
+        echo "ACTION:RAW_LOG|MSG:Cannot determine root implementation (Magisk/KSU/APatch)."
     else
-        echo "ACTION:INFO|MSG:Found $ROOT. Installing module..."
-        $CMD "$DL_PATH" >/dev/null 2>&1
-        echo "ACTION:INFO|MSG:Installation complete! Please Reboot."
+        echo "ACTION:INFO|MSG:Installing via $ROOT..."
+        echo "ACTION:RAW_LOG|MSG:Executing command: $CMD $DL_PATH"
+
+        # 4. Stream actual installation process logs to UI
+        $CMD "$DL_PATH" 2>&1 | while read -r line; do
+            echo "ACTION:RAW_LOG|MSG:$line"
+        done
+
+        echo "ACTION:RAW_LOG|MSG:Installation command finished."
+        echo "ACTION:INFO|MSG:Installation Complete! Please Reboot."
     fi
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
 }
@@ -149,25 +172,30 @@ do_rom_backup() {
     local DIR="$BACKUP_BASE/ROM_Data"
     mkdir -p "$DIR" "$DIR/media_audio"
 
-    echo "ACTION:INFO|MSG:Extracting specific ROM Name..."
-    local ROM_NAME=$(getprop ro.modversion)
-    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.evolution.version)
-    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.crdroid.version)
-    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.lineage.version)
-    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.build.display.id)
-    echo "${ROM_NAME:-Unknown ROM}" > "$DIR/meta_rom.txt"
+    # Purged meta_rom.txt completely
 
-    [ "$1" = "1" ] && {
+    if [ "$1" = "1" ] || [ "$1" = "true" ]; then
         echo "ACTION:INFO|MSG:Backing up Settings via native CLI..."
-        /system/bin/cmd settings list system > "$DIR/system_settings.txt" 2>/dev/null
-        /system/bin/cmd settings list secure > "$DIR/secure_settings.txt" 2>/dev/null
-        /system/bin/cmd settings list global > "$DIR/global_settings.txt" 2>/dev/null
-    }
+        # Due to su vs su -mm fix, Binder IPC is restored. Direct settings will not throw 2147483646.
+        settings list system > "$DIR/system_settings.txt" 2>/dev/null || /system/bin/settings list system > "$DIR/system_settings.txt" 2>/dev/null
+        settings list secure > "$DIR/secure_settings.txt" 2>/dev/null || /system/bin/settings list secure > "$DIR/secure_settings.txt" 2>/dev/null
+        settings list global > "$DIR/global_settings.txt" 2>/dev/null || /system/bin/settings list global > "$DIR/global_settings.txt" 2>/dev/null
+    fi
 
-    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Call Ringtones..."; find /sdcard/Ringtones -maxdepth 2 -type f -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null; }
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Backing up SMS/Alarms..."; find /sdcard/Notifications /sdcard/Alarms -maxdepth 2 -type f -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null; }
+    if [ "$2" = "1" ] || [ "$2" = "true" ]; then
+        echo "ACTION:INFO|MSG:Backing up Call Ringtones..."
+        find /sdcard/Ringtones -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.flac" -o -iname "*.m4a" \) -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null
+    fi
 
-    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Wallpaper..."; cp -f /data/system/users/0/wallpaper* "$DIR/" 2>/dev/null; }
+    if [ "$3" = "1" ] || [ "$3" = "true" ]; then
+        echo "ACTION:INFO|MSG:Backing up SMS/Alarms..."
+        find /sdcard/Notifications /sdcard/Alarms -maxdepth 2 -type f \( -iname "*.mp3" -o -iname "*.ogg" -o -iname "*.wav" -o -iname "*.flac" -o -iname "*.m4a" \) -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null
+    fi
+
+    if [ "$4" = "1" ] || [ "$4" = "true" ]; then
+        echo "ACTION:INFO|MSG:Backing up Wallpaper..."
+        cp -f /data/system/users/0/wallpaper* "$DIR/" 2>/dev/null
+    fi
 
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
 }
@@ -175,13 +203,7 @@ do_rom_backup() {
 do_rom_restore() {
     local DIR="$BACKUP_BASE/ROM_Data"
 
-    if [ ! -f "$DIR/meta_rom.txt" ]; then
-        echo "ACTION:INFO|MSG:No backup found!"
-        echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
-        return
-    fi
-
-    [ "$1" = "1" ] && {
+    if [ "$1" = "1" ] || [ "$1" = "true" ]; then
         echo "ACTION:INFO|MSG:Injecting Settings via native CLI..."
         local SETTINGS_CMD="/system/bin/cmd settings put"
         /system/bin/cmd settings list system >/dev/null 2>&1 || SETTINGS_CMD="/system/bin/settings put"
@@ -189,12 +211,25 @@ do_rom_restore() {
         [ -s "$DIR/system_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD system "$key" "$val" 2>/dev/null; done < "$DIR/system_settings.txt"
         [ -s "$DIR/secure_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD secure "$key" "$val" 2>/dev/null; done < "$DIR/secure_settings.txt"
         [ -s "$DIR/global_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD global "$key" "$val" 2>/dev/null; done < "$DIR/global_settings.txt"
-    }
+    fi
 
-    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Call Ringtones..."; cp -f "$DIR/media_audio/"* /sdcard/Ringtones/ 2>/dev/null; }
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Restoring SMS/Alarms..."; cp -f "$DIR/media_audio/"* /sdcard/Notifications/ 2>/dev/null; cp -f "$DIR/media_audio/"* /sdcard/Alarms/ 2>/dev/null; }
+    if [ "$2" = "1" ] || [ "$2" = "true" ]; then
+        echo "ACTION:INFO|MSG:Restoring Call Ringtones..."
+        cp -f "$DIR/media_audio/"* /sdcard/Ringtones/ 2>/dev/null
+    fi
 
-    [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Wallpaper..."; cp -f "$DIR"/wallpaper* /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/wallpaper*; chown system:system /data/system/users/0/wallpaper*; }
+    if [ "$3" = "1" ] || [ "$3" = "true" ]; then
+        echo "ACTION:INFO|MSG:Restoring SMS/Alarms..."
+        cp -f "$DIR/media_audio/"* /sdcard/Notifications/ 2>/dev/null
+        cp -f "$DIR/media_audio/"* /sdcard/Alarms/ 2>/dev/null
+    fi
+
+    if [ "$4" = "1" ] || [ "$4" = "true" ]; then
+        echo "ACTION:INFO|MSG:Restoring Wallpaper..."
+        cp -f "$DIR"/wallpaper* /data/system/users/0/ 2>/dev/null
+        chmod 600 /data/system/users/0/wallpaper*
+        chown system:system /data/system/users/0/wallpaper*
+    fi
 
     echo "ACTION:INFO|MSG:Please REBOOT to apply ROM settings."
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
