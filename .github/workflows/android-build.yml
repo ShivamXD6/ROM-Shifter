@@ -2,7 +2,7 @@ name: Build Android App
 
 on:
   push:
-    branches: [ "main" ] # Triggers the build every time you push to main
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -22,8 +22,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
+      - name: Building ROM Shifter APK
+        run: ./gradlew assembleRelease --no-daemon --console=plain --info
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
