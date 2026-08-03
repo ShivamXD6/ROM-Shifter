@@ -94,7 +94,16 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Support via Supermoney, GPay, PhonePe, Paytm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Support via PhonePe, Paytm, BHIM", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://i.ibb.co/5g4J2RXR/1f38d6d7-a8a2-4696-88e6-9cf503e0592c.png") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Donate via Google Pay", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Scan QR or direct link", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
