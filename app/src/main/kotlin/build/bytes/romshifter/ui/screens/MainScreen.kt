@@ -1,5 +1,9 @@
 package build.bytes.romshifter.ui.screens
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +27,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.MigratorMode
+
+// Helper function to launch intents securely
+fun openUriSafely(context: Context, uriString: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriString)))
+    } catch (e: Exception) {
+        Toast.makeText(context, "No suitable app found to open this link.", Toast.LENGTH_SHORT).show()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,6 +147,7 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
 
 @Composable
 fun OnboardingWizard(viewModel: MainViewModel) {
+    val context = LocalContext.current
     var step by remember { mutableIntStateOf(1) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -148,7 +162,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
     }
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        viewModel.finishOnboarding()
+        step = 4
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -196,9 +210,32 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         android.Manifest.permission.READ_CONTACTS,
                         android.Manifest.permission.WRITE_CONTACTS
                     ))
-                }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Grant Permissions & Finish") }
+                }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Grant Permissions & Next") }
                 Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { viewModel.finishOnboarding() }) { Text("Skip for now") }
+                TextButton(onClick = { step = 4 }) { Text("Skip for now") }
+            }
+            4 -> {
+                Icon(Icons.Default.Favorite, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(24.dp))
+                Text("About & Support", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text("Developed with ♥ by all the Build Bytes team.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Text("If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(24.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = { openUriSafely(context, "https://t.me/buildbytes") }, modifier = Modifier.weight(1f)) { Text("Telegram") }
+                    OutlinedButton(onClick = { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }, modifier = Modifier.weight(1f)) { Text("GitHub") }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f)) { Text("Donate UPI") }
+                    Button(onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") }, modifier = Modifier.weight(1f)) { Text("PayPal") }
+                }
+
+                Spacer(Modifier.height(32.dp))
+                Button(onClick = { viewModel.finishOnboarding() }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Let's Shift!") }
             }
         }
     }
