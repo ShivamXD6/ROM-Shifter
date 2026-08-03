@@ -70,7 +70,7 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
                 MigratorMode.RESTORE_APPS -> "Restore Apps"
                 MigratorMode.MANAGE -> "Manage Backups"
                 MigratorMode.DEBLOAT -> "Debloat / Restore Apps"
-                MigratorMode.SYSTEMIZE -> "Systemize Apps"
+                MigratorMode.SYSTEMIZE -> "Systemize User Apps"
                 else -> "ROM Shifter"
             }
         }
@@ -87,11 +87,16 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (dynamicTitle == "ROM Shifter") {
+                    if (dynamicTitle == "ROM Shifter") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Bolt, contentDescription = "Logo", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                             Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(text = dynamicTitle, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.SansSerif, letterSpacing = 0.5.sp)
+                                Text("by @BuildBytes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            }
                         }
+                    } else {
                         Text(text = dynamicTitle, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.SansSerif, letterSpacing = 0.5.sp)
                     }
                 },
@@ -173,7 +178,9 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 Text("Get Started with", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("ROM Shifter", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
-                Text("The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely. Let's get things set up.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Text("Developed by @ShastikXD & the @BuildBytes team.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(32.dp))
                 Button(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Next") }
             }
@@ -219,7 +226,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 Spacer(Modifier.height(24.dp))
                 Text("About & Support", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Text("Developed with ♥ by all the Build Bytes team.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                Text("Made by @ShastikXD | Build Bytes Team", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
                 Text("If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(24.dp))
@@ -230,7 +237,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f)) { Text("Donate UPI") }
+                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f)) { Text("UPI") }
+                    Button(onClick = { openUriSafely(context, "https://i.ibb.co/5g4J2RXR/1f38d6d7-a8a2-4696-88e6-9cf503e0592c.png") }, modifier = Modifier.weight(1f)) { Text("GPay") }
                     Button(onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") }, modifier = Modifier.weight(1f)) { Text("PayPal") }
                 }
 

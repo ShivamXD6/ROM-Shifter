@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
@@ -39,6 +40,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
     val isEditing = inputPath != savedPath
     val currentFolderName = savedPath.trimEnd('/').substringAfterLast('/')
     var showResetDialog by remember { mutableStateOf(false) }
+    var showAboutSheet by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -61,6 +63,67 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
             confirmButton = { Button(onClick = { showResetDialog = false; viewModel.resetApp(context) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Wipe & Restart") } },
             dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Cancel") } }
         )
+    }
+
+    if (showAboutSheet) {
+        ModalBottomSheet(onDismissRequest = { showAboutSheet = false }) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
+                Text("About & Support", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text("App info, social links, and donations", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://t.me/buildbytes") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.OpenInNew, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Join Telegram", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Join the Build Bytes community", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.OpenInNew, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Star on GitHub", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("View source code and releases", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Support via PhonePe, Paytm, BHIM", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://i.ibb.co/5g4J2RXR/1f38d6d7-a8a2-4696-88e6-9cf503e0592c.png") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Donate via Google Pay", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Scan QR or direct link", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://paypal.me/ShivamXD6") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Donate via PayPal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Support via international cards", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Made by @ShastikXD | Build Bytes Team", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
     }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -104,6 +167,17 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
                     Text(if (isDarkTheme) "Dark Mode" else "Light Mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     Switch(checked = isDarkTheme, onCheckedChange = { onThemeToggle() })
                 }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                Row(modifier = Modifier.fillMaxWidth().clickable { showAboutSheet = true }.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("About & Support", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("App info, social links, and donations", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Row(modifier = Modifier.fillMaxWidth().clickable { showResetDialog = true }.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.DeleteForever, contentDescription = "Reset", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))
@@ -112,51 +186,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
                         Text("Reset Application", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                         Text("Clear all caches and reset engine", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
-            }
-        }
-
-        SectionHeader("About & Support", "App info, social links, and donations")
-        ElevatedCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://t.me/buildbytes") }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = "Telegram", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Join Telegram", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Join the Build Bytes community", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = "GitHub", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Star on GitHub", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("View source code and releases", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, contentDescription = "UPI", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Support via GPay, PhonePe, Paytm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://paypal.me/ShivamXD6") }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, contentDescription = "PayPal", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Donate via PayPal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Support via international cards", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text("Developed with ♥ by all the Build Bytes team.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

@@ -277,7 +277,7 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
         Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 SectionHeader("Flash Utilities", "Auto Flash Zips or Flash Raw Partition Images")
-                MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken touchscreens") { viewModel.openFlashWizard() }
+                MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken recovery touch") { viewModel.openFlashWizard() }
                 MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { selectedPartition = ""; showBackupDialog = true }
                 MenuCard("Flash Partitions", Icons.Default.SystemUpdateAlt, "Flash images directly to active slot") { backedUpImages = viewModel.getBackedUpImages(); selectedPartition = ""; customImgPath = ""; restoreMode = "backup"; showRestoreDialog = true }
             }

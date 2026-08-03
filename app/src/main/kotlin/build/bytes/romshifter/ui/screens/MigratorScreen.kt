@@ -203,8 +203,8 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         matchesSearch && (matchesType || appState.isRestoreDebloatMode)
     }
 
-    var showLogsSheet by remember { mutableStateOf(false) }
     var showForceRemoveWarning by remember { mutableStateOf(false) }
+    var showPrivilegedWarning by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     val compIcons = mapOf(1 to Icons.Default.Android, 2 to Icons.Default.Storage, 3 to Icons.Default.Folder, 4 to Icons.Default.PermMedia, 5 to Icons.Default.Inventory, 6 to Icons.Default.Fingerprint)
     val compNames = mapOf(1 to "App", 2 to "Data", 3 to "ExtData", 4 to "Media", 5 to "OBB", 6 to "Android ID")
@@ -219,19 +219,14 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    if (showLogsSheet) {
-        ModalBottomSheet(onDismissRequest = { showLogsSheet = false }) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                Text("Execution Logs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)).background(Color(0xFF1E1E1E)).padding(8.dp)) {
-                    LazyColumn(reverseLayout = true) {
-                        items(appState.logs.reversed()) { log -> Text(text = log, color = Color(0xFF4CAF50), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 1.dp)) }
-                    }
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
+    if (showPrivilegedWarning) {
+        AlertDialog(
+            onDismissRequest = { showPrivilegedWarning = false },
+            title = { Text("Privileged App Mode", fontWeight = FontWeight.Bold) },
+            text = { Text("This is only for some user apps (e.g., Custom Launchers, System UI mods, Custom Dialers) which strictly require higher system privileges to function. Normal apps do not need this mode.") },
+            confirmButton = { Button(onClick = { viewModel.setPrivilegedSystemize(true); showPrivilegedWarning = false }) { Text("Enable Mode") } },
+            dismissButton = { TextButton(onClick = { showPrivilegedWarning = false }) { Text("Cancel") } }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -274,54 +269,75 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Universally use the Hamburger icon for all screens
-            Box {
-                FilledTonalIconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(56.dp), shape = CircleShape) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+            // Universally use the Select All icon for Manage and Restore directly
+            val isManageOrRestore = appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE
+            if (isManageOrRestore || (appState.migratorMode == MigratorMode.DEBLOAT && appState.isRestoreDebloatMode)) {
+                val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
+                FilledTonalIconButton(onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) }, modifier = Modifier.size(56.dp), shape = CircleShape) {
+                    Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
                 }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    if (appState.migratorMode == MigratorMode.DEBLOAT) {
-                        DropdownMenuItem(
-                            text = { Text("Restore Debloated Apps") },
-                            trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) },
-                            onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false }
-                        )
-                        HorizontalDivider()
+            } else {
+                Box {
+                    FilledTonalIconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(56.dp), shape = CircleShape) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                     }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
 
-                    // This logic successfully hides the system/user toggles exactly when in Restore Apps mode
-                    if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.RESTORE_APPS) {
-                        DropdownMenuItem(
-                            text = { Text("Show User Apps") },
-                            trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) },
-                            onClick = { viewModel.toggleShowUserApps(!appState.showUserApps); menuExpanded = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Show System Apps") },
-                            trailingIcon = { if (appState.showSystemApps) Icon(Icons.Default.Check, null) },
-                            onClick = { viewModel.toggleSystemApps(); menuExpanded = false }
-                        )
-                    }
-
-                    if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Force Deletion (rm -rf)") },
-                            trailingIcon = { if (appState.forceRemoveEnabled) Icon(Icons.Default.Check, null) },
-                            onClick = {
-                                if(!appState.forceRemoveEnabled) showForceRemoveWarning = true
-                                else viewModel.setForceRemove(false)
-                                menuExpanded = false
+                        if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
+                            val isPrivileged by viewModel.isPrivilegedSystemize.collectAsState()
+                            DropdownMenuItem(
+                                text = { Text("Privileged App Mode") },
+                                trailingIcon = { if (isPrivileged) Icon(Icons.Default.Check, null) },
+                                onClick = {
+                                    if(!isPrivileged) showPrivilegedWarning = true
+                                    else viewModel.setPrivilegedSystemize(false)
+                                    menuExpanded = false
+                                }
+                            )
+                        } else {
+                            if (appState.migratorMode == MigratorMode.DEBLOAT) {
+                                DropdownMenuItem(
+                                    text = { Text("Restore Debloated Apps") },
+                                    trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) },
+                                    onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false }
+                                )
+                                HorizontalDivider()
                             }
-                        )
-                    }
 
-                    HorizontalDivider()
-                    val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
-                    DropdownMenuItem(
-                        text = { Text(if (allSelected) "Deselect All" else "Select All") },
-                        onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps); menuExpanded = false }
-                    )
+                            if (!appState.isRestoreDebloatMode) {
+                                DropdownMenuItem(
+                                    text = { Text("Show User Apps") },
+                                    trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) },
+                                    onClick = { viewModel.toggleShowUserApps(!appState.showUserApps); menuExpanded = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Show System Apps") },
+                                    trailingIcon = { if (appState.showSystemApps) Icon(Icons.Default.Check, null) },
+                                    onClick = { viewModel.toggleSystemApps(); menuExpanded = false }
+                                )
+                            }
+
+                            if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Force Deletion (rm -rf)") },
+                                    trailingIcon = { if (appState.forceRemoveEnabled) Icon(Icons.Default.Check, null) },
+                                    onClick = {
+                                        if(!appState.forceRemoveEnabled) showForceRemoveWarning = true
+                                        else viewModel.setForceRemove(false)
+                                        menuExpanded = false
+                                    }
+                                )
+                            }
+
+                            HorizontalDivider()
+                            val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
+                            DropdownMenuItem(
+                                text = { Text(if (allSelected) "Deselect All" else "Select All") },
+                                onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps); menuExpanded = false }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -364,7 +380,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
         AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically(), exit = shrinkVertically()) {
             ElevatedCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp).clickable { showLogsSheet = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
                 shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -382,7 +398,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             Text(appState.currentStep, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Details", tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
             }
         }

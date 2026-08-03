@@ -36,6 +36,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val savedPath: StateFlow<String> = _savedPath.asStateFlow()
     val isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
 
+    val isPrivilegedSystemize = MutableStateFlow(false)
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val isRooted = Shell.getShell().isRoot
@@ -134,8 +136,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun exportLogs() = SettingsManager.exportLogs(_uiState.value.logs, _savedPath.value, getApplication<Application>().cacheDir)
-
     private fun autoHideProgress() {
         viewModelScope.launch {
             delay(3000)
@@ -188,6 +188,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setPrivilegedSystemize(enabled: Boolean) {
+        isPrivilegedSystemize.value = enabled
+    }
+
     fun toggleRestoreDebloatMode() {
         val newState = !_uiState.value.isRestoreDebloatMode
         _uiState.value = _uiState.value.copy(isRestoreDebloatMode = newState)
@@ -195,13 +199,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setMigratorMode(mode: MigratorMode) {
-        val showSysApps = (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS)
+        val showSysApps = (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE)
         _uiState.value = _uiState.value.copy(
             migratorMode = mode, appList = emptyList(), progress = 0,
             searchQuery = "", currentAction = "Operation Completed", currentStep = "", logs = emptyList(),
             showUserApps = true, showSystemApps = showSysApps, systemAppsFetched = false,
             isRestoreDebloatMode = false, globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
+        if (mode == MigratorMode.SYSTEMIZE) isPrivilegedSystemize.value = false
+
         when (mode) {
             MigratorMode.BACKUP_APPS -> fetchAppsList("User")
             MigratorMode.RESTORE_APPS -> { MigratorManager.clearCache(); fetchAppsList("AllBackups") }
@@ -273,6 +279,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             MigratorManager.runDynamicOperation(
                 context = getApplication(), state = state, selectedApps = selectedApps, currentPath = _savedPath.value,
+                isPrivilegedSystemize = isPrivilegedSystemize.value,
                 updateLog = { log ->
                     val currentLogs = _uiState.value.logs.toMutableList()
                     currentLogs.add(log)

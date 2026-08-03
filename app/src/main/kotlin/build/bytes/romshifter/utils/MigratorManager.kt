@@ -120,6 +120,7 @@ object MigratorManager {
 
     suspend fun runDynamicOperation(
         context: Context, state: AppState, selectedApps: List<AppInfo>, currentPath: String,
+        isPrivilegedSystemize: Boolean = false,
         updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
         var wakeLock: PowerManager.WakeLock? = null
@@ -187,14 +188,13 @@ object MigratorManager {
                     val apkPathOut = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out.joinToString("").substringAfter("package:").trim()
                     if (apkPathOut.isNotEmpty()) {
                         val safeLabel = app.label.replace(Regex("[^a-zA-Z0-9]"), "_")
-                        val targetDir = "$upDir/system/product/app/$safeLabel"
+                        val baseTarget = if (isPrivilegedSystemize) "$upDir/system/product/priv-app" else "$upDir/system/product/app"
+                        val targetDir = "$baseTarget/$safeLabel"
 
-                        // Copy entire folder recursively to grab oat/ and lib/
                         val sourceDir = apkPathOut.substringBeforeLast("/")
 
                         Shell.cmd("su -c 'mkdir -p \"$targetDir\" && cp -r \"$sourceDir/.\" \"$targetDir/\"'").exec()
 
-                        // Strict permissions for systemizer
                         Shell.cmd("su -c 'find \"$targetDir\" -type d -exec chmod 755 {} \\;'").exec()
                         Shell.cmd("su -c 'find \"$targetDir\" -type f -exec chmod 644 {} \\;'").exec()
 
