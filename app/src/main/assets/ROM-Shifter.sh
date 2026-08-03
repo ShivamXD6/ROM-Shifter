@@ -38,7 +38,6 @@ ensure_root() {
 }
 
 init_shifter() {
-    # Hardcoded to bypass scoped storage passing broken arguments from Android
     MAIN_DIR="/sdcard/#Shifter"
     BACKUP_BASE="$MAIN_DIR/Data-Migrated"
     LP_DIR="$MAIN_DIR/Live-Partition"
@@ -57,14 +56,17 @@ CHK() {
 }
 
 RAW_SIZE() {
-    [ -z "$1" ] && { echo 0; return; }
-    echo "$1" | while IFS= read -r p; do
-        if [ -e "$p" ]; then
-            local base=$(du -sk "$p" 2>/dev/null | awk '{print $1}')
-            local cache=$(du -sk "$p/cache" "$p/code_cache" 2>/dev/null | awk '{s+=$1} END{print s+0}')
-            echo $(( ${base:-0} - ${cache:-0} ))
+    local sum=0
+    for p in $1; do
+        p=$(echo "$p" | tr -d '\r')
+        if [ -n "$p" ] && [ -e "$p" ]; then
+            local base=$(du -sk "$p" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
+            local c1=$(du -sk "$p/cache" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
+            local c2=$(du -sk "$p/code_cache" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
+            sum=$(( sum + ${base:-0} - ${c1:-0} - ${c2:-0} ))
         fi
-    done | awk '{s+=$1} END{print s+0}'
+    done
+    echo "$sum"
 }
 
 FORMAT_SIZE() {
@@ -88,7 +90,7 @@ DELGMS() { rm -f "/data/data/$1/databases/com.google.android.datatransport.event
 PKG_INSTALLED() {
     pm list packages | grep -q "^package:$1$" || return 1
     [ -z "$2" ] && return 0
-    local apkpath="$(pm path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n 1)"
+    local apkpath="$(pm path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n 1 | tr -d '\r')"
     [ -z "$apkpath" ] && return 1
     local inst_ver=$(dumpsys package "$1" | grep versionName | head -n1 | cut -d= -f2)
     [ "$inst_ver" = "$2" ] || return 1
@@ -105,12 +107,16 @@ UNBUNDAPP() {
 
 # --- Systemizer Meta Module Installer ---
 install_meta_module() {
-    echo "ACTION:INFO|MSG:Downloading Meta-OverlayFS..."
-    local DL_PATH="/data/local/tmp/meta.zip"
-    curl -LLo "$DL_PATH" "https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/download/v1.0.4/meta-overlayfs-v1.0.4.zip" || wget -qO "$DL_PATH" "https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/download/v1.0.4/meta-overlayfs-v1.0.4.zip"
+    local DL_PATH="/sdcard/Download/meta-overlayfs.zip"
+    echo "ACTION:INFO|MSG:Downloading Meta-OverlayFS to Downloads..."
 
-    if [ ! -f "$DL_PATH" ]; then
-        echo "ACTION:INFO|MSG:Download failed. Check internet."
+    local URL="https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases/download/v1.3.1/meta-overlayfs-v1.3.1.zip"
+    curl -k -L -f -o "$DL_PATH" "$URL" || wget --no-check-certificate -qO "$DL_PATH" "$URL"
+
+    local ZIP_SIZE=$(stat -c%s "$DL_PATH" 2>/dev/null || echo 0)
+    if [ "$ZIP_SIZE" -lt 100000 ]; then
+        echo "ACTION:INFO|MSG:Download corrupted (9B). Check internet or GitHub status."
+        rm -f "$DL_PATH"
         echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
         return
     fi
@@ -135,23 +141,31 @@ install_meta_module() {
         $CMD "$DL_PATH" >/dev/null 2>&1
         echo "ACTION:INFO|MSG:Installation complete! Please Reboot."
     fi
-    rm -f "$DL_PATH"
     echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
 }
 
-# --- ROM Specific Backups (Settings DBs, Wallpaper, Ringtones) ---
+# --- ROM Specific Backups ---
 do_rom_backup() {
     local DIR="$BACKUP_BASE/ROM_Data"
-    mkdir -p "$DIR" "$DIR/ringtones" "$DIR/notifications"
+    mkdir -p "$DIR" "$DIR/media_audio"
 
-    echo "ACTION:INFO|MSG:Generating Meta lock..."
-    getprop ro.build.display.id > "$DIR/meta_rom.txt"
+    echo "ACTION:INFO|MSG:Extracting specific ROM Name..."
+    local ROM_NAME=$(getprop ro.modversion)
+    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.evolution.version)
+    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.crdroid.version)
+    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.lineage.version)
+    [ -z "$ROM_NAME" ] && ROM_NAME=$(getprop ro.build.display.id)
+    echo "${ROM_NAME:-Unknown ROM}" > "$DIR/meta_rom.txt"
 
-    [ "$1" = "1" ] && { echo "ACTION:INFO|MSG:Backing up XML Settings..."; cp -f /data/system/users/0/settings_*.xml "$DIR/" 2>/dev/null; }
+    [ "$1" = "1" ] && {
+        echo "ACTION:INFO|MSG:Backing up Settings via native CLI..."
+        /system/bin/cmd settings list system > "$DIR/system_settings.txt" 2>/dev/null
+        /system/bin/cmd settings list secure > "$DIR/secure_settings.txt" 2>/dev/null
+        /system/bin/cmd settings list global > "$DIR/global_settings.txt" 2>/dev/null
+    }
 
-    # Check both CE and DE paths for Ringtones on modern Android
-    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Call Ringtones..."; cp -f /data/system_ce/0/ringtones/* "$DIR/ringtones/" 2>/dev/null; cp -f /data/system_de/0/ringtones/* "$DIR/ringtones/" 2>/dev/null; }
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Backing up SMS Ringtones..."; cp -f /data/system_ce/0/notifications/* "$DIR/notifications/" 2>/dev/null; cp -f /data/system_de/0/notifications/* "$DIR/notifications/" 2>/dev/null; }
+    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Call Ringtones..."; find /sdcard/Ringtones -maxdepth 2 -type f -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null; }
+    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Backing up SMS/Alarms..."; find /sdcard/Notifications /sdcard/Alarms -maxdepth 2 -type f -exec cp -f {} "$DIR/media_audio/" \; 2>/dev/null; }
 
     [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Backing up Wallpaper..."; cp -f /data/system/users/0/wallpaper* "$DIR/" 2>/dev/null; }
 
@@ -167,20 +181,18 @@ do_rom_restore() {
         return
     fi
 
-    local CUR_ROM=$(getprop ro.build.display.id)
-    local BAK_ROM=$(cat "$DIR/meta_rom.txt")
+    [ "$1" = "1" ] && {
+        echo "ACTION:INFO|MSG:Injecting Settings via native CLI..."
+        local SETTINGS_CMD="/system/bin/cmd settings put"
+        /system/bin/cmd settings list system >/dev/null 2>&1 || SETTINGS_CMD="/system/bin/settings put"
 
-    if [ "$CUR_ROM" != "$BAK_ROM" ]; then
-        echo "ACTION:INFO|MSG:ROM mismatch! Backup: $BAK_ROM | Current: $CUR_ROM"
-        echo "ACTION:INFO|MSG:Restore aborted to prevent bootloops."
-        echo "ACTION:GLOBAL_DONE|TOTAL:0|TIME:0"
-        return
-    fi
+        [ -s "$DIR/system_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD system "$key" "$val" 2>/dev/null; done < "$DIR/system_settings.txt"
+        [ -s "$DIR/secure_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD secure "$key" "$val" 2>/dev/null; done < "$DIR/secure_settings.txt"
+        [ -s "$DIR/global_settings.txt" ] && while IFS='=' read -r key val; do [ -n "$key" ] && [ -n "$val" ] && $SETTINGS_CMD global "$key" "$val" 2>/dev/null; done < "$DIR/global_settings.txt"
+    }
 
-    [ "$1" = "1" ] && { echo "ACTION:INFO|MSG:Restoring XML Settings..."; cp -f "$DIR"/settings_*.xml /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/settings_*.xml; chown system:system /data/system/users/0/settings_*.xml; }
-
-    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Call Ringtones..."; cp -f "$DIR/ringtones/"* /data/system_ce/0/ringtones/ 2>/dev/null; cp -f "$DIR/ringtones/"* /data/system_de/0/ringtones/ 2>/dev/null; }
-    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Restoring SMS Ringtones..."; cp -f "$DIR/notifications/"* /data/system_ce/0/notifications/ 2>/dev/null; cp -f "$DIR/notifications/"* /data/system_de/0/notifications/ 2>/dev/null; }
+    [ "$2" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Call Ringtones..."; cp -f "$DIR/media_audio/"* /sdcard/Ringtones/ 2>/dev/null; }
+    [ "$3" = "1" ] && { echo "ACTION:INFO|MSG:Restoring SMS/Alarms..."; cp -f "$DIR/media_audio/"* /sdcard/Notifications/ 2>/dev/null; cp -f "$DIR/media_audio/"* /sdcard/Alarms/ 2>/dev/null; }
 
     [ "$4" = "1" ] && { echo "ACTION:INFO|MSG:Restoring Wallpaper..."; cp -f "$DIR"/wallpaper* /data/system/users/0/ 2>/dev/null; chmod 600 /data/system/users/0/wallpaper*; chown system:system /data/system/users/0/wallpaper*; }
 
@@ -227,7 +239,7 @@ DO_BACKUP() {
     fi
 
     TMP_SIZES="$AM_TMP/${PKG}_sizes"; mkdir -p "$TMP_SIZES"
-    apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://')"
+    apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
 
     CHK 1 && ( echo $(RAW_SIZE "$apks") > "$TMP_SIZES/app" ) &
     CHK 2 && ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
@@ -247,7 +259,8 @@ DO_BACKUP() {
         if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
             if [ "$CUR_APP" -gt 0 ] && [ -n "$apks" ]; then
                 echo "INFO:STEP|MSG:App (Base & Splits)"
-                echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" & ACT=1
+                echo "$apks" | sed 's|^/||' > "$APP_DIR/app_files.txt"
+                tar -cf - -C / -T "$APP_DIR/app_files.txt" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" & ACT=1
             else rm -f "$APP_DIR/App.bundle.pack"; fi
             OLD_APP=$CUR_APP
         fi
@@ -427,7 +440,7 @@ do_backup() {
         ver=$(echo "$ver" | tr -d '\r'); type=$(echo "$type" | tr -d '\r')
 
         size=0
-        CHK 1 && apks=$(pm path "$pkg" 2>/dev/null | sed 's/^package://') && [ -n "$apks" ] && size=$((size + $(RAW_SIZE "$apks") ))
+        CHK 1 && apks=$(pm path "$pkg" 2>/dev/null | sed 's/^package://' | tr -d '\r') && [ -n "$apks" ] && size=$((size + $(RAW_SIZE "$apks") ))
         CHK 2 && size=$((size + $(RAW_SIZE "/data/data/$pkg") + $(RAW_SIZE "/data/user_de/0/$pkg") ))
         CHK 3 && size=$((size + $(RAW_SIZE "/data/media/0/Android/data/$pkg") ))
         CHK 4 && size=$((size + $(RAW_SIZE "/data/media/0/Android/media/$pkg") ))
@@ -484,10 +497,10 @@ ensure_root
 init_shifter
 
 case "$1" in
-    --backup) do_backup "$3" ;;
-    --restore) do_restore "$3" ;;
-    --rom-backup) do_rom_backup "$3" "$4" "$5" "$6" ;;
-    --rom-restore) do_rom_restore "$3" "$4" "$5" "$6" ;;
+    --backup) do_backup "$2" ;;
+    --restore) do_restore "$2" ;;
+    --rom-backup) do_rom_backup "$2" "$3" "$4" "$5" ;;
+    --rom-restore) do_rom_restore "$2" "$3" "$4" "$5" ;;
     --install-meta) install_meta_module ;;
     --live-backup) do_live_backup "$3" ;;
     --live-restore) do_live_restore "$3" "$4" ;;
