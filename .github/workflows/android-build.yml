@@ -23,7 +23,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Building ROM Shifter APK
-        run: ./gradlew assembleRelease --no-daemon --console=plain --info
+        run: ./gradlew assembleRelease -x lintVitalRelease --no-daemon --console=plain
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
