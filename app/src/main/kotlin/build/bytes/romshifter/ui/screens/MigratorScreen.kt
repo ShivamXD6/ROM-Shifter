@@ -88,7 +88,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             title = { Text("Backup Native Data", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Select items to backup locally via Android Native ContentResolver:", style = MaterialTheme.typography.bodyMedium)
+                    Text("Select items to backup locally:", style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { doSms = !doSms }.fillMaxWidth()) {
                         Checkbox(checked = doSms, onCheckedChange = { doSms = it })
@@ -154,11 +154,11 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            SectionHeader("Data & Apps Migrator", "Backup, restore, and manage your apps and telemetry data")
-            MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup installed applications") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
-            MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore apps from your migrated backups") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
+            SectionHeader("Apps and Data Migrator", "Backup/Restore or Manage your Apps and Telephony Data")
+            MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
+            MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
             MenuCard("Backup Telephony Data", Icons.Default.Sms, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
-            MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
+            MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Telephony Data from Storage") { showNativeRestoreDialog = true }
             MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -229,12 +229,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         items(appState.logs.reversed()) { log -> Text(text = log, color = Color(0xFF4CAF50), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 1.dp)) }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = { viewModel.exportLogs(); Toast.makeText(context, "Logs saved to Shifter Location", Toast.LENGTH_SHORT).show() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Save, contentDescription = "Save", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save Debug Logs")
-                }
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -280,59 +274,54 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            if ((appState.migratorMode == MigratorMode.DEBLOAT && appState.isRestoreDebloatMode) || appState.migratorMode == MigratorMode.RESTORE_APPS) {
-                val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
-                FilledTonalIconButton(onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) }, modifier = Modifier.size(56.dp), shape = CircleShape) {
-                    Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
+            // Universally use the Hamburger icon for all screens
+            Box {
+                FilledTonalIconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(56.dp), shape = CircleShape) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                 }
-            } else {
-                Box {
-                    FilledTonalIconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(56.dp), shape = CircleShape) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        if (appState.migratorMode == MigratorMode.DEBLOAT) {
-                            DropdownMenuItem(
-                                text = { Text("Restore Debloated Apps") },
-                                trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) },
-                                onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false }
-                            )
-                            HorizontalDivider()
-                        }
-
-                        if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.RESTORE_APPS) {
-                            DropdownMenuItem(
-                                text = { Text("Show User Apps") },
-                                trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) },
-                                onClick = { viewModel.toggleShowUserApps(!appState.showUserApps); menuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Show System Apps") },
-                                trailingIcon = { if (appState.showSystemApps) Icon(Icons.Default.Check, null) },
-                                onClick = { viewModel.toggleSystemApps(); menuExpanded = false }
-                            )
-                        }
-
-                        if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Force Deletion (rm -rf)") },
-                                trailingIcon = { if (appState.forceRemoveEnabled) Icon(Icons.Default.Check, null) },
-                                onClick = {
-                                    if(!appState.forceRemoveEnabled) showForceRemoveWarning = true
-                                    else viewModel.setForceRemove(false)
-                                    menuExpanded = false
-                                }
-                            )
-                        }
-
-                        HorizontalDivider()
-                        val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    if (appState.migratorMode == MigratorMode.DEBLOAT) {
                         DropdownMenuItem(
-                            text = { Text(if (allSelected) "Deselect All" else "Select All") },
-                            onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps); menuExpanded = false }
+                            text = { Text("Restore Debloated Apps") },
+                            trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) },
+                            onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false }
+                        )
+                        HorizontalDivider()
+                    }
+
+                    // This logic successfully hides the system/user toggles exactly when in Restore Apps mode
+                    if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.RESTORE_APPS) {
+                        DropdownMenuItem(
+                            text = { Text("Show User Apps") },
+                            trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) },
+                            onClick = { viewModel.toggleShowUserApps(!appState.showUserApps); menuExpanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Show System Apps") },
+                            trailingIcon = { if (appState.showSystemApps) Icon(Icons.Default.Check, null) },
+                            onClick = { viewModel.toggleSystemApps(); menuExpanded = false }
                         )
                     }
+
+                    if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Force Deletion (rm -rf)") },
+                            trailingIcon = { if (appState.forceRemoveEnabled) Icon(Icons.Default.Check, null) },
+                            onClick = {
+                                if(!appState.forceRemoveEnabled) showForceRemoveWarning = true
+                                else viewModel.setForceRemove(false)
+                                menuExpanded = false
+                            }
+                        )
+                    }
+
+                    HorizontalDivider()
+                    val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
+                    DropdownMenuItem(
+                        text = { Text(if (allSelected) "Deselect All" else "Select All") },
+                        onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps); menuExpanded = false }
+                    )
                 }
             }
         }

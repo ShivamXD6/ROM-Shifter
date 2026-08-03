@@ -47,7 +47,6 @@ object MigratorManager {
         when (type) {
             "User", "System", "AllInstalled" -> {
                 val installedApps = pm.getInstalledApplications(0)
-                // Use parallel async to load apps instantly
                 val fetchedApps = installedApps.map { app ->
                     async(Dispatchers.IO) {
                         val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
@@ -176,16 +175,29 @@ object MigratorManager {
             }
 
             if (state.migratorMode == MigratorMode.SYSTEMIZE) {
-                val modDir = "/data/adb/modules/romshifter_systemized"
-                Shell.cmd("su -c 'mkdir -p $modDir/system/priv-app'").exec()
-                Shell.cmd("su -c 'echo \"id=roms-shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps un-uninstallable.\" > $modDir/module.prop'").exec()
+                val modDir = "/data/adb/modules/ROM-Shifter"
+                val upDir = "/data/adb/modules_update/ROM-Shifter"
+                val propContent = "id=ROM-Shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps system apps."
+
+                Shell.cmd("su -c 'mkdir -p \"$modDir\" && echo \"$propContent\" > \"$modDir/module.prop\" && chmod 644 \"$modDir/module.prop\"'").exec()
+                Shell.cmd("su -c 'mkdir -p \"$upDir\" && echo \"$propContent\" > \"$upDir/module.prop\" && chmod 644 \"$upDir/module.prop\"'").exec()
 
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Systemizing ${app.label}", "", ((index + 1) * 100) / selectedApps.size)
-                    val apkPath = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out.joinToString("").substringAfter("package:").trim()
-                    if (apkPath.isNotEmpty()) {
+                    val apkPathOut = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out.joinToString("").substringAfter("package:").trim()
+                    if (apkPathOut.isNotEmpty()) {
                         val safeLabel = app.label.replace(Regex("[^a-zA-Z0-9]"), "_")
-                        Shell.cmd("su -c 'mkdir -p \"$modDir/system/priv-app/$safeLabel\" && cp \"$apkPath\" \"$modDir/system/priv-app/$safeLabel/base.apk\"'").exec()
+                        val targetDir = "$upDir/system/product/app/$safeLabel"
+
+                        // Copy entire folder recursively to grab oat/ and lib/
+                        val sourceDir = apkPathOut.substringBeforeLast("/")
+
+                        Shell.cmd("su -c 'mkdir -p \"$targetDir\" && cp -r \"$sourceDir/.\" \"$targetDir/\"'").exec()
+
+                        // Strict permissions for systemizer
+                        Shell.cmd("su -c 'find \"$targetDir\" -type d -exec chmod 755 {} \\;'").exec()
+                        Shell.cmd("su -c 'find \"$targetDir\" -type f -exec chmod 644 {} \\;'").exec()
+
                         updateLog("Systemized: ${app.label}")
                     }
                 }
@@ -206,7 +218,6 @@ object MigratorManager {
             val operation = if (state.migratorMode.name.contains("RESTORE")) "--restore" else "--backup"
             val compsString = state.globalComponents.sorted().joinToString(" ")
 
-            // This invokes the shell script with proper parameters
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString'\""
 
             ShellEngine.executeShifterCommand(command).collect { event ->
@@ -220,7 +231,7 @@ object MigratorManager {
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)
                         updateLog("DONE! Total Size: $smartSize. Time: ${event.timeSec}s")
-                        onComplete("Operation Completed!", "Total Size: $smartSize | Time: ${event.timeSec}s")
+                        onComplete("Operation Completed", "Total Size: $smartSize | Time: ${event.timeSec}s")
                     }
                     is ShifterEvent.RawLog -> updateLog(event.line)
                     else -> {}

@@ -1,5 +1,7 @@
 package build.bytes.romshifter.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -15,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -23,9 +26,33 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.SectionHeader
+import kotlinx.coroutines.launch
 
 @Composable
 fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
+    val context = LocalContext.current
+    var showMetaWarningDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showMetaWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showMetaWarningDialog = false },
+            title = { Text("Meta-OverlayFS Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+            text = { Text("You are not using Magisk. To systemize apps via KernelSU or APatch, you must have the Meta-OverlayFS module installed. Please download and flash it in your root manager, then try again.") },
+            confirmButton = {
+                Button(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases"))
+                    context.startActivity(intent)
+                    showMetaWarningDialog = false
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                    Text("Download Module")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMetaWarningDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     if (appState.migratorMode in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE)) {
         MigratorActionScreen(appState, viewModel)
@@ -34,7 +61,16 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 SectionHeader("Advanced Utilities", "Root tools and device modifications")
                 MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }
-                MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") { viewModel.setMigratorMode(MigratorMode.SYSTEMIZE) }
+
+                MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") {
+                    scope.launch {
+                        if (viewModel.canSystemize()) {
+                            viewModel.setMigratorMode(MigratorMode.SYSTEMIZE)
+                        } else {
+                            showMetaWarningDialog = true
+                        }
+                    }
+                }
             }
 
             AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically(), exit = shrinkVertically()) {

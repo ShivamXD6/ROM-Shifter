@@ -156,16 +156,17 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             1 -> {
                 Icon(Icons.Default.Bolt, null, modifier = Modifier.size(100.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(24.dp))
-                Text("Welcome to ROM Shifter", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Text("Get Started with", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("ROM Shifter", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
-                Text("The ultimate root-powered tool for migrating apps, backing up telephony data, flashing system images, and modifying your ROM securely. Let's get things set up.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely. Let's get things set up.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(32.dp))
                 Button(onClick = { step = 2 }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(24.dp)) { Text("Next") }
             }
             2 -> {
                 Icon(Icons.Default.Folder, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(24.dp))
-                Text("Storage Directory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text("Shifter Directory", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
                 Text("ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. You can auto-detect an existing one or select manually.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(32.dp))

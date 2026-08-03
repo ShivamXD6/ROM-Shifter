@@ -81,7 +81,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(flashWizardStep = 4) }
         }
     }
-    fun restartFlashWizard() { viewModelScope.launch(Dispatchers.IO) { FlashManager.restartFlashWizard(); withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList(), currentAction = "Ready to Shift") } } }
+    fun restartFlashWizard() { viewModelScope.launch(Dispatchers.IO) { FlashManager.restartFlashWizard(); withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList(), currentAction = "Operation Completed") } } }
     fun executeFlashNow() { _uiState.value = _uiState.value.copy(currentAction = "Rebooting to Recovery...", flashWizardStep = 4); viewModelScope.launch(Dispatchers.IO) { FlashManager.executeFlashNow() } }
     fun getAllPartitions(): List<String> = FlashManager.getAllPartitions()
     fun getBackedUpImages(): List<String> = FlashManager.getBackedUpImages(_savedPath.value)
@@ -140,7 +140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             delay(3000)
             if (!_uiState.value.isRunning) {
-                _uiState.value = _uiState.value.copy(currentAction = "Ready to Shift", currentStep = "", progress = 0)
+                _uiState.value = _uiState.value.copy(currentAction = "Operation Completed", currentStep = "", progress = 0)
             }
         }
     }
@@ -170,6 +170,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun isMagisk(): Boolean = withContext(Dispatchers.IO) {
+        Shell.cmd("su -c '[ -d /data/adb/magisk ] && echo YES'").exec().out.joinToString("").trim() == "YES"
+    }
+
+    suspend fun canSystemize(): Boolean = withContext(Dispatchers.IO) {
+        if (isMagisk()) return@withContext true
+        val check = Shell.cmd("su -c '[ -d /data/adb/modules/meta-overlayfs ] || [ -d /data/adb/metamodule ] && echo YES'").exec().out.joinToString("").trim()
+        return@withContext check == "YES"
+    }
+
     fun toggleSystemApps() {
         val newState = !_uiState.value.showSystemApps
         _uiState.value = _uiState.value.copy(showSystemApps = newState)
@@ -188,7 +198,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val showSysApps = (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS)
         _uiState.value = _uiState.value.copy(
             migratorMode = mode, appList = emptyList(), progress = 0,
-            searchQuery = "", currentAction = "Ready to Shift", currentStep = "", logs = emptyList(),
+            searchQuery = "", currentAction = "Operation Completed", currentStep = "", logs = emptyList(),
             showUserApps = true, showSystemApps = showSysApps, systemAppsFetched = false,
             isRestoreDebloatMode = false, globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
@@ -239,12 +249,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val sysApps = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "System", false, emptyList())
                 withContext(Dispatchers.Main) {
                     val combined = (userApps + sysApps).sortedBy { it.label.lowercase() }
-                    _uiState.value = _uiState.value.copy(appList = combined, isFetchingApps = false, currentAction = "Ready to Shift", systemAppsFetched = true)
+                    _uiState.value = _uiState.value.copy(appList = combined, isFetchingApps = false, currentAction = "Operation Completed", systemAppsFetched = true)
                 }
             } else {
                 val apps = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, type, append, _uiState.value.appList)
                 withContext(Dispatchers.Main) {
-                    _uiState.value = _uiState.value.copy(appList = apps, isFetchingApps = false, currentAction = if (apps.isEmpty()) "No apps found." else "Ready to Shift")
+                    _uiState.value = _uiState.value.copy(appList = apps, isFetchingApps = false, currentAction = if (apps.isEmpty()) "No apps found." else "Operation Completed")
                     if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
                         _uiState.value = _uiState.value.copy(systemAppsFetched = true)
                     }
