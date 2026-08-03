@@ -237,8 +237,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f)) { Text("UPI") }
-                    Button(onClick = { openUriSafely(context, "https://i.ibb.co/5g4J2RXR/1f38d6d7-a8a2-4696-88e6-9cf503e0592c.png") }, modifier = Modifier.weight(1f)) { Text("GPay") }
+                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivam.dhage@superyes&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f)) { Text("UPI / GPay") }
                     Button(onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") }, modifier = Modifier.weight(1f)) { Text("PayPal") }
                 }
 
