@@ -393,6 +393,66 @@ do_restore() {
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
 }
 
+do_remove() {
+    local PKG="$1"
+    local FORCE="$2"
+    if [ "$FORCE" == "true" ]; then
+        local APK_PATH=$(pm path "$PKG" | sed 's/^package://')
+        if [[ "$APK_PATH" == /system/* ]] || [[ "$APK_PATH" == /product/* ]] || [[ "$APK_PATH" == /vendor/* ]]; then
+            local DIR_PATH=$(dirname "$APK_PATH")
+            mount -o rw,remount /
+            mount -o rw,remount /system
+            mount -o rw,remount /product
+            mount -o rw,remount /vendor
+            rm -rf "$DIR_PATH"
+            pm uninstall --user 0 "$PKG" >/dev/null 2>&1
+            echo "FORCE_REMOVED"
+            return
+        fi
+    fi
+    pm uninstall --user 0 "$PKG" >/dev/null 2>&1
+    echo "UNINSTALLED"
+}
+
+do_restore_debloat() {
+    cmd package install-existing "$1" >/dev/null 2>&1
+    echo "RESTORED"
+}
+
+do_systemize() {
+    local PKG="$1"
+    local LABEL="$2"
+    local IS_PRIV="$3"
+
+    local MOD_DIR="/data/adb/modules/ROM-Shifter"
+    local UP_DIR="/data/adb/modules_update/ROM-Shifter"
+    local PROP="id=ROM-Shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps system apps."
+
+    mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
+    mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
+
+    local APK_PATH=$(pm path "$PKG" | sed 's/^package://')
+    if [ -n "$APK_PATH" ]; then
+        local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
+        local TARGET_DIR=""
+        if [ "$IS_PRIV" == "true" ]; then
+            TARGET_DIR="$UP_DIR/system/product/priv-app/$SAFE_LABEL"
+        else
+            TARGET_DIR="$UP_DIR/system/product/app/$SAFE_LABEL"
+        fi
+        local SOURCE_DIR=$(dirname "$APK_PATH")
+
+        mkdir -p "$TARGET_DIR"
+        cp -rf "$SOURCE_DIR"/*.apk "$TARGET_DIR/"
+        chmod 755 "$TARGET_DIR"
+        chmod 644 "$TARGET_DIR"/*.apk
+        echo "SYSTEMIZED"
+    else
+        echo "FAILED"
+    fi
+}
+
+# --- ENTRY POINT ---
 ensure_root
 init_shifter
 
@@ -401,4 +461,7 @@ case "$1" in
     --restore) do_restore "$2" ;;
     --live-backup) do_live_backup "$3" ;;
     --live-restore) do_live_restore "$3" "$4" ;;
+    --remove) do_remove "$2" "$3" ;;
+    --restore-debloat) do_restore_debloat "$2" ;;
+    --systemize) do_systemize "$2" "$3" "$4" ;;
 esac

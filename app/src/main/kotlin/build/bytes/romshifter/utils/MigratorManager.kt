@@ -143,39 +143,6 @@ object MigratorManager {
         } catch (_: SecurityException) { updateLog("Warning: WAKE_LOCK permission missing!") }
 
         try {
-            if (state.migratorMode == MigratorMode.DEBLOAT) {
-                if (state.isRestoreDebloatMode) {
-                    selectedApps.forEachIndexed { index, app ->
-                        updateProgress("Restoring Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-                        Shell.cmd("su -mm -c \"cmd package install-existing ${app.packageName}\"").exec()
-                        updateLog("Restored: ${app.label}")
-                    }
-                    onComplete("Restore Complete!", "Successfully restored ${selectedApps.size} apps.")
-                    return@withContext
-                } else {
-                    selectedApps.forEachIndexed { index, app ->
-                        updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-                        if (state.forceRemoveEnabled) {
-                            val pathOut = Shell.cmd("su -mm -c \"pm path ${app.packageName}\"").exec().out.firstOrNull { it.startsWith("package:") }?.substringAfter("package:")?.trim() ?: ""
-                            if (pathOut.startsWith("/system") || pathOut.startsWith("/product") || pathOut.startsWith("/vendor")) {
-                                val dir = pathOut.substringBeforeLast("/")
-                                Shell.cmd("su -mm -c \"mount -o rw,remount /; mount -o rw,remount /system; mount -o rw,remount /product; mount -o rw,remount /vendor; rm -rf '$dir'\"").exec()
-                                Shell.cmd("su -mm -c \"pm uninstall --user 0 ${app.packageName}\"").exec()
-                                updateLog("Force Removed (rm -rf): ${app.label}")
-                            } else {
-                                Shell.cmd("su -mm -c \"pm uninstall --user 0 ${app.packageName}\"").exec()
-                                updateLog("Uninstalled (User App): ${app.label}")
-                            }
-                        } else {
-                            Shell.cmd("su -mm -c \"pm uninstall --user 0 ${app.packageName}\"").exec()
-                            updateLog("Uninstalled: ${app.label}")
-                        }
-                    }
-                    onComplete("Debloat Complete!", "Successfully removed ${selectedApps.size} apps.")
-                    return@withContext
-                }
-            }
-
             if (state.migratorMode == MigratorMode.MANAGE) {
                 selectedApps.forEach { app ->
                     val sysType = if (app.isSystem) "System" else "User"
@@ -183,40 +150,6 @@ object MigratorManager {
                 }
                 updateProgress("Backups Deleted", "Data Successfully Removed", 100)
                 onComplete("Deletion Complete!", "Freed up storage space.")
-                return@withContext
-            }
-
-            if (state.migratorMode == MigratorMode.SYSTEMIZE) {
-                val modDir = "/data/adb/modules/ROM-Shifter"
-                val upDir = "/data/adb/modules_update/ROM-Shifter"
-                val propContent = "id=ROM-Shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps system apps."
-
-                Shell.cmd("su -c 'mkdir -p \"$modDir\" && echo \"$propContent\" > \"$modDir/module.prop\" && chmod 644 \"$modDir/module.prop\"'").exec()
-                Shell.cmd("su -c 'mkdir -p \"$upDir\" && echo \"$propContent\" > \"$upDir/module.prop\" && chmod 644 \"$upDir/module.prop\"'").exec()
-
-                selectedApps.forEachIndexed { index, app ->
-                    updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-
-                    val pathLines = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out
-                    val apkPathOut = pathLines.firstOrNull { it.startsWith("package:") }?.substringAfter("package:")?.trim() ?: ""
-
-                    if (apkPathOut.isNotEmpty()) {
-                        val safeLabel = app.label.replace(Regex("[^a-zA-Z0-9]"), "_")
-                        val baseTarget = if (isPrivilegedSystemize) "$upDir/system/product/priv-app" else "$upDir/system/product/app"
-                        val targetDir = "$baseTarget/$safeLabel"
-
-                        val sourceDir = apkPathOut.substringBeforeLast("/")
-
-                        Shell.cmd("su -c 'mkdir -p \"$targetDir\" && cp -f \"$sourceDir\"/*.apk \"$targetDir/\"'").exec()
-                        Shell.cmd("su -c 'chmod 755 \"$targetDir\"'").exec()
-                        Shell.cmd("su -c 'chmod 644 \"$targetDir\"/*.apk'").exec()
-
-                        updateLog("Systemized: ${app.label}")
-                    } else {
-                        updateLog("Failed to locate APK path for: ${app.label}")
-                    }
-                }
-                onComplete("Systemization Complete!", "Please REBOOT to apply System Apps.")
                 return@withContext
             }
 

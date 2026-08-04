@@ -1,5 +1,8 @@
 package build.bytes.romshifter.utils
 
+import android.content.Context
+import android.os.PowerManager
+import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.ShifterEvent
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
@@ -7,46 +10,61 @@ import kotlinx.coroutines.withContext
 
 object ExtrasManager {
 
-    suspend fun runRomDataOperation(
-        isBackup: Boolean,
-        settings: Boolean,
-        callRing: Boolean,
-        smsRing: Boolean,
-        wall: Boolean,
-        savedPath: String,
-        onEvent: (ShifterEvent) -> Unit
+    suspend fun runDebloatOperation(
+        context: Context, selectedApps: List<AppInfo>, isRestore: Boolean, forceRemove: Boolean,
+        updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
-        val action = if (isBackup) "--rom-backup" else "--rom-restore"
-        val s1 = if (settings) "1" else "0"
-        val s2 = if (callRing) "1" else "0"
-        val s3 = if (smsRing) "1" else "0"
-        val s4 = if (wall) "1" else "0"
-
-        // FIX: Changed "su -mm" to "su". Mount Master breaks Android's Binder IPC,
-        // which caused the 'Failed transaction (2147483646)' error for the settings command.
-        val command = "su -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$s1' '$s2' '$s3' '$s4'\""
-
-        ShellEngine.executeShifterCommand(command).collect { event ->
-            withContext(Dispatchers.Main) { onEvent(event) }
-        }
-    }
-
-    suspend fun checkAndInstallMetaModule(onEvent: (ShifterEvent) -> Unit) = withContext(Dispatchers.IO) {
-        val command = "su -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --install-meta\""
-
+        var wakeLock: PowerManager.WakeLock? = null
         try {
-            ShellEngine.executeShifterCommand(command).collect { event ->
-                withContext(Dispatchers.Main) { onEvent(event) }
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ROMShifter::DebloatWakelock")
+            wakeLock.acquire(15 * 60 * 1000L)
+
+            if (isRestore) {
+                selectedApps.forEachIndexed { index, app ->
+                    updateProgress("Restoring Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
+                    Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --restore-debloat '${app.packageName}'\"").exec()
+                    updateLog("Restored: ${app.label}")
+                }
+                onComplete("Restore Complete!", "Successfully restored ${selectedApps.size} apps.")
+            } else {
+                selectedApps.forEachIndexed { index, app ->
+                    updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
+                    val isForce = if (forceRemove) "true" else "false"
+                    val result = Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --remove '${app.packageName}' '$isForce'\"").exec().out.joinToString("").trim()
+
+                    if (result == "FORCE_REMOVED") updateLog("Force Removed (rm -rf): ${app.label}")
+                    else updateLog("Uninstalled: ${app.label}")
+                }
+                onComplete("Debloat Complete!", "Successfully removed ${selectedApps.size} apps.")
             }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) {
-                onEvent(ShifterEvent.RawLog("CRITICAL ERROR: ${e.message}"))
-                onEvent(ShifterEvent.GlobalDone("0", "0"))
-            }
+        } finally {
+            wakeLock?.let { if (it.isHeld) it.release() }
         }
     }
 
-    suspend fun isMetaModuleInstalled(): Boolean = withContext(Dispatchers.IO) {
-        Shell.cmd("su -c '[ -d /data/adb/modules/meta-overlayfs ] && echo YES'").exec().out.joinToString("").trim() == "YES"
+    suspend fun runSystemizeOperation(
+        context: Context, selectedApps: List<AppInfo>, isPrivileged: Boolean,
+        updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        var wakeLock: PowerManager.WakeLock? = null
+        try {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ROMShifter::SystemizeWakelock")
+            wakeLock.acquire(15 * 60 * 1000L)
+
+            selectedApps.forEachIndexed { index, app ->
+                updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
+
+                val isPriv = if (isPrivileged) "true" else "false"
+                val result = Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}' '$isPriv'\"").exec().out.joinToString("").trim()
+
+                if (result == "SYSTEMIZED") updateLog("Systemized: ${app.label}")
+                else updateLog("Failed to locate APK path for: ${app.label}")
+            }
+            onComplete("Systemization Complete!", "Please REBOOT to apply System Apps.")
+        } finally {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        }
     }
 }
