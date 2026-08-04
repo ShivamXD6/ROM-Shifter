@@ -1,9 +1,11 @@
 package build.bytes.romshifter.models
 
 import android.graphics.drawable.Drawable
+import androidx.compose.runtime.Stable
 
 enum class MigratorMode { MENU, BACKUP_APPS, RESTORE_APPS, MANAGE, DEBLOAT, SYSTEMIZE }
 
+@Stable
 data class AppInfo(
     val label: String,
     val packageName: String,
@@ -33,7 +35,10 @@ data class AppState(
     val hasRoot: Boolean = true,
     val forceRemoveEnabled: Boolean = false,
     val flashWizardStep: Int = 0,
-    val flashWipeMode: Int = 2,
+
+    // Updated Auto-Flash Variables
+    val flashWipePartitions: Set<String> = setOf("dalvik", "cache"),
+    val flashFormatData: Boolean = false,
     val flashZips: List<FlashZip> = emptyList(),
     val isProcessingZips: Boolean = false,
     val hasLockscreen: Boolean = false

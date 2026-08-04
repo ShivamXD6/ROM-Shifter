@@ -1,10 +1,17 @@
 package build.bytes.romshifter
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -38,7 +45,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isPrivilegedSystemize = MutableStateFlow(false)
 
+    // Split notification IDs to guarantee the final state rings!
+    private val notificationManager = NotificationManagerCompat.from(application)
+    private val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
+    private val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
+    private val NOTIFICATION_ID = 1001
+
     init {
+        createNotificationChannel()
         viewModelScope.launch(Dispatchers.IO) {
             val isRooted = Shell.getShell().isRoot
             _uiState.value = _uiState.value.copy(hasRoot = isRooted)
@@ -52,6 +66,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val progressChannel = NotificationChannel(CHANNEL_PROGRESS_ID, "Task Progress", NotificationManager.IMPORTANCE_LOW)
+            val alertChannel = NotificationChannel(CHANNEL_ALERT_ID, "Task Completed", NotificationManager.IMPORTANCE_HIGH)
+            notificationManager.createNotificationChannel(progressChannel)
+            notificationManager.createNotificationChannel(alertChannel)
+        }
+    }
+
+    private fun updateProgressNotification(title: String, content: String, progress: Int, max: Int = 100) {
+        if (ContextCompat.checkSelfPermission(getApplication(), "android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+
+            // This displays the exact percentage in the notification body!
+            val displayContent = if (progress in 0..100) "$content  •  $progress%" else content
+
+            val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle(title)
+                .setContentText(displayContent)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOnlyAlertOnce(true)
+                .setOngoing(true)
+
+            if (progress in 0..100) builder.setProgress(max, progress, false)
+            else builder.setProgress(0, 0, true)
+
+            notificationManager.notify(NOTIFICATION_ID, builder.build())
+        }
+    }
+
+    // High priority ringing alert for completion
+    private fun showCompletionNotification(title: String, content: String) {
+        if (ContextCompat.checkSelfPermission(getApplication(), "android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            val builder = NotificationCompat.Builder(getApplication(), CHANNEL_ALERT_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setDefaults(NotificationCompat.DEFAULT_ALL) // Forces ring and vibration!
+
+            notificationManager.notify(NOTIFICATION_ID, builder.build())
+        }
+    }
+
+    private fun cancelNotification() {
+        notificationManager.cancel(NOTIFICATION_ID)
+    }
+
     fun finishOnboarding() {
         prefs.edit { putBoolean("is_first_run", false) }
         isFirstRun.value = false
@@ -59,7 +122,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openFlashWizard() { _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList()) }
     fun closeFlashWizard() { _uiState.value = _uiState.value.copy(flashWizardStep = 0) }
-    fun setFlashWipeMode(mode: Int) { _uiState.value = _uiState.value.copy(flashWipeMode = mode) }
     fun removeZip(index: Int) { val l = _uiState.value.flashZips.toMutableList(); if (index in l.indices) l.removeAt(index); _uiState.value = _uiState.value.copy(flashZips = l) }
     fun moveZipUp(index: Int) { val l = _uiState.value.flashZips.toMutableList(); if (index > 0) { val i = l.removeAt(index); l.add(index - 1, i) }; _uiState.value = _uiState.value.copy(flashZips = l) }
     fun moveZipDown(index: Int) { val l = _uiState.value.flashZips.toMutableList(); if (index < l.size - 1) { val i = l.removeAt(index); l.add(index + 1, i) }; _uiState.value = _uiState.value.copy(flashZips = l) }
@@ -77,15 +139,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(hasLockscreen = isLocked, flashWizardStep = 3) }
         }
     }
+    fun toggleFlashWipePartition(partition: String) {
+        val current = _uiState.value.flashWipePartitions.toMutableSet()
+        if (current.contains(partition)) current.remove(partition) else current.add(partition)
+        _uiState.value = _uiState.value.copy(flashWipePartitions = current)
+    }
+
+    fun setFlashFormatData(format: Boolean) {
+        _uiState.value = _uiState.value.copy(flashFormatData = format)
+    }
+
     fun generateOrsAndProceed() {
         viewModelScope.launch(Dispatchers.IO) {
-            FlashManager.generateOrsAndProceed(_uiState.value.flashWipeMode, _uiState.value.flashZips)
+            FlashManager.generateOrsAndProceed(_uiState.value.flashWipePartitions, _uiState.value.flashFormatData, _uiState.value.flashZips)
             withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(flashWizardStep = 4) }
         }
     }
     fun restartFlashWizard() { viewModelScope.launch(Dispatchers.IO) { FlashManager.restartFlashWizard(); withContext(Dispatchers.Main) { _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList(), currentAction = "Operation Completed") } } }
     fun executeFlashNow() { _uiState.value = _uiState.value.copy(currentAction = "Rebooting to Recovery...", flashWizardStep = 4); viewModelScope.launch(Dispatchers.IO) { FlashManager.executeFlashNow() } }
-    fun getAllPartitions(): List<String> = FlashManager.getAllPartitions()
+
+    fun getAllPartitions(): List<String> {
+        val parts = FlashManager.getAllPartitions().toMutableList()
+        if (!parts.contains("data")) parts.add("data")
+        return parts.sorted()
+    }
     fun getBackedUpImages(): List<String> = FlashManager.getBackedUpImages(_savedPath.value)
     fun deleteLivePartitionImage(imgName: String) = FlashManager.deleteLivePartitionImage(_savedPath.value, imgName)
     fun runLiveOperation(action: String, partition: String, customPath: String? = null, onComplete: (String) -> Unit) {
@@ -99,7 +176,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun migrateFolder(newPath: String, onSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             SettingsManager.migrateFolder(_savedPath.value.trimEnd('/'), newPath, prefs)
-            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'").exec()
+            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\" && touch \"$newPath/.nomedia\"'").exec()
             _savedPath.value = newPath
             withContext(Dispatchers.Main) { onSuccess() }
         }
@@ -107,9 +184,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun autoDetectShifterFolder(onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val searchCmd = "su -mm -c 'find /storage /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name \".shifter_dir\" 2>/dev/null | head -n 1'"
+            val searchCmd = "su -mm -c 'find /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name \".shifter_dir\" 2>/dev/null | head -n 1'"
             val markerFile = Shell.cmd(searchCmd).exec().out.joinToString("").trim()
             var detected = if (markerFile.isNotEmpty()) markerFile.removeSuffix("/.shifter_dir") else ""
+
+            if (detected.startsWith("/data/media/0")) {
+                detected = detected.replaceFirst("/data/media/0", "/storage/emulated/0")
+            } else if (detected.startsWith("/mnt/media_rw/")) {
+                detected = detected.replaceFirst("/mnt/media_rw/", "/storage/")
+            }
 
             if (detected.isEmpty()) {
                 detected = SettingsManager.autoDetectFolder(prefs) ?: ""
@@ -136,37 +219,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun autoHideProgress() {
-        viewModelScope.launch {
-            delay(3000)
-            if (!_uiState.value.isRunning) {
-                _uiState.value = _uiState.value.copy(currentAction = "Operation Completed", currentStep = "", progress = 0)
-            }
-        }
-    }
-
     fun runNativeDataOperation(context: Context, isBackup: Boolean, doSms: Boolean, doCall: Boolean, doContacts: Boolean) {
-        _uiState.value = _uiState.value.copy(isRunning = true, currentAction = if (isBackup) "Backing up Native Data..." else "Restoring Native Data...", currentStep = "Processing via Android ContentResolver...", progress = 0)
+        val title = if (isBackup) "Backing up Native Data" else "Restoring Native Data"
+        _uiState.value = _uiState.value.copy(isRunning = true, currentAction = title, currentStep = "Processing via ContentResolver...", progress = 0)
+        updateProgressNotification(title, "Starting Process...", 0)
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                NativeTelephonyManager.runOperation(context, isBackup, doSms, doCall, doContacts, _savedPath.value) { step, prog -> _uiState.value = _uiState.value.copy(currentStep = step, progress = prog) }
+                NativeTelephonyManager.runOperation(context, isBackup, doSms, doCall, doContacts, _savedPath.value) { step, prog ->
+                    _uiState.value = _uiState.value.copy(currentStep = step, progress = prog)
+                    updateProgressNotification(title, step, prog)
+                }
                 withContext(Dispatchers.Main) {
-                    _uiState.value = _uiState.value.copy(isRunning = false, currentAction = "Operation Complete!", currentStep = "Done.", progress = 100)
-                    autoHideProgress()
+                    val finalMsg = if (isBackup) "Backup Complete!" else "Restore Complete!"
+                    showCompletionNotification(finalMsg, "Task finished successfully.")
+                    _uiState.value = _uiState.value.copy(isRunning = false, currentAction = finalMsg, currentStep = "Done.", progress = 100)
                 }
             } catch(e: Exception) {
                 withContext(Dispatchers.Main) {
+                    cancelNotification()
                     _uiState.value = _uiState.value.copy(isRunning = false, currentAction = "Error occurred", currentStep = e.message ?: "")
-                    autoHideProgress()
                 }
             }
         }
     }
 
-    fun clearNativeDataBackups(context: Context) {
+    fun deleteNativeBackups(context: Context, doSms: Boolean, doCall: Boolean, doContacts: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            Shell.cmd("su -c \"rm -rf '${_savedPath.value}/Native'\"").exec()
-            withContext(Dispatchers.Main) { Toast.makeText(context, "Native Backups Cleared", Toast.LENGTH_SHORT).show() }
+            val path = _savedPath.value
+            if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/'*sms*\"").exec()
+            if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/'*call*\"").exec()
+            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/'*contact*\"").exec()
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Selected Native Backups Deleted", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -242,6 +329,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(appList = updatedList)
     }
 
+    fun clearLogs() {
+        _uiState.value = _uiState.value.copy(logs = emptyList(), currentAction = "Operation Completed", currentStep = "", progress = 0)
+    }
+
     private fun fetchAppsList(type: String, append: Boolean = false) {
         if (!append) _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
@@ -286,19 +377,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(logs = currentLogs.takeLast(100))
                 },
                 updateProgress = { action, step, prog ->
+                    val safeAction = action.ifEmpty { "ROM Shifter" }
+                    // Update silent ongoing progress bar
+                    updateProgressNotification(safeAction, step, prog)
+
                     val newState = _uiState.value.copy()
                     if (action.isNotEmpty()) _uiState.value = newState.copy(currentAction = action)
                     if (step.isNotEmpty()) _uiState.value = newState.copy(currentStep = step)
                     if (prog >= 0) _uiState.value = newState.copy(progress = prog)
                 },
                 onComplete = { action, step ->
+                    showCompletionNotification(action, step)
+
                     when (state.migratorMode) {
-                        MigratorMode.DEBLOAT -> if (state.isRestoreDebloatMode) fetchAppsList("Uninstalled") else fetchAppsList("AllInstalled")
-                        MigratorMode.MANAGE -> { MigratorManager.clearCache(); fetchAppsList("AllBackups") }
+                        MigratorMode.DEBLOAT -> {
+                            MigratorManager.clearCache()
+                            if (state.isRestoreDebloatMode) fetchAppsList("Uninstalled") else fetchAppsList("AllInstalled")
+                        }
+                        MigratorMode.MANAGE -> {
+                            MigratorManager.clearCache()
+                            fetchAppsList("AllBackups")
+                        }
                         else -> {}
                     }
                     _uiState.value = _uiState.value.copy(isRunning = false, currentAction = action, currentStep = step, progress = 100)
-                    autoHideProgress()
                 }
             )
         }

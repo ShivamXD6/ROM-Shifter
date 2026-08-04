@@ -134,20 +134,19 @@ object MigratorManager {
             if (state.migratorMode == MigratorMode.DEBLOAT) {
                 if (state.isRestoreDebloatMode) {
                     selectedApps.forEachIndexed { index, app ->
-                        updateProgress("Restoring ${app.label}", "", ((index + 1) * 100) / selectedApps.size)
+                        updateProgress("Restoring Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
                         Shell.cmd("su -mm -c \"cmd package install-existing ${app.packageName}\"").exec()
                         updateLog("Restored: ${app.label}")
                     }
-                    onComplete("Restore Complete!", "Apps restored for User 0.")
+                    onComplete("Restore Complete!", "Successfully restored ${selectedApps.size} apps.")
                     return@withContext
                 } else {
                     selectedApps.forEachIndexed { index, app ->
-                        updateProgress("Debloating ${app.label}", "", ((index + 1) * 100) / selectedApps.size)
+                        updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
                         if (state.forceRemoveEnabled) {
-                            val pathOut = Shell.cmd("su -mm -c \"pm path ${app.packageName}\"").exec().out.joinToString("")
-                            val apkPath = pathOut.substringAfter("package:").trim()
-                            if (apkPath.startsWith("/system") || apkPath.startsWith("/product") || apkPath.startsWith("/vendor")) {
-                                val dir = apkPath.substringBeforeLast("/")
+                            val pathOut = Shell.cmd("su -mm -c \"pm path ${app.packageName}\"").exec().out.firstOrNull { it.startsWith("package:") }?.substringAfter("package:")?.trim() ?: ""
+                            if (pathOut.startsWith("/system") || pathOut.startsWith("/product") || pathOut.startsWith("/vendor")) {
+                                val dir = pathOut.substringBeforeLast("/")
                                 Shell.cmd("su -mm -c \"mount -o rw,remount /; mount -o rw,remount /system; mount -o rw,remount /product; mount -o rw,remount /vendor; rm -rf '$dir'\"").exec()
                                 Shell.cmd("su -mm -c \"pm uninstall --user 0 ${app.packageName}\"").exec()
                                 updateLog("Force Removed (rm -rf): ${app.label}")
@@ -160,7 +159,7 @@ object MigratorManager {
                             updateLog("Uninstalled: ${app.label}")
                         }
                     }
-                    onComplete("Debloat Complete!", "Apps removed.")
+                    onComplete("Debloat Complete!", "Successfully removed ${selectedApps.size} apps.")
                     return@withContext
                 }
             }
@@ -170,8 +169,8 @@ object MigratorManager {
                     val sysType = if (app.isSystem) "System" else "User"
                     Shell.cmd("su -mm -c \"rm -rf '$currentPath/Data-Migrated/$sysType/${app.label}'\"").exec()
                 }
-                updateProgress("Backups Deleted Successfully!", "", 100)
-                onComplete("Backups Deleted Successfully!", "Freed up storage space.")
+                updateProgress("Backups Deleted", "Data Successfully Removed", 100)
+                onComplete("Deletion Complete!", "Freed up storage space.")
                 return@withContext
             }
 
@@ -184,8 +183,11 @@ object MigratorManager {
                 Shell.cmd("su -c 'mkdir -p \"$upDir\" && echo \"$propContent\" > \"$upDir/module.prop\" && chmod 644 \"$upDir/module.prop\"'").exec()
 
                 selectedApps.forEachIndexed { index, app ->
-                    updateProgress("Systemizing ${app.label}", "", ((index + 1) * 100) / selectedApps.size)
-                    val apkPathOut = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out.joinToString("").substringAfter("package:").trim()
+                    updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
+
+                    val pathLines = Shell.cmd("su -c \"pm path ${app.packageName}\"").exec().out
+                    val apkPathOut = pathLines.firstOrNull { it.startsWith("package:") }?.substringAfter("package:")?.trim() ?: ""
+
                     if (apkPathOut.isNotEmpty()) {
                         val safeLabel = app.label.replace(Regex("[^a-zA-Z0-9]"), "_")
                         val baseTarget = if (isPrivilegedSystemize) "$upDir/system/product/priv-app" else "$upDir/system/product/app"
@@ -193,12 +195,13 @@ object MigratorManager {
 
                         val sourceDir = apkPathOut.substringBeforeLast("/")
 
-                        Shell.cmd("su -c 'mkdir -p \"$targetDir\" && cp -r \"$sourceDir/.\" \"$targetDir/\"'").exec()
-
-                        Shell.cmd("su -c 'find \"$targetDir\" -type d -exec chmod 755 {} \\;'").exec()
-                        Shell.cmd("su -c 'find \"$targetDir\" -type f -exec chmod 644 {} \\;'").exec()
+                        Shell.cmd("su -c 'mkdir -p \"$targetDir\" && cp -f \"$sourceDir\"/*.apk \"$targetDir/\"'").exec()
+                        Shell.cmd("su -c 'chmod 755 \"$targetDir\"'").exec()
+                        Shell.cmd("su -c 'chmod 644 \"$targetDir\"/*.apk'").exec()
 
                         updateLog("Systemized: ${app.label}")
+                    } else {
+                        updateLog("Failed to locate APK path for: ${app.label}")
                     }
                 }
                 onComplete("Systemization Complete!", "Please REBOOT to apply System Apps.")
@@ -220,18 +223,23 @@ object MigratorManager {
 
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString'\""
 
+            val actText = if (state.migratorMode.name.contains("RESTORE")) "Restoring Apps" else "Backing up Apps"
+
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
                     is ShifterEvent.BackupProgress -> {
-                        val actText = if (state.migratorMode.name.contains("RESTORE")) "Restoring" else "Backing up"
                         updateLog("[${event.percent}%] $actText ${event.label} - ${event.size}")
-                        updateProgress("$actText ${event.label} (${event.current}/${event.total})", "", event.percent)
+                        updateProgress(actText, "${event.label} (${event.current}/${event.total})", event.percent)
                     }
-                    is ShifterEvent.InfoStep -> { updateProgress("", event.msg, -1); updateLog(" -> ${event.msg}") }
+                    is ShifterEvent.InfoStep -> {
+                        // Removed updateProgress so Meta/Data/etc component steps NEVER hijack the main notification progress bar!
+                        updateLog(" -> ${event.msg}")
+                    }
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)
                         updateLog("DONE! Total Size: $smartSize. Time: ${event.timeSec}s")
-                        onComplete("Operation Completed", "Total Size: $smartSize | Time: ${event.timeSec}s")
+                        val actDone = if (state.migratorMode.name.contains("RESTORE")) "Restore Complete!" else "Backup Complete!"
+                        onComplete(actDone, "Total Size: $smartSize | Time: ${event.timeSec}s")
                     }
                     is ShifterEvent.RawLog -> updateLog(event.line)
                     else -> {}

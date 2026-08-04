@@ -167,23 +167,42 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
         Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
             when (appState.flashWizardStep) {
                 1 -> {
-                    SectionHeader("Step 1: Wipe Mode", "Select partitions to clear before flashing")
+                    SectionHeader("Wipe Configuration", "Select partitions to clear before flashing")
                     ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            val wipeModes = listOf(
-                                Triple(1, "Dirty (Dalvik, Cache)", "ex: flashing recovery or kernel"),
-                                Triple(2, "Clean (+ System, Data)", "ex: flashing roms or gapps"),
-                                Triple(3, "Format (+ Metadata, Format Data)", "ex: removing encryption or flashing firmware")
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            val availableWipes = listOf(
+                                "dalvik" to "Dalvik / ART Cache",
+                                "cache" to "Cache",
+                                "data" to "Data (Keeps internal storage)",
+                                "metadata" to "Metadata",
+                                "system" to "System (Legacy / Non-Dynamic)"
                             )
-                            wipeModes.forEach { (mode, title, desc) ->
-                                Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.setFlashWipeMode(mode) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = appState.flashWipeMode == mode, onClick = { viewModel.setFlashWipeMode(mode) })
+
+                            availableWipes.forEach { (partId, label) ->
+                                Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.toggleFlashWipePartition(partId) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(
+                                        checked = appState.flashWipePartitions.contains(partId),
+                                        onCheckedChange = { viewModel.toggleFlashWipePartition(partId) }
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(title, fontWeight = FontWeight.Medium)
-                                        Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                                    Text(label, fontWeight = FontWeight.Medium)
                                 }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
+                            Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.setFlashFormatData(!appState.flashFormatData) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Format Data", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                                    Text("Erase EVERYTHING including internal storage", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                                }
+                                Switch(
+                                    checked = appState.flashFormatData,
+                                    onCheckedChange = { viewModel.setFlashFormatData(it) },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.error, checkedTrackColor = MaterialTheme.colorScheme.errorContainer)
+                                )
                             }
                         }
                     }
@@ -191,7 +210,7 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                     Button(onClick = { isAppending = false; zipLauncher.launch(arrayOf("application/zip")) }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Next: Select ZIP Files") }
                 }
                 2 -> {
-                    SectionHeader("Step 2: Review & Order", "Valid ZIPs have been safely ordered")
+                    SectionHeader("Review & Order ZIPs", "Valid ZIPs have been safely ordered")
                     if (appState.isProcessingZips) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 40.dp))
                     } else {
@@ -223,20 +242,32 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
                 3 -> {
-                    SectionHeader("Step 3: Security Check", "Recovery cannot flash encrypted data")
+                    SectionHeader("Security Check", "Recovery cannot flash encrypted data")
                     if (appState.hasLockscreen) {
                         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.Lock, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text("Screen Lock Detected!", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                                Text("You must remove your PIN/Pattern before flashing to prevent FRP lock or decryption issues.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onErrorContainer)
+                                Text("You must remove your PIN/Pattern before flashing so recovery can decrypt your storage automatically.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onErrorContainer)
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Button(onClick = { context.startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onErrorContainer)) { Text("Open Settings") }
                             }
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("I've Removed It - Verify Again") }
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("I've Removed It - Verify Again") }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Note: Skipping means you MUST enter your password manually in recovery. Only proceed if your recovery touch works!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(onClick = { viewModel.generateOrsAndProceed() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Skip (Enter in Recovery)") }
+                        }
                     } else {
                         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {

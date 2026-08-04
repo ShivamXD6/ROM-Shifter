@@ -53,14 +53,17 @@ object FlashManager {
 
     fun checkLockscreen(): Boolean = !Shell.cmd("su -mm -c 'locksettings verify'").exec().isSuccess
 
-    fun generateOrsAndProceed(wipeMode: Int, zips: List<FlashZip>) {
+    fun generateOrsAndProceed(wipePartitions: Set<String>, formatData: Boolean, zips: List<FlashZip>) {
         val script = java.lang.StringBuilder()
-        if (wipeMode >= 1) { script.append("wipe dalvik\nwipe cache\n") }
-        if (wipeMode >= 2) { script.append("wipe system\nwipe data\n") }
-        if (wipeMode == 3) { script.append("wipe metadata\n") }
+
+        // Custom Partition Wipes
+        wipePartitions.forEach { script.append("wipe $it\n") }
+
         zips.forEach { script.append("install ${it.path}\n") }
-        if (wipeMode == 3) { script.append("format data\n") }
+
+        if (formatData) { script.append("format data\n") }
         script.append("reboot system\n")
+
         val safeScript = script.toString().replace("'", "'\\''")
         Shell.cmd("su -mm -c \"mkdir -p /cache/recovery && echo '$safeScript' > /cache/recovery/openrecoveryscript && chmod 666 /cache/recovery/openrecoveryscript\"").exec()
     }
