@@ -73,6 +73,14 @@ object MigratorManager {
                 val fetchedApps = allApps.map { app ->
                     async(Dispatchers.IO) {
                         if (!activeApps.contains(app.packageName)) {
+                            val apkExists = try {
+                                app.sourceDir != null && File(app.sourceDir).exists()
+                            } catch (e: Exception) { false }
+
+                            if (!apkExists) {
+                                return@async null
+                            }
+
                             val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
 

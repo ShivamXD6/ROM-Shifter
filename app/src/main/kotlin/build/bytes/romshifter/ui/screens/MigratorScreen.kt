@@ -134,7 +134,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 @Composable
 fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     val context = LocalContext.current
-
+    val isPrivileged by viewModel.isPrivilegedSystemize.collectAsState()
     val filteredApps by remember(appState.appList, appState.searchQuery, appState.showSystemApps, appState.showUserApps, appState.isRestoreDebloatMode) {
         derivedStateOf {
             appState.appList.filter {
@@ -146,7 +146,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     }
 
     var showForceRemoveWarning by remember { mutableStateOf(false) }
-    var menuExpanded by remember { mutableStateOf(false) }
     var isTerminalExpanded by remember { mutableStateOf(false) }
 
     // Native Deletion Dialog States
@@ -200,24 +199,45 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
+    if (showForceRemoveWarning) {
+        AlertDialog(
+            onDismissRequest = { showForceRemoveWarning = false },
+            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Enable Force Deletion?") },
+            text = { Text("This will completely wipe the app data from the root partitions to free up space.\n\nWarning: Apps removed this way CANNOT be restored later using ROM Shifter!", color = MaterialTheme.colorScheme.error) },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.setForceRemove(true); showForceRemoveWarning = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("I Understand, Enable") }
+            },
+            dismissButton = { TextButton(onClick = { showForceRemoveWarning = false }) { Text("Cancel") } }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
 
+        // GLOBAL COMPONENTS ROW (Backup / Restore)
         if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
-            LazyRow(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(horizontal = 16.dp)) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(compNames.entries.toList()) { entry ->
                     val isSelected = appState.globalComponents.contains(entry.key)
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.toggleGlobalComponent(entry.key) },
                         label = { Text(entry.value, style = MaterialTheme.typography.labelMedium) },
-                        leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } },
-                        modifier = Modifier.padding(end = 8.dp)
+                        leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } }
                     )
                 }
             }
         }
 
+        // SEARCH BAR ROW
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             TextField(
                 value = appState.searchQuery,
@@ -230,65 +250,112 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                modifier = Modifier.weight(1f).height(48.dp)
+                // FIX: Removed height(48.dp) so the text stops clipping!
+                modifier = Modifier.weight(1f)
             )
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            val isManageOrRestore = appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE
-            if (isManageOrRestore) {
-                val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
-                FilledTonalIconButton(onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) }, modifier = Modifier.size(48.dp), shape = CircleShape) {
-                    Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
-                }
-            } else {
-                Box {
-                    FilledTonalIconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(48.dp), shape = CircleShape) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
-                            val isPrivileged by viewModel.isPrivilegedSystemize.collectAsState()
-                            DropdownMenuItem(text = { Text("Privileged App Mode") }, trailingIcon = { if (isPrivileged) Icon(Icons.Default.Check, null) }, onClick = { viewModel.setPrivilegedSystemize(!isPrivileged); menuExpanded = false })
-                        } else {
-                            if (appState.migratorMode == MigratorMode.DEBLOAT) {
-                                DropdownMenuItem(text = { Text("Restore Debloated Apps") }, trailingIcon = { if (appState.isRestoreDebloatMode) Icon(Icons.Default.Check, null) }, onClick = { viewModel.toggleRestoreDebloatMode(); menuExpanded = false })
-                                HorizontalDivider()
-                            }
-                            if (!appState.isRestoreDebloatMode) {
-                                DropdownMenuItem(text = { Text("Show User Apps") }, trailingIcon = { if (appState.showUserApps) Icon(Icons.Default.Check, null) }, onClick = { viewModel.toggleShowUserApps(!appState.showUserApps); menuExpanded = false })
-                                DropdownMenuItem(text = { Text("Show System Apps") }, trailingIcon = { if (appState.showSystemApps) Icon(Icons.Default.Check, null) }, onClick = { viewModel.toggleSystemApps(); menuExpanded = false })
-                            }
-                            if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
-                                HorizontalDivider()
-                                DropdownMenuItem(text = { Text("Force Deletion (rm -rf)") }, trailingIcon = { if (appState.forceRemoveEnabled) Icon(Icons.Default.Check, null) }, onClick = { if(!appState.forceRemoveEnabled) showForceRemoveWarning = true else viewModel.setForceRemove(false); menuExpanded = false })
-                            }
-                            HorizontalDivider()
-                            val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
-                            DropdownMenuItem(text = { Text(if (allSelected) "Deselect All" else "Select All") }, onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps); menuExpanded = false })
-                        }
-                    }
-                }
-            }
-        }
-
-        // New Interactive Telephony Card strictly for Manage Backups Mode!
-        if (appState.migratorMode == MigratorMode.MANAGE) {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp).clickable { showNativeDeleteDialog = true },
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
+            FilledTonalIconButton(
+                onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) },
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape
             ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.SettingsPhone, contentDescription = "Telephony", tint = MaterialTheme.colorScheme.onErrorContainer)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Delete Telephony Backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                        Text("Individually remove SMS, Calls, or Contacts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f))
-                    }
+                Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
+            }
+        }
+
+        // DYNAMIC CONTEXTUAL CHIPS ROW (Replaces Big Cards!)
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Debloat Toggles
+            if (appState.migratorMode == MigratorMode.DEBLOAT) {
+                item {
+                    FilterChip(
+                        selected = appState.isRestoreDebloatMode,
+                        onClick = { viewModel.toggleRestoreDebloatMode() },
+                        label = { Text("Restore Mode") },
+                        leadingIcon = { Icon(Icons.Default.Restore, null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
+
+            // App Type Toggles (Hide if in Systemize or Restore-Debloat mode)
+            if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.SYSTEMIZE) {
+                item {
+                    FilterChip(
+                        selected = appState.showUserApps,
+                        onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) },
+                        label = { Text("User Apps") },
+                        leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = appState.showSystemApps,
+                        onClick = { viewModel.toggleSystemApps() },
+                        label = { Text("System Apps") },
+                        leadingIcon = { Icon(Icons.Default.Android, null, modifier = Modifier.size(16.dp)) }
+                    )
+                }
+            }
+
+            // Force Deletion Chip (Red Warning Theme)
+            if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
+                item {
+                    FilterChip(
+                        selected = appState.forceRemoveEnabled,
+                        onClick = { if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning = true },
+                        label = { Text("Force Deletion") },
+                        leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    )
+                }
+            }
+
+            // Privileged App Chip
+            if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
+                item {
+                    FilterChip(
+                        selected = isPrivileged,
+                        onClick = { viewModel.setPrivilegedSystemize(!isPrivileged) },
+                        label = { Text("Privileged Mode") },
+                        leadingIcon = { Icon(Icons.Default.SecurityUpdateGood, null, modifier = Modifier.size(16.dp)) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    )
+                }
+            }
+
+            // Delete Telephony Chip
+            if (appState.migratorMode == MigratorMode.MANAGE) {
+                item {
+                    AssistChip(
+                        onClick = { showNativeDeleteDialog = true },
+                        label = { Text("Delete Telephony") },
+                        leadingIcon = { Icon(Icons.Default.SettingsPhone, null, modifier = Modifier.size(16.dp)) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            labelColor = MaterialTheme.colorScheme.onErrorContainer,
+                            leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    )
                 }
             }
         }
 
+        // APP LIST CONTAINER
         Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
             if (appState.isFetchingApps) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
@@ -303,6 +370,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
+        // BOTTOM ACTION ROW
         val selectedCount = appState.appList.count { it.isSelected }
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),

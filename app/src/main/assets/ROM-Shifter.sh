@@ -431,7 +431,8 @@ do_systemize() {
     mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
     mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
 
-    local APK_PATH=$(pm path "$PKG" | sed 's/^package://')
+    local APK_PATH=$(pm path "$PKG" | sed 's/^package://' | head -n 1 | tr -d '\r')
+
     if [ -n "$APK_PATH" ]; then
         local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
         local TARGET_DIR=""
@@ -443,7 +444,7 @@ do_systemize() {
         local SOURCE_DIR=$(dirname "$APK_PATH")
 
         mkdir -p "$TARGET_DIR"
-        cp -rf "$SOURCE_DIR"/*.apk "$TARGET_DIR/"
+        cp -f "$SOURCE_DIR"/*.apk "$TARGET_DIR/"
         chmod 755 "$TARGET_DIR"
         chmod 644 "$TARGET_DIR"/*.apk
         echo "SYSTEMIZED"
@@ -452,7 +453,6 @@ do_systemize() {
     fi
 }
 
-# --- ENTRY POINT ---
 ensure_root
 init_shifter
 
