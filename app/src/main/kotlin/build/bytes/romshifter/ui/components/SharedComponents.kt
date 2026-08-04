@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.sp
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.utils.getAvatarColor
 import build.bytes.romshifter.utils.toSafeBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 
 @Composable
 fun SectionHeader(title: String, subtitle: String) {
@@ -53,14 +56,46 @@ fun MenuCard(title: String, icon: ImageVector, desc: String, onClick: () -> Unit
 
 @Composable
 fun AppListItem(app: AppInfo, onToggleSelect: (String) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().clickable { onToggleSelect(app.packageName) }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (app.icon != null) {
-            Image(bitmap = app.icon.toSafeBitmap().asImageBitmap(), contentDescription = "App Icon", modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
-        } else {
-            val letter = app.label.firstOrNull()?.uppercase() ?: "?"
-            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(getAvatarColor(app.label)), contentAlignment = Alignment.Center) { Text(text = letter, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleSelect(app.packageName) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (app.iconBitmap != null) {
+            Image(
+                bitmap = app.iconBitmap.asImageBitmap(),
+                contentDescription = "App Icon",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
         }
+        else if (app.iconPath != null) {
+            AsyncImage(
+                model = app.iconPath,
+                contentDescription = "App Icon",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            )
+        }
+        else {
+            val letter = app.label.firstOrNull()?.uppercase() ?: "?"
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(getAvatarColor(app.label)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = letter, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            }
+        }
+
         Spacer(modifier = Modifier.width(16.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(text = app.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(text = app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)

@@ -1,7 +1,7 @@
 package build.bytes.romshifter.models
 
-import android.graphics.drawable.Drawable
 import androidx.compose.runtime.Stable
+import android.graphics.Bitmap
 
 enum class MigratorMode { MENU, BACKUP_APPS, RESTORE_APPS, MANAGE, DEBLOAT, SYSTEMIZE }
 
@@ -12,7 +12,8 @@ data class AppInfo(
     val version: String = "",
     val isSystem: Boolean = false,
     val isSelected: Boolean = false,
-    val icon: Drawable? = null
+    val iconBitmap: Bitmap? = null,
+    val iconPath: String? = null
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)
