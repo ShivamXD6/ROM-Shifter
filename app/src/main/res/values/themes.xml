@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The parent MUST be NoActionBar so it doesn't collide with Compose -->
     <style name="Theme.ROMShifter" parent="android:Theme.DeviceDefault.NoActionBar">
-        <!-- Sets the native background to black before Compose loads -->
-        <item name="android:windowBackground">@color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 </resources>

@@ -35,8 +35,6 @@ data class AppState(
     val hasRoot: Boolean = true,
     val forceRemoveEnabled: Boolean = false,
     val flashWizardStep: Int = 0,
-
-    // Updated Auto-Flash Variables
     val flashWipePartitions: Set<String> = setOf("dalvik", "cache"),
     val flashFormatData: Boolean = false,
     val flashZips: List<FlashZip> = emptyList(),
