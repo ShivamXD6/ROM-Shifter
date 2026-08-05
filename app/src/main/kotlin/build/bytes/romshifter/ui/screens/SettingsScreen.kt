@@ -59,8 +59,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
             title = { Text("Reset Application Data", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-            text = { Text("This will permanently clear application caches, remove binary engines, reset configurations, and restart the app. Are you sure?") },
-            confirmButton = { Button(onClick = { showResetDialog = false; viewModel.resetApp(context) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Wipe & Restart") } },
+            text = { Text("This will permanently clear application data, remove binary engines, reset configurations, and restart the app. Are you sure?") },            confirmButton = { Button(onClick = { showResetDialog = false; viewModel.resetApp(context) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Cancel") } }
         )
     }
@@ -183,8 +182,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel, isDarkTheme: Boolean
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Reset Application", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Text("Clear all caches and reset engine", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                        Text("Clear all data and reset engine", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)                    }
                 }
             }
         }

@@ -15,14 +15,14 @@ object SettingsManager {
 
     fun migrateFolder(oldPath: String, newPath: String, prefs: SharedPreferences) {
         if (oldPath != newPath && oldPath.isNotBlank() && newPath.isNotBlank()) {
-            Shell.cmd("su -mm -c \"mkdir -p '$newPath' && touch '$newPath/.shifter_dir'\"").exec()
-            Shell.cmd("su -mm -c \"mv '$oldPath'/* '$newPath'/ 2>/dev/null; rm -rf '$oldPath'\"").exec()
+            Shell.cmd("mkdir -p '$newPath' && touch '$newPath/.shifter_dir'").exec()
+            Shell.cmd("mv '$oldPath'/* '$newPath'/ 2>/dev/null; rm -rf '$oldPath'").exec()
             prefs.edit { putString("base_path", newPath) }
         }
     }
 
     fun autoDetectFolder(prefs: SharedPreferences): String? {
-        val out = Shell.cmd("su -mm -c \"find /storage /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name '.shifter_dir' 2>/dev/null | head -n 1\"").exec().out.joinToString("").trim()
+        val out = Shell.cmd("find /storage /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name '.shifter_dir' 2>/dev/null | head -n 1").exec().out.joinToString("").trim()
         if (out.isNotEmpty()) {
             val detectedPath = out.substringBeforeLast("/")
             prefs.edit { putString("base_path", detectedPath) }
@@ -32,8 +32,9 @@ object SettingsManager {
     }
 
     fun resetApp(context: Context) {
-        Shell.cmd("su -mm -c \"rm -rf /data/adb/#Shifter\"").exec()
-        Shell.cmd("su -c \"pm clear ${context.packageName}\"").exec()
+        val pkg = context.packageName
+        Shell.cmd("rm -rf '/data/adb/#Shifter'").exec()
+        Shell.cmd("pm clear $pkg").exec()
     }
 
     fun exportLogs(logs: List<String>, savedPath: String, cacheDir: File) {
@@ -41,7 +42,8 @@ object SettingsManager {
         val targetFile = "$savedPath/Debug_Logs.txt"
         val tempLog = File(cacheDir, "temp_logs.txt")
         tempLog.writeText(logData)
-        Shell.cmd("su -mm -c \"cp '${tempLog.absolutePath}' '$targetFile' && chmod 666 '$targetFile'\"").exec()
+
+        Shell.cmd("cp '${tempLog.absolutePath}' '$targetFile' && chmod 666 '$targetFile'").exec()
         tempLog.delete()
     }
 }

@@ -312,12 +312,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetApp(context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val pkg = context.packageName
-            Shell.cmd("su -c '(sleep 2 && pm clear $pkg && am start -n $pkg/build.bytes.romshifter.MainActivity) &'")
-                .exec()
-            withContext(Dispatchers.Main) { kotlin.system.exitProcess(0) }
-        }
+        SettingsManager.resetApp(context)
     }
 
     fun runNativeDataOperation(
