@@ -132,9 +132,8 @@ DO_BACKUP() {
         if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
             if [ "$CUR_APP" -gt 0 ] && [ -n "$apks" ]; then
                 echo "INFO:STEP|MSG:App (Base & Splits)"
-                echo "$apks" | sed 's|^/||' > "$APP_DIR/app_files.txt"
-                tar -cf - -C / -T "$APP_DIR/app_files.txt" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" & ACT=1
-            else rm -f "$APP_DIR/App.bundle.pack"; fi
+                echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" & ACT=1
+                else rm -f "$APP_DIR/App.bundle.pack"; fi
             OLD_APP=$CUR_APP
         fi
     fi
