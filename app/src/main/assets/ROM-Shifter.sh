@@ -4,44 +4,17 @@
 # ==========================================
 
 BIN_DIR="/data/adb/#Shifter"
-CACHE_DIR="$BIN_DIR/.cache"
-CONFIG_FILE="$BIN_DIR/.config"
 ZAPDOS="$BIN_DIR/zapdos"
-ZAPDOS_HASH="a03b08f73703daf906c1c56316394dd22be8d5b63bec79dfddd430c8bce6af9c"
 JOBS=$(nproc 2>/dev/null || echo 4)
-
 AM_TMP="/data/local/tmp/appmgr_tmp"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-
-verify_binaries() {
-    local actual_zapdos=$(sha256sum "$BIN_DIR/zapdos" 2>/dev/null | awk '{print $1}')
-    if [ "$actual_zapdos" != "$ZAPDOS_HASH" ]; then
-        echo "ERROR:TAMPER|MSG:zapdos binary is corrupted" >&2
-        rm -f "$BIN_DIR/zapdos"
-        exit 1
-    fi
-}
-
-extract_binaries() {
-    if [ ! -x "$BIN_DIR/zapdos" ]; then
-        echo "INFO:EXTRACT|MSG:Extracting zapdos..."
-        awk '/^__ZAPDOS__/{flag=1; next} flag' "$0" | base64 -d | busybox gzip -d > "$BIN_DIR/zapdos" 2>/dev/null
-        chmod +x "$BIN_DIR/zapdos"
-    fi
-    verify_binaries
-}
-
-ensure_root() {
-    [ "$(id -u)" != "0" ] && { echo "ERROR:ROOT|MSG:Please run as root."; exit 1; }
-    mkdir -p "$BIN_DIR" "$CACHE_DIR" "$AM_TMP"
-    extract_binaries
-}
+MAIN_DIR="/sdcard/#Shifter"
+BACKUP_BASE="$MAIN_DIR/Data-Migrated"
+LP_DIR="$MAIN_DIR/Live-Partition"
 
 init_shifter() {
-    MAIN_DIR="/sdcard/#Shifter"
-    BACKUP_BASE="$MAIN_DIR/Data-Migrated"
-    LP_DIR="$MAIN_DIR/Live-Partition"
-    mkdir -p "$BACKUP_BASE" "$LP_DIR"
+     mkdir -p "$BIN_DIR" "$AM_TMP" "$BACKUP_BASE" "$LP_DIR"
+     chmod +x "$ZAPDOS" 2>/dev/null
 }
 
 # --- Utility Functions ---
@@ -453,7 +426,6 @@ do_systemize() {
     fi
 }
 
-ensure_root
 init_shifter
 
 case "$1" in

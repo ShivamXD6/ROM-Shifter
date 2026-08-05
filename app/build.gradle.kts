@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "build.bytes.romshifter"
-        minSdk = 28
+        minSdk = 24
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -30,25 +30,34 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a")
+            include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = false
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols.add("**/libzapdos.so")
+            keepDebugSymbols.add("**/libandroidx.graphics.path.so")
+        }
+    }
 }
 
 dependencies {
-    // libsu for root execution
-    val libsuVersion = "6.0.0"
-    implementation("com.github.topjohnwu.libsu:core:$libsuVersion")
-    implementation("com.github.topjohnwu.libsu:io:$libsuVersion")
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    // Root execution
+    implementation(libs.libsu.core)
+    implementation(libs.libsu.io)
+
+    // UI & System
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.graphics.path)
 
     // Jetpack Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -68,12 +77,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Image Loading (Crucial for fixing our memory leak later)
+    // Image Loading
     implementation(libs.coil.compose)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.core)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
