@@ -49,6 +49,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isPrivilegedSystemize = MutableStateFlow(false)
 
+    private val _themeMode = MutableStateFlow(prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM")
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _accentColor = MutableStateFlow(prefs.getString("accent_color", "BLUE") ?: "BLUE")
+    val accentColor: StateFlow<String> = _accentColor.asStateFlow()
+
+    private val _customHex = MutableStateFlow(prefs.getString("custom_hex", "#FF5733") ?: "#FF5733")
+    val customHex: StateFlow<String> = _customHex.asStateFlow()
+
     private val notificationManager = NotificationManagerCompat.from(application)
     private val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
     private val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
@@ -69,6 +78,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun setThemeMode(mode: String) {
+        _themeMode.value = mode
+        prefs.edit { putString("theme_mode", mode) }
+    }
+
+    fun setAccentColor(colorName: String) {
+        _accentColor.value = colorName
+        prefs.edit { putString("accent_color", colorName) }
+    }
+
+    fun setCustomHex(hex: String) {
+        _customHex.value = hex
+        prefs.edit { putString("custom_hex", hex) }
     }
 
     private fun createNotificationChannel() {

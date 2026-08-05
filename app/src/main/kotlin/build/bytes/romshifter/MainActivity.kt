@@ -1,31 +1,24 @@
 package build.bytes.romshifter
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.core.content.edit
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import build.bytes.romshifter.ui.screens.MainScreen
+import build.bytes.romshifter.ui.theme.ROMShifterTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -34,29 +27,30 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val prefs = getSharedPreferences("shifter_prefs", MODE_PRIVATE)
+
         setContent {
-            val context = LocalContext.current
-            var isDarkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
-            val colorScheme = when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> { if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
-                isDarkTheme -> darkColorScheme()
-                else -> lightColorScheme()
+            val themeMode by viewModel.themeMode.collectAsState()
+            val accentColor by viewModel.accentColor.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+
+            val isDark = when (themeMode) {
+                "DARK_DYNAMIC", "DARK_STATIC" -> true
+                "LIGHT_DYNAMIC", "LIGHT_STATIC" -> false
+                else -> systemDark
             }
+
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = this@MainActivity.window
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDarkTheme
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDarkTheme
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
                 }
             }
-            MaterialTheme(colorScheme = colorScheme) {
+
+            ROMShifterTheme(themeMode = themeMode, accentColor = accentColor) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen(viewModel, isDarkTheme) {
-                        isDarkTheme = !isDarkTheme
-                        prefs.edit { putBoolean("dark_theme", isDarkTheme) }
-                    }
+                    MainScreen(viewModel = viewModel)
                 }
             }
         }

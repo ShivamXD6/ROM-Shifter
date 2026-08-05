@@ -1,8 +1,5 @@
 package build.bytes.romshifter.ui.screens
 
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import build.bytes.romshifter.R
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -13,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,14 +18,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import build.bytes.romshifter.MainViewModel
+import build.bytes.romshifter.R
 import build.bytes.romshifter.models.MigratorMode
 
 fun openUriSafely(context: Context, uriString: String) {
@@ -42,7 +39,7 @@ fun openUriSafely(context: Context, uriString: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: () -> Unit) {
+fun MainScreen(viewModel: MainViewModel) {
     val appState by viewModel.uiState.collectAsState()
     val isFirstRun by viewModel.isFirstRun.collectAsState()
     var selectedTab by remember { mutableIntStateOf(1) }
@@ -92,9 +89,10 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (dynamicTitle == "ROM Shifter") {
-                            Image(
+                            Icon(
                                 painter = painterResource(id = R.drawable.ic_home),
                                 contentDescription = "Logo",
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
@@ -113,11 +111,12 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
                 },
                 actions = {
                     if (appState.migratorMode == MigratorMode.MENU && !showSettings && appState.flashWizardStep == 0) {
-                        IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, contentDescription = "Settings") }
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
-            )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)            )
         },
         bottomBar = {
             AnimatedVisibility(
@@ -125,14 +124,23 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+                NavigationBar(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent, // Blended background
+                    tonalElevation = 0.dp // Removes MD2 shadow line
+                ) {
                     tabs.forEachIndexed { index, tab ->
                         NavigationBarItem(
                             icon = { Icon(imageVector = tab.second, contentDescription = tab.first) },
                             label = { Text(text = tab.third, style = MaterialTheme.typography.labelSmall) },
                             selected = selectedTab == index,
                             onClick = { selectedTab = index; if (index != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer)
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                indicatorColor = MaterialTheme.colorScheme.secondaryContainer, // Pill shape indicator
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
                 }
@@ -141,7 +149,7 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             if (showSettings) {
-                SettingsTab(LocalContext.current, viewModel, isDarkTheme, onThemeToggle)
+                SettingsTab(LocalContext.current, viewModel)
             } else {
                 when (selectedTab) {
                     0 -> FlashTab(LocalContext.current, viewModel)
