@@ -56,7 +56,6 @@ object FlashManager {
     fun generateOrsAndProceed(wipePartitions: Set<String>, formatData: Boolean, zips: List<FlashZip>) {
         val script = java.lang.StringBuilder()
 
-        // Custom Partition Wipes
         wipePartitions.forEach { script.append("wipe $it\n") }
 
         zips.forEach { script.append("install ${it.path}\n") }

@@ -49,7 +49,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isPrivilegedSystemize = MutableStateFlow(false)
 
-    // Split notification IDs to guarantee the final state rings!
     private val notificationManager = NotificationManagerCompat.from(application)
     private val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
     private val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
@@ -101,11 +100,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
         ) {
 
-            // This displays the exact percentage in the notification body!
             val displayContent = if (progress in 0..100) "$content  •  $progress%" else content
 
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setSmallIcon(R.drawable.ic_home)
                 .setContentTitle(title)
                 .setContentText(displayContent)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -119,7 +117,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // High priority ringing alert for completion
     private fun showCompletionNotification(title: String, content: String) {
         if (ContextCompat.checkSelfPermission(
                 getApplication(),
@@ -127,12 +124,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
         ) {
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_ALERT_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setSmallIcon(R.drawable.ic_home)
                 .setContentTitle(title)
                 .setContentText(content)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
-                .setDefaults(NotificationCompat.DEFAULT_ALL) // Forces ring and vibration!
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
 
             notificationManager.notify(NOTIFICATION_ID, builder.build())
         }
@@ -581,7 +578,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         viewModelScope.launch {
-            // Extract the callbacks so we can pass them cleanly to either manager
             val updateLog: (String) -> Unit = { log ->
                 val currentLogs = _uiState.value.logs.toMutableList()
                 currentLogs.add(log)
@@ -590,7 +586,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
                 val safeAction = action.ifEmpty { "ROM Shifter" }
-                // Update silent ongoing progress bar
                 updateProgressNotification(safeAction, step, prog)
 
                 val newState = _uiState.value.copy()
@@ -625,7 +620,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Route the operation to the correct manager!
             when (state.migratorMode) {
                 MigratorMode.DEBLOAT -> {
                     ExtrasManager.runDebloatOperation(
@@ -651,7 +645,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 else -> {
-                    // Backup, Restore, and Manage routes here
                     MigratorManager.runDynamicOperation(
                         context = getApplication(),
                         state = state,

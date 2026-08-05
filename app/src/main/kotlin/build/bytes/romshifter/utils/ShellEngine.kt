@@ -14,33 +14,24 @@ object ShellEngine {
      */
     fun executeShifterCommand(command: String): Flow<ShifterEvent> = callbackFlow {
 
-        // CallbackList intercepts each line of stdout as it happens
         val outputList = object : CallbackList<String>() {
             override fun onAddElement(line: String) {
-                // Parse the line and send it to the Flow
                 trySend(parseLine(line))
             }
         }
 
-        // Submit the command asynchronously
         Shell.cmd(command)
-            .to(outputList, outputList) // Route both stdout and stderr to our list
+            .to(outputList, outputList)
             .submit {
-                // This block runs when the shell command finishes completely
                 close()
             }
 
-        // Suspend until the Flow collector is cancelled or the shell job finishes
         awaitClose { }
     }
 
-    /**
-     * Parses the pipe-delimited strings from the bash script into Kotlin Data Classes
-     */
     private fun parseLine(line: String): ShifterEvent {
         if (!line.contains("|")) return ShifterEvent.RawLog(line)
 
-        // Convert "ACTION:BACKUP_START|PKG:com.whatsapp" into a Map
         val parts = line.split("|").associate { segment ->
             val kv = segment.split(":", limit = 2)
             if (kv.size == 2) kv[0] to kv[1] else segment to ""
@@ -68,7 +59,6 @@ object ShellEngine {
             action == "FETCH_DONE" -> ShifterEvent.FetchDone(
                 file = parts["FILE"] ?: ""
             )
-            // Catch-all for ERROR:TAMPER, ERROR:ROOT, etc.
             else -> ShifterEvent.RawLog(line)
         }
     }

@@ -5,12 +5,11 @@ plugins {
 
 android {
     namespace = "build.bytes.romshifter"
-
     compileSdk = 37
 
     defaultConfig {
         applicationId = "build.bytes.romshifter"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -31,7 +30,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a") // Only build for modern 64-bit Android phones
+            include("arm64-v8a")
             isUniversalApk = false
         }
     }

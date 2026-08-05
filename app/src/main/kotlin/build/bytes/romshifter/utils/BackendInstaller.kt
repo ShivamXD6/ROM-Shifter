@@ -9,7 +9,7 @@ import java.io.File
 object BackendInstaller {
     suspend fun installEngine(context: Context): Boolean = withContext(Dispatchers.IO) {
         val targetDir = "/data/adb/#Shifter"
-        val filesToCopy = listOf("ROM-Shifter.sh", "zapdos") // Removed Porygonz
+        val filesToCopy = listOf("ROM-Shifter.sh", "zapdos")
         val cacheDir = context.cacheDir
 
         try {

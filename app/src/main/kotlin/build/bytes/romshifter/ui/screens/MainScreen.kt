@@ -1,5 +1,8 @@
 package build.bytes.romshifter.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import build.bytes.romshifter.R
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -89,10 +92,13 @@ fun MainScreen(viewModel: MainViewModel, isDarkTheme: Boolean, onThemeToggle: ()
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (dynamicTitle == "ROM Shifter") {
-                            Icon(Icons.Default.Bolt, contentDescription = "Logo", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_home),
+                                contentDescription = "Logo",
+                                modifier = Modifier.size(28.dp)
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                         }
-                        // Subtitle removed, back to clean dynamic titles!
                         Text(text = dynamicTitle, fontWeight = FontWeight.Bold, fontFamily = FontFamily.SansSerif, letterSpacing = 0.5.sp)
                     }
                 },
@@ -218,7 +224,6 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                     OutlinedButton(onClick = { launcher.launch(null) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(26.dp)) { Text("Select Folder Manually") }
                 }
                 3 -> {
-                    // Auto-request notifications when landing on step 3!
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                         LaunchedEffect(Unit) {
                             notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)

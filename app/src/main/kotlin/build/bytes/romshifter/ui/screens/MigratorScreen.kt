@@ -148,7 +148,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     var showForceRemoveWarning by remember { mutableStateOf(false) }
     var isTerminalExpanded by remember { mutableStateOf(false) }
 
-    // Native Deletion Dialog States
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
@@ -218,7 +217,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     Column(modifier = Modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // GLOBAL COMPONENTS ROW (Backup / Restore)
         if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
             LazyRow(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -237,7 +235,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        // SEARCH BAR ROW
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             TextField(
                 value = appState.searchQuery,
@@ -250,7 +247,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                // FIX: Removed height(48.dp) so the text stops clipping!
                 modifier = Modifier.weight(1f)
             )
 
@@ -266,13 +262,11 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        // DYNAMIC CONTEXTUAL CHIPS ROW (Replaces Big Cards!)
         LazyRow(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Debloat Toggles
             if (appState.migratorMode == MigratorMode.DEBLOAT) {
                 item {
                     FilterChip(
@@ -284,7 +278,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 }
             }
 
-            // App Type Toggles (Hide if in Systemize or Restore-Debloat mode)
             if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.SYSTEMIZE) {
                 item {
                     FilterChip(
@@ -304,7 +297,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 }
             }
 
-            // Force Deletion Chip (Red Warning Theme)
             if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
                 item {
                     FilterChip(
@@ -321,7 +313,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 }
             }
 
-            // Privileged App Chip
             if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
                 item {
                     FilterChip(
@@ -338,7 +329,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 }
             }
 
-            // Delete Telephony Chip
             if (appState.migratorMode == MigratorMode.MANAGE) {
                 item {
                     AssistChip(
@@ -355,7 +345,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        // APP LIST CONTAINER
         Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
             if (appState.isFetchingApps) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
@@ -370,7 +359,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        // BOTTOM ACTION ROW
         val selectedCount = appState.appList.count { it.isSelected }
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
