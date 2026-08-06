@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -29,26 +27,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val themeMode by viewModel.themeMode.collectAsState()
-            val accentColor by viewModel.accentColor.collectAsState()
             val systemDark = isSystemInDarkTheme()
-
-            val isDark = when (themeMode) {
-                "DARK_DYNAMIC", "DARK_STATIC" -> true
-                "LIGHT_DYNAMIC", "LIGHT_STATIC" -> false
-                else -> systemDark
-            }
 
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = this@MainActivity.window
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
+                    // Directly use system dark mode for status/navigation bar icons
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !systemDark
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !systemDark
                 }
             }
 
-            ROMShifterTheme(themeMode = themeMode, accentColor = accentColor) {
+            // Simplified theme call without deprecated parameters
+            ROMShifterTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(viewModel = viewModel)
                 }

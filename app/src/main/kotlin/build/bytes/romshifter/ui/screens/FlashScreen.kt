@@ -5,12 +5,15 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,15 +22,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.ui.components.MenuCard
-import build.bytes.romshifter.ui.components.SectionHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,40 +43,116 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
     val appState by viewModel.uiState.collectAsState()
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
+
+    var selectedBackupPartitions by remember { mutableStateOf(setOf<String>()) }
     var selectedPartition by remember { mutableStateOf("") }
+
     var restoreMode by remember { mutableStateOf("backup") }
     var customImgPath by remember { mutableStateOf("") }
     var allPartitions by remember { mutableStateOf(listOf<String>()) }
     var backedUpImages by remember { mutableStateOf(listOf<String>()) }
     var isAppending by remember { mutableStateOf(false) }
+    var partitionSearchQuery by remember { mutableStateOf("") }
 
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.processSelectedZips(uris, isAppending)
     }
+
+    // FIX: Ensure users cannot select non-img files (like ZIPs) and display an error toast
     val imgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            build.bytes.romshifter.utils.FlashManager.getPathFromUri(context, uri)?.let { customImgPath = it }
+            build.bytes.romshifter.utils.FlashManager.getPathFromUri(context, uri)?.let { path ->
+                if (path.endsWith(".img", ignoreCase = true)) {
+                    customImgPath = path
+                } else {
+                    Toast.makeText(context, "Invalid file. Please select a valid .img partition file.", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
     if (showBackupDialog) {
-        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions() } }
+        LaunchedEffect(Unit) {
+            partitionSearchQuery = "" // Reset search when opened
+            selectedBackupPartitions = emptySet() // Reset selections
+            withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions() }
+        }
+
+        val filteredPartitions = allPartitions.filter { it.contains(partitionSearchQuery, ignoreCase = true) }
+
         AlertDialog(
             onDismissRequest = { showBackupDialog = false },
-            title = { Text("Backup Partition", fontWeight = FontWeight.Bold) },
+            title = { Text("Backup Partitions", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Select a partition to securely extract to local storage:", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Select partitions to securely extract to local storage:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TextField(
+                            value = partitionSearchQuery,
+                            onValueChange = { partitionSearchQuery = it },
+                            placeholder = { Text("Search partitions...", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(20.dp)) },
+                            singleLine = true,
+                            shape = CircleShape,
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        val allSelected = filteredPartitions.isNotEmpty() && filteredPartitions.all { selectedBackupPartitions.contains(it) }
+                        FilledTonalIconButton(
+                            onClick = {
+                                selectedBackupPartitions = if (allSelected) {
+                                    selectedBackupPartitions - filteredPartitions.toSet()
+                                } else {
+                                    selectedBackupPartitions + filteredPartitions.toSet()
+                                }
+                            },
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape
+                        ) {
+                            Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
+                        }
+                    }
+
                     if (allPartitions.isEmpty()) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp))
+                    } else if (filteredPartitions.isEmpty()) {
+                        Text("No partitions found.", modifier = Modifier.align(Alignment.CenterHorizontally).padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
-                            items(allPartitions) { part ->
-                                Row(modifier = Modifier.fillMaxWidth().clickable { selectedPartition = part }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = selectedPartition == part, onClick = { selectedPartition = part })
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(part, fontWeight = FontWeight.Medium)
+                            items(filteredPartitions) { part ->
+                                val isSelected = selectedBackupPartitions.contains(part)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                                        .clickable {
+                                            selectedBackupPartitions = if (isSelected) selectedBackupPartitions - part else selectedBackupPartitions + part
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = null
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = part,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             }
                         }
@@ -76,19 +160,31 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    if (selectedPartition.isNotBlank()) {
-                        viewModel.runLiveOperation("--live-backup", selectedPartition) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                        showBackupDialog = false
-                    }
-                }) { Text("Backup") }
+                Button(
+                    onClick = {
+                        if (selectedBackupPartitions.isNotEmpty()) {
+                            selectedBackupPartitions.forEach { part ->
+                                viewModel.runLiveOperation("--live-backup", part) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            }
+                            showBackupDialog = false
+                        }
+                    },
+                    enabled = selectedBackupPartitions.isNotEmpty()
+                ) {
+                    val text = if (selectedBackupPartitions.isEmpty()) "Backup" else "Backup (${selectedBackupPartitions.size})"
+                    Text(text)
+                }
             },
             dismissButton = { TextButton(onClick = { showBackupDialog = false }) { Text("Cancel") } }
         )
     }
 
     if (showRestoreDialog) {
-        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions(); backedUpImages = viewModel.getBackedUpImages() } }
+        LaunchedEffect(Unit) {
+            partitionSearchQuery = "" // Reset search when opened
+            withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions(); backedUpImages = viewModel.getBackedUpImages() }
+        }
+
         AlertDialog(
             onDismissRequest = { showRestoreDialog = false },
             title = { Text("Flash Partition", fontWeight = FontWeight.Bold) },
@@ -101,13 +197,13 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                             Text("Warning: Live flashing modifies raw hardware partitions. Incorrect images will hard brick your device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                         FilterChip(selected = restoreMode == "backup", onClick = { restoreMode = "backup"; selectedPartition = "" }, label = { Text("From Backup") })
                         Spacer(Modifier.width(8.dp))
                         FilterChip(selected = restoreMode == "custom", onClick = { restoreMode = "custom"; selectedPartition = "" }, label = { Text("Custom .img") })
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     if (restoreMode == "backup") {
                         if (backedUpImages.isEmpty()) {
@@ -115,15 +211,31 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                         } else {
                             LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
                                 items(backedUpImages) { img ->
-                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Row(modifier = Modifier.weight(1f).clickable { selectedPartition = img }, verticalAlignment = Alignment.CenterVertically) {
-                                            RadioButton(selected = selectedPartition == img, onClick = { selectedPartition = img })
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(img, fontWeight = FontWeight.Medium)
+                                    val isSelected = selectedPartition == img
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                                            .clickable { selectedPartition = img }
+                                            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            RadioButton(selected = isSelected, onClick = null)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text(
+                                                text = img,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                                            )
                                         }
                                         IconButton(onClick = {
                                             viewModel.deleteLivePartitionImage(img)
                                             backedUpImages = backedUpImages.filter { it != img }
+                                            if (selectedPartition == img) selectedPartition = ""
                                         }) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error) }
                                     }
                                 }
@@ -134,13 +246,45 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                             Text(if (customImgPath.isEmpty()) "Select .img File" else customImgPath.substringAfterLast("/"))
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Target Partition:", style = MaterialTheme.typography.labelMedium)
+
+                        TextField(
+                            value = partitionSearchQuery,
+                            onValueChange = { partitionSearchQuery = it },
+                            placeholder = { Text("Search target partition...", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(20.dp)) },
+                            singleLine = true,
+                            shape = CircleShape,
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        )
+
+                        val filteredPartitions = allPartitions.filter { it.contains(partitionSearchQuery, ignoreCase = true) }
+
                         LazyColumn(modifier = Modifier.fillMaxHeight(0.5f)) {
-                            items(allPartitions) { part ->
-                                Row(modifier = Modifier.fillMaxWidth().clickable { selectedPartition = part }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = selectedPartition == part, onClick = { selectedPartition = part })
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(part, fontWeight = FontWeight.Medium)
+                            items(filteredPartitions) { part ->
+                                val isSelected = selectedPartition == part
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                                        .clickable { selectedPartition = part }
+                                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = isSelected, onClick = null)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = part,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             }
                         }
@@ -148,27 +292,29 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    if (restoreMode == "backup" && selectedPartition.isNotBlank()) {
-                        val partName = selectedPartition.substringBefore("_backup.img")
-                        viewModel.runLiveOperation("--live-restore", partName, "${viewModel.savedPath.value}/Live-Partition/$selectedPartition") { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                        showRestoreDialog = false
-                    } else if (restoreMode == "custom" && customImgPath.isNotBlank() && selectedPartition.isNotBlank()) {
-                        viewModel.runLiveOperation("--live-restore", selectedPartition, customImgPath) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
-                        showRestoreDialog = false
-                    }
-                }) { Text("Flash Image") }
+                Button(
+                    onClick = {
+                        if (restoreMode == "backup" && selectedPartition.isNotBlank()) {
+                            val partName = selectedPartition.substringBefore("_backup.img")
+                            viewModel.runLiveOperation("--live-restore", partName, "${viewModel.savedPath.value}/Live-Partition/$selectedPartition") { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            showRestoreDialog = false
+                        } else if (restoreMode == "custom" && customImgPath.isNotBlank() && selectedPartition.isNotBlank()) {
+                            viewModel.runLiveOperation("--live-restore", selectedPartition, customImgPath) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            showRestoreDialog = false
+                        }
+                    },
+                    enabled = selectedPartition.isNotBlank() && (restoreMode == "backup" || customImgPath.isNotBlank())
+                ) { Text("Flash Image") }
             },
             dismissButton = { TextButton(onClick = { showRestoreDialog = false }) { Text("Cancel") } }
         )
     }
 
     if (appState.flashWizardStep > 0) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp)) {
             when (appState.flashWizardStep) {
                 1 -> {
-                    SectionHeader("Wipe Configuration", "Select partitions to clear before flashing")
-                    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             val availableWipes = listOf(
                                 "dalvik" to "Dalvik / ART Cache",
@@ -179,19 +325,35 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                             )
 
                             availableWipes.forEach { (partId, label) ->
-                                Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.toggleFlashWipePartition(partId) }.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(
-                                        checked = appState.flashWipePartitions.contains(partId),
-                                        onCheckedChange = { viewModel.toggleFlashWipePartition(partId) }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                val isChecked = appState.flashWipePartitions.contains(partId)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .clickable { viewModel.toggleFlashWipePartition(partId) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
                                     Text(label, fontWeight = FontWeight.Medium)
+                                    Switch(
+                                        checked = isChecked,
+                                        onCheckedChange = null,
+                                        thumbContent = {
+                                            Icon(
+                                                imageVector = if (isChecked) Icons.Filled.Check else Icons.Filled.Close,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(SwitchDefaults.IconSize)
+                                            )
+                                        }
+                                    )
                                 }
                             }
 
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
-                            Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.setFlashFormatData(!appState.flashFormatData) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(modifier = Modifier.fillMaxWidth().clickable { viewModel.setFlashFormatData(!appState.flashFormatData) }.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -200,23 +362,48 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                                 }
                                 Switch(
                                     checked = appState.flashFormatData,
-                                    onCheckedChange = { viewModel.setFlashFormatData(it) },
+                                    onCheckedChange = null,
+                                    thumbContent = {
+                                        Icon(
+                                            imageVector = if (appState.flashFormatData) Icons.Filled.Check else Icons.Filled.Close,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(SwitchDefaults.IconSize)
+                                        )
+                                    },
                                     colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.error, checkedTrackColor = MaterialTheme.colorScheme.errorContainer)
                                 )
                             }
                         }
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    Button(onClick = { isAppending = false; zipLauncher.launch(arrayOf("application/zip")) }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Next: Select ZIP Files") }
+                    Button(
+                        onClick = { isAppending = false; zipLauncher.launch(arrayOf("application/zip")) },
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                    ) {
+                        Text("Next: Select ZIP Files")
+                    }
                 }
                 2 -> {
-                    SectionHeader("Review & Order ZIPs", "Valid ZIPs have been safely ordered")
                     if (appState.isProcessingZips) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 40.dp))
                     } else {
+                        val density = LocalDensity.current
+                        val swapThreshold = with(density) { 64.dp.toPx() }
+
                         LazyColumn(modifier = Modifier.weight(1f)) {
-                            itemsIndexed(appState.flashZips) { index, zip ->
-                                ElevatedCard(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(16.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                            itemsIndexed(items = appState.flashZips, key = { _, zip -> zip.path }) { index, zip ->
+                                var dragOffset by remember(zip.path) { mutableFloatStateOf(0f) }
+
+                                ElevatedCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .offset { IntOffset(0, dragOffset.roundToInt()) }
+                                        .animateItem(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                ) {
                                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("${index + 1}", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                                         Spacer(modifier = Modifier.width(16.dp))
@@ -224,11 +411,39 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                                             Text(zip.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Text("Category: ${zip.category}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
-                                        Column {
-                                            IconButton(onClick = { viewModel.moveZipUp(index) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.KeyboardArrowUp, null) }
-                                            IconButton(onClick = { viewModel.moveZipDown(index) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.KeyboardArrowDown, null) }
+
+                                        Icon(
+                                            imageVector = Icons.Default.DragHandle,
+                                            contentDescription = "Drag to reorder",
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .pointerInput(zip.path) {
+                                                    detectVerticalDragGestures(
+                                                        onDragEnd = { dragOffset = 0f },
+                                                        onDragCancel = { dragOffset = 0f }
+                                                    ) { change, dragAmount ->
+                                                        change.consume()
+                                                        dragOffset += dragAmount
+
+                                                        val currentIndex = appState.flashZips.indexOf(zip)
+
+                                                        if (dragOffset > swapThreshold && currentIndex < appState.flashZips.size - 1) {
+                                                            viewModel.moveZipDown(currentIndex)
+                                                            dragOffset -= swapThreshold
+                                                        }
+                                                        else if (dragOffset < -swapThreshold && currentIndex > 0) {
+                                                            viewModel.moveZipUp(currentIndex)
+                                                            dragOffset += swapThreshold
+                                                        }
+                                                    }
+                                                }
+                                                .padding(4.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        IconButton(onClick = { viewModel.removeZip(index) }, modifier = Modifier.size(36.dp)) {
+                                            Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error)
                                         }
-                                        IconButton(onClick = { viewModel.removeZip(index) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error) }
                                     }
                                 }
                             }
@@ -242,14 +457,22 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
                 3 -> {
-                    SectionHeader("Security Check", "Recovery cannot flash encrypted data")
+                    val hasRomZip = appState.flashZips.any { it.category.contains("ROM", ignoreCase = true) || it.name.contains("ROM", ignoreCase = true) }
+
                     if (appState.hasLockscreen) {
                         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.Lock, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text("Screen Lock Detected!", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
-                                Text("You must remove your PIN/Pattern before flashing so recovery can decrypt your storage automatically.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onErrorContainer)
+
+                                val warningText = if (hasRomZip) {
+                                    "You must remove your PIN/Pattern to avoid FRP (Factory Reset Protection) lock when flashing a ROM zip."
+                                } else {
+                                    "You must remove your PIN/Pattern before flashing so recovery can decrypt your storage automatically."
+                                }
+                                Text(warningText, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onErrorContainer)
+
                                 Spacer(modifier = Modifier.height(24.dp))
                                 Button(onClick = { context.startActivity(Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS)) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onErrorContainer)) { Text("Open Settings") }
                             }
@@ -257,16 +480,17 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                         Spacer(modifier = Modifier.weight(1f))
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("I've Removed It - Verify Again") }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Note: Skipping means you MUST enter your password manually in recovery. Only proceed if your recovery touch works!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(onClick = { viewModel.generateOrsAndProceed() }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) { Text("Skip (Enter in Recovery)") }
+
+                            if (!hasRomZip) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                OutlinedButton(
+                                    onClick = { viewModel.generateOrsAndProceed() },
+                                    shape = RoundedCornerShape(24.dp),
+                                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                                ) {
+                                    Text("Skip (Only if Recovery Touch works)")
+                                }
+                            }
                         }
                     } else {
                         ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -281,11 +505,10 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
                 4 -> {
-                    SectionHeader("Ready to Flash", "Press button to reboot to recovery and flash")
                     if (appState.currentAction == "Rebooting to Recovery...") {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 40.dp))
                     } else {
-                        ElevatedCard(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                        ElevatedCard(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
@@ -305,12 +528,14 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
             }
         }
     } else {
-        Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                SectionHeader("Flash Utilities", "Auto Flash Zips or Flash Raw Partition Images")
+                Spacer(modifier = Modifier.height(8.dp))
                 MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken recovery touch") { viewModel.openFlashWizard() }
-                MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { selectedPartition = ""; showBackupDialog = true }
+                MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { showBackupDialog = true }
                 MenuCard("Flash Partitions", Icons.Default.SystemUpdateAlt, "Flash images directly to active slot") { backedUpImages = viewModel.getBackedUpImages(); selectedPartition = ""; customImgPath = ""; restoreMode = "backup"; showRestoreDialog = true }
+
+                Spacer(modifier = Modifier.height(120.dp))
             }
         }
     }

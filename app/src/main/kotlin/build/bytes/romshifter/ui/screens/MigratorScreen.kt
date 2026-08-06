@@ -29,7 +29,6 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.AppListItem
 import build.bytes.romshifter.ui.components.MenuCard
-import build.bytes.romshifter.ui.components.SectionHeader
 import build.bytes.romshifter.ui.components.ShimmerAppListItem
 
 @Composable
@@ -69,22 +68,46 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         AlertDialog(
             onDismissRequest = { showNativeBackupDialog = false; showNativeRestoreDialog = false },
             icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null) },
-            title = { Text(if (isBackup) "Backup Telephony Data" else "Restore Telephony Data") },
+            title = { Text(if (isBackup) "Telephony Data" else "Restore Telephony Data") },
             text = {
                 Column {
-                    Text("Select items to process:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { doSms = !doSms }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = doSms, onCheckedChange = { doSms = it })
-                        Text("SMS Messages")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { doCall = !doCall }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = doCall, onCheckedChange = { doCall = it })
-                        Text("Call Logs")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { doContacts = !doContacts }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = doContacts, onCheckedChange = { doContacts = it })
-                        Text("Contacts (vCard)")
+                    // FIX: Removed unnecessary subtext
+                    val options = listOf(
+                        "SMS Messages" to doSms,
+                        "Call Logs" to doCall,
+                        "Contacts (vCard)" to doContacts
+                    )
+
+                    options.forEach { (label, state) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    when (label) {
+                                        "SMS Messages" -> doSms = !doSms
+                                        "Call Logs" -> doCall = !doCall
+                                        "Contacts (vCard)" -> doContacts = !doContacts
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(label, fontWeight = FontWeight.Medium)
+                            Switch(
+                                checked = state,
+                                onCheckedChange = null,
+                                thumbContent = { // FIX: Added Checked/Cross Icon
+                                    Icon(
+                                        imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             },
@@ -98,15 +121,16 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize()) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            SectionHeader("Apps & Data Migrator", "Backup / Restore or Manage your data")
+            Spacer(modifier = Modifier.height(8.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
             MenuCard("Backup Telephony Data", Icons.Default.Sms, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
             MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Telephony Data from Storage") { showNativeRestoreDialog = true }
             MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.height(120.dp))
         }
 
         AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
@@ -167,19 +191,42 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             title = { Text("Delete Telephony Backups") },
             text = {
                 Column {
-                    Text("Select native backups to permanently delete from storage:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { delSms = !delSms }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = delSms, onCheckedChange = { delSms = it })
-                        Text("SMS Messages")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { delCall = !delCall }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = delCall, onCheckedChange = { delCall = it })
-                        Text("Call Logs")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { delContacts = !delContacts }.padding(vertical = 4.dp)) {
-                        Checkbox(checked = delContacts, onCheckedChange = { delContacts = it })
-                        Text("Contacts (vCard)")
+                    // FIX: Removed unnecessary subtext
+                    val options = listOf(
+                        "SMS Messages" to delSms,
+                        "Call Logs" to delCall,
+                        "Contacts (vCard)" to delContacts
+                    )
+                    options.forEach { (label, state) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    when (label) {
+                                        "SMS Messages" -> delSms = !delSms
+                                        "Call Logs" -> delCall = !delCall
+                                        "Contacts (vCard)" -> delContacts = !delContacts
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(label, fontWeight = FontWeight.Medium)
+                            Switch(
+                                checked = state,
+                                onCheckedChange = null,
+                                thumbContent = { // FIX: Added Checked/Cross Icon
+                                    Icon(
+                                        imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             },
@@ -359,29 +406,43 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
+        // TRUE M3 BOTTOM ACTION BAR: Fixes selected text alignment and padding
         val selectedCount = appState.appList.count { it.isSelected }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) {
-            Text(text = "$selectedCount Selected", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-
-            Button(
-                onClick = { viewModel.runDynamicOperation() },
-                enabled = !appState.isRunning && selectedCount > 0,
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
-                modifier = Modifier.height(48.dp).padding(horizontal = 8.dp)
+            Row(
+                modifier = Modifier
+                    .navigationBarsPadding() // Never touches gesture pill
+                    .padding(horizontal = 24.dp, vertical = 16.dp), // Perfectly padded aligned components
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                val act = when (appState.migratorMode) {
-                    MigratorMode.MANAGE -> "Delete Apps"
-                    MigratorMode.DEBLOAT -> if (appState.isRestoreDebloatMode) "Restore" else "Debloat"
-                    MigratorMode.RESTORE_APPS -> "Restore"
-                    MigratorMode.SYSTEMIZE -> "Systemize"
-                    else -> "Backup"
+                Text(
+                    text = "$selectedCount Selected",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Button(
+                    onClick = { viewModel.runDynamicOperation() },
+                    enabled = !appState.isRunning && selectedCount > 0,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.height(48.dp)
+                ) {
+                    val act = when (appState.migratorMode) {
+                        MigratorMode.MANAGE -> "Delete Apps"
+                        MigratorMode.DEBLOAT -> if (appState.isRestoreDebloatMode) "Restore" else "Debloat"
+                        MigratorMode.RESTORE_APPS -> "Restore"
+                        MigratorMode.SYSTEMIZE -> "Systemize"
+                        else -> "Backup"
+                    }
+                    Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
-                Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
         }
 

@@ -8,6 +8,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -62,7 +67,7 @@ fun MainScreen(viewModel: MainViewModel) {
     )
 
     val dynamicTitle = when {
-        showSettings -> "Settings & Config"
+        showSettings -> "Settings" // FIX: Updated text exactly as requested!
         appState.flashWizardStep > 0 -> "Auto Flash Wizard"
         appState.migratorMode != MigratorMode.MENU -> {
             when (appState.migratorMode) {
@@ -83,78 +88,102 @@ fun MainScreen(viewModel: MainViewModel) {
         else viewModel.setMigratorMode(MigratorMode.MENU)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (dynamicTitle == "ROM Shifter") {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_home),
-                                contentDescription = "Logo",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (dynamicTitle == "ROM Shifter") {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_home),
+                                    contentDescription = "Logo",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                            }
+                            Text(
+                                text = dynamicTitle,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.SansSerif,
+                                letterSpacing = 0.5.sp,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
                         }
-                        Text(text = dynamicTitle, fontWeight = FontWeight.Bold, fontFamily = FontFamily.SansSerif, letterSpacing = 0.5.sp)
-                    }
-                },
-                navigationIcon = {
-                    if (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0) {
-                        IconButton(onClick = {
-                            if (showSettings) showSettings = false
-                            else if (appState.flashWizardStep > 0) viewModel.closeFlashWizard()
-                            else viewModel.setMigratorMode(MigratorMode.MENU)
-                        }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                    }
-                },
-                actions = {
-                    if (appState.migratorMode == MigratorMode.MENU && !showSettings && appState.flashWizardStep == 0) {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                    },
+                    navigationIcon = {
+                        if (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0) {
+                            IconButton(onClick = {
+                                if (showSettings) showSettings = false
+                                else if (appState.flashWizardStep > 0) viewModel.closeFlashWizard()
+                                else viewModel.setMigratorMode(MigratorMode.MENU)
+                            }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)            )
-        },
-        bottomBar = {
-            AnimatedVisibility(
-                visible = !showSettings && appState.flashWizardStep == 0 && appState.migratorMode == MigratorMode.MENU,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                NavigationBar(
-                    containerColor = androidx.compose.ui.graphics.Color.Transparent, // Blended background
-                    tonalElevation = 0.dp // Removes MD2 shadow line
-                ) {
-                    tabs.forEachIndexed { index, tab ->
-                        NavigationBarItem(
-                            icon = { Icon(imageVector = tab.second, contentDescription = tab.first) },
-                            label = { Text(text = tab.third, style = MaterialTheme.typography.labelSmall) },
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index; if (index != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                indicatorColor = MaterialTheme.colorScheme.secondaryContainer, // Pill shape indicator
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
+                    },
+                    actions = {
+                        if (appState.migratorMode == MigratorMode.MENU && !showSettings && appState.flashWizardStep == 0) {
+                            IconButton(onClick = { showSettings = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { innerPadding ->
+            Box(modifier = Modifier.padding(top = innerPadding.calculateTopPadding()).fillMaxSize()) {
+
+                AnimatedContent(
+                    targetState = showSettings to selectedTab,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "AppContentTransition",
+                    modifier = Modifier.fillMaxSize()
+                ) { (isSettingsOpen, currentTab) ->
+                    if (isSettingsOpen) {
+                        SettingsTab(LocalContext.current, viewModel)
+                    } else {
+                        when (currentTab) {
+                            0 -> FlashTab(LocalContext.current, viewModel)
+                            1 -> MigratorTab(appState, viewModel)
+                            2 -> ExtrasTab(appState, viewModel)
+                        }
                     }
                 }
-            }
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            if (showSettings) {
-                SettingsTab(LocalContext.current, viewModel)
-            } else {
-                when (selectedTab) {
-                    0 -> FlashTab(LocalContext.current, viewModel)
-                    1 -> MigratorTab(appState, viewModel)
-                    2 -> ExtrasTab(appState, viewModel)
+
+                AnimatedVisibility(
+                    visible = !showSettings && appState.flashWizardStep == 0 && appState.migratorMode == MigratorMode.MENU,
+                    enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(400, easing = FastOutSlowInEasing)) + fadeIn(tween(400)),
+                    exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(400, easing = FastOutLinearInEasing)) + fadeOut(tween(400)),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    NavigationBar(
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                            .clip(RoundedCornerShape(32.dp)),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 0.dp
+                    ) {
+                        tabs.forEachIndexed { index, tab ->
+                            NavigationBarItem(
+                                icon = { Icon(imageVector = tab.second, contentDescription = tab.first) },
+                                label = { Text(text = tab.third, style = MaterialTheme.typography.labelSmall) },
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index; if (index != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }

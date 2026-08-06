@@ -28,27 +28,41 @@ import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 
 @Composable
-fun SectionHeader(title: String, subtitle: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        HorizontalDivider(modifier = Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), thickness = 2.dp)
-    }
-}
-
-@Composable
-fun MenuCard(title: String, icon: ImageVector, desc: String, onClick: () -> Unit) {
+fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () -> Unit) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp) // Added vertical padding for clear visual separation
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp) // Creates a subtle shadow
     ) {
-        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(imageVector = icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
             Spacer(modifier = Modifier.width(20.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

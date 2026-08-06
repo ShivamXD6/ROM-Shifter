@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SecurityUpdateGood
@@ -25,7 +26,6 @@ import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.MenuCard
-import build.bytes.romshifter.ui.components.SectionHeader
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,11 +57,10 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
     if (appState.migratorMode in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE)) {
         MigratorActionScreen(appState, viewModel)
     } else {
-        Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                SectionHeader("Advanced Utilities", "Root tools and device modifications")
+                Spacer(modifier = Modifier.height(8.dp))
                 MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }
-
                 MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") {
                     scope.launch {
                         if (viewModel.canSystemize()) {
@@ -71,6 +70,9 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
                         }
                     }
                 }
+
+                // Gap for floating navbar
+                Spacer(modifier = Modifier.height(120.dp))
             }
 
             AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically(), exit = shrinkVertically()) {
