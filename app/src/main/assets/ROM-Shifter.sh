@@ -17,7 +17,6 @@ init_shifter() {
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
-# --- Utility Functions ---
 COOLDOWN() { while [ "$(jobs | grep -c 'Running')" -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
 SANITIZE() { echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'; }
 
@@ -73,7 +72,6 @@ UNBUNDAPP() {
     "$ZAPDOS" -d -q -c "$1" | tar -xf - -C "$2" 2>/dev/null &
 }
 
-# --- Live Partitions Engine ---
 do_live_backup() {
     local part="$1"
     local BLOCK_PATH="/dev/block/by-name/$part"
@@ -93,7 +91,6 @@ do_live_restore() {
     fi
 }
 
-# --- Data Migrator Engine ---
 DO_BACKUP() {
     PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; PCT="$7"; SIZE="$8"
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
@@ -126,24 +123,21 @@ DO_BACKUP() {
     CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}
     CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}
     CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
-    rm -rf "$TMP_SIZES"; ACT=0
+    rm -rf "$TMP_SIZES"
 
     if CHK 1; then
         if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
             if [ "$CUR_APP" -gt 0 ] && [ -n "$apks" ]; then
-                echo "INFO:STEP|MSG:App (Base & Splits)"
-                echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" & ACT=1
-                else rm -f "$APP_DIR/App.bundle.pack"; fi
+                echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" &
+            else rm -f "$APP_DIR/App.bundle.pack"; fi
             OLD_APP=$CUR_APP
         fi
     fi
     if CHK 2; then
         if [ "$CUR_DATA" != "$OLD_DATA" ] || { [ "$CUR_DATA" -gt 0 ] && [ ! -f "$APP_DIR/Data.bundle.pack" ] && [ ! -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
             if [ "$CUR_DATA" -gt 0 ]; then
-                echo "INFO:STEP|MSG:Data (/data & user_de)"
                 [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
                 [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
-                ACT=1
             else rm -f "$APP_DIR/Data.bundle.pack" "$APP_DIR/UserDe.bundle.pack"; fi
             OLD_DATA=$CUR_DATA
         fi
@@ -151,9 +145,7 @@ DO_BACKUP() {
     if CHK 3; then
         if [ "$CUR_EXT" != "$OLD_EXT" ] || { [ "$CUR_EXT" -gt 0 ] && [ ! -f "$APP_DIR/ExtData.bundle.pack" ]; }; then
             if [ "$CUR_EXT" -gt 0 ]; then
-                echo "INFO:STEP|MSG:ExtData (Android/data)"
                 BUNDAPP "/data/media/0/Android/data" "$PKG" "$APP_DIR" "ExtData"
-                ACT=1
             else rm -f "$APP_DIR/ExtData.bundle.pack"; fi
             OLD_EXT=$CUR_EXT
         fi
@@ -161,9 +153,7 @@ DO_BACKUP() {
     if CHK 4; then
         if [ "$CUR_MED" != "$OLD_MED" ] || { [ "$CUR_MED" -gt 0 ] && [ ! -f "$APP_DIR/Media.bundle.pack" ]; }; then
             if [ "$CUR_MED" -gt 0 ]; then
-                echo "INFO:STEP|MSG:Media (Android/media)"
                 BUNDAPP "/data/media/0/Android/media" "$PKG" "$APP_DIR" "Media"
-                ACT=1
             else rm -f "$APP_DIR/Media.bundle.pack"; fi
             OLD_MED=$CUR_MED
         fi
@@ -171,9 +161,7 @@ DO_BACKUP() {
     if CHK 5; then
         if [ "$CUR_OBB" != "$OLD_OBB" ] || { [ "$CUR_OBB" -gt 0 ] && [ ! -f "$APP_DIR/Obb.bundle.pack" ]; }; then
             if [ "$CUR_OBB" -gt 0 ]; then
-                echo "INFO:STEP|MSG:OBB (Android/obb)"
                 BUNDAPP "/data/media/0/Android/obb" "$PKG" "$APP_DIR" "Obb"
-                ACT=1
             else rm -f "$APP_DIR/Obb.bundle.pack"; fi
             OLD_OBB=$CUR_OBB
         fi
@@ -181,12 +169,11 @@ DO_BACKUP() {
     if CHK 6; then
         CUR_SSAID=$(READID "$PKG")
         if [ -n "$CUR_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
-            echo "INFO:STEP|MSG:Android ID"; OLD_SSAID=$CUR_SSAID; ACT=1
+            OLD_SSAID=$CUR_SSAID
         fi
     fi
 
     wait
-    [ "$ACT" -eq 0 ] && echo "INFO:STEP|MSG:Up to date (Skipped)"
     local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
     SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | awk -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
 
@@ -210,7 +197,7 @@ EOF
 DO_RESTORE() {
     LABEL="$1"; TYPE="$2"; CUR_IDX="$3"; TOT_IDX="$4"; PCT="$5"; SIZE="$6"
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"
-    [ -f "$APP_DIR/Meta.txt" ] || { echo "ERROR:RESTORE|MSG:Meta.txt missing for $LABEL"; return; }
+    [ -f "$APP_DIR/Meta.txt" ] || return
     PKG=$(grep "Package=" "$APP_DIR/Meta.txt" | cut -d= -f2); [ -z "$PKG" ] && return
     VER=$(grep "Version=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"
@@ -224,15 +211,14 @@ DO_RESTORE() {
     OLD_MED=$(grep "^MediaSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_MED=${OLD_MED:-0}
     OLD_OBB=$(grep "^ObbSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_OBB=${OLD_OBB:-0}
     OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
-    ACT=0; FORCE_DATA=0
+    FORCE_DATA=0
 
     if CHK 1 && [ -f "$APP_DIR/App.bundle.pack" ]; then
         if ! PKG_INSTALLED "$PKG" "$VER"; then
-            echo "INFO:STEP|MSG:App (Base & Splits)"
             "$ZAPDOS" -d -q -c "$APP_DIR/App.bundle.pack" | tar -xf - -C "$TMP_PKG" 2>/dev/null
             apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
             [ -n "$apks_to_install" ] && pm install -g --dexopt-compiler-filter skip $apks_to_install >/dev/null 2>&1
-            ACT=1; FORCE_DATA=1
+            FORCE_DATA=1
         fi
     fi
 
@@ -255,25 +241,23 @@ DO_RESTORE() {
 
     if CHK 2 && { [ -f "$APP_DIR/Data.bundle.pack" ] || [ -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-            echo "INFO:STEP|MSG:Data (/data & user_de)"
             [ -f "$APP_DIR/Data.bundle.pack" ] && UNBUNDAPP "$APP_DIR/Data.bundle.pack" "/data/data"
             [ -f "$APP_DIR/UserDe.bundle.pack" ] && UNBUNDAPP "$APP_DIR/UserDe.bundle.pack" "/data/user_de/0"
-            ACT=1
         fi
     fi
     if CHK 3 && [ -f "$APP_DIR/ExtData.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
-            echo "INFO:STEP|MSG:ExtData (Android/data)"; UNBUNDAPP "$APP_DIR/ExtData.bundle.pack" "/data/media/0/Android/data"; ACT=1
+            UNBUNDAPP "$APP_DIR/ExtData.bundle.pack" "/data/media/0/Android/data"
         fi
     fi
     if CHK 4 && [ -f "$APP_DIR/Media.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
-            echo "INFO:STEP|MSG:Media (Android/media)"; UNBUNDAPP "$APP_DIR/Media.bundle.pack" "/data/media/0/Android/media"; ACT=1
+            UNBUNDAPP "$APP_DIR/Media.bundle.pack" "/data/media/0/Android/media"
         fi
     fi
     if CHK 5 && [ -f "$APP_DIR/Obb.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
-            echo "INFO:STEP|MSG:OBB (Android/obb)"; UNBUNDAPP "$APP_DIR/Obb.bundle.pack" "/data/media/0/Android/obb"; ACT=1
+            UNBUNDAPP "$APP_DIR/Obb.bundle.pack" "/data/media/0/Android/obb"
         fi
     fi
     wait
@@ -281,14 +265,13 @@ DO_RESTORE() {
     if CHK 6; then
         CUR_SSAID=$(READID "$PKG")
         if [ -n "$OLD_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
-            echo "INFO:STEP|MSG:Android ID & Permissions"; CHANID "$PKG" "$OLD_SSAID"; ACT=1
+            CHANID "$PKG" "$OLD_SSAID"
         fi
     fi
 
-    [ "$ACT" -eq 1 ] && [ -f "$APP_DIR/Permissions.txt" ] && SETPERM "$PKG" "$APP_DIR/Permissions.txt"
-    [ "$ACT" -eq 0 ] && echo "INFO:STEP|MSG:Up to date (Skipped)"
+    [ -f "$APP_DIR/Permissions.txt" ] && SETPERM "$PKG" "$APP_DIR/Permissions.txt"
 
-    if [ -n "$NEW_UID" ] && [ "$ACT" -eq 1 ]; then
+    if [ -n "$NEW_UID" ]; then
         chown -R "$NEW_UID:$NEW_UID" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
         restorecon -R "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
         [ -n "$ADGID" ] && chown -R "$NEW_UID:$ADGID" "/data/media/0/Android/data/$PKG" 2>/dev/null
@@ -304,7 +287,6 @@ do_backup() {
     export APP_COMPS="$1"
     rm -rf "$AM_TMP/precalc" "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" 2>/dev/null
     mkdir -p "$AM_TMP/precalc"
-    echo "ACTION:CALCULATING|MSG:Calculating sizes..."
 
     while IFS='|' read -r pkg label ver type || [ -n "$pkg" ]; do
         [ -z "$pkg" ] && continue
@@ -378,17 +360,14 @@ do_remove() {
             mount -o rw,remount /vendor
             rm -rf "$DIR_PATH"
             pm uninstall --user 0 "$PKG" >/dev/null 2>&1
-            echo "FORCE_REMOVED"
             return
         fi
     fi
     pm uninstall --user 0 "$PKG" >/dev/null 2>&1
-    echo "UNINSTALLED"
 }
 
 do_restore_debloat() {
     cmd package install-existing "$1" >/dev/null 2>&1
-    echo "RESTORED"
 }
 
 do_systemize() {
@@ -419,9 +398,6 @@ do_systemize() {
         cp -f "$SOURCE_DIR"/*.apk "$TARGET_DIR/"
         chmod 755 "$TARGET_DIR"
         chmod 644 "$TARGET_DIR"/*.apk
-        echo "SYSTEMIZED"
-    else
-        echo "FAILED"
     fi
 }
 

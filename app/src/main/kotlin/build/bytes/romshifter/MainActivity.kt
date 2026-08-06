@@ -33,13 +33,13 @@ class MainActivity : ComponentActivity() {
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = this@MainActivity.window
-                    // Directly use system dark mode for status/navigation bar icons
+                    
                     WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !systemDark
                     WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !systemDark
                 }
             }
 
-            // Simplified theme call without deprecated parameters
+            
             ROMShifterTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(viewModel = viewModel)

@@ -140,15 +140,14 @@ object MigratorManager {
 
     suspend fun runDynamicOperation(
         context: Context, state: AppState, selectedApps: List<AppInfo>, currentPath: String,
-        isPrivilegedSystemize: Boolean = false,
-        updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
+        updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
         var wakeLock: PowerManager.WakeLock? = null
         try {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ROMShifter::OperationWakelock")
             wakeLock.acquire(15 * 60 * 1000L)
-        } catch (_: SecurityException) { updateLog("Warning: WAKE_LOCK permission missing!") }
+        } catch (_: SecurityException) { }
 
         try {
             if (state.migratorMode == MigratorMode.MANAGE) {
@@ -161,6 +160,64 @@ object MigratorManager {
                 return@withContext
             }
 
+            // --- SMART PRE-SCAN LOGIC BEGINS ---
+            val isRestore = state.migratorMode.name.contains("RESTORE")
+            val cApp = state.globalComponents.contains(1)
+            val cData = state.globalComponents.contains(2)
+            val cExt = state.globalComponents.contains(3)
+            val cMed = state.globalComponents.contains(4)
+            val cObb = state.globalComponents.contains(5)
+            val cId = state.globalComponents.contains(6)
+            val appPartsMap = mutableMapOf<String, String>()
+
+            if (isRestore) {
+                // Instantly checks the backup directory to see which parts were actually saved!
+                selectedApps.forEach { app ->
+                    val sysType = if (app.isSystem) "System" else "User"
+                    val basePath = "$currentPath/Data-Migrated/$sysType/${app.label}"
+                    val parts = mutableListOf<String>()
+                    if (cApp && File("$basePath/App.bundle.pack").exists()) parts.add("App")
+                    if (cData && (File("$basePath/Data.bundle.pack").exists() || File("$basePath/UserDe.bundle.pack").exists())) parts.add("Data")
+                    if (cExt && File("$basePath/ExtData.bundle.pack").exists()) parts.add("ExtData")
+                    if (cMed && File("$basePath/Media.bundle.pack").exists()) parts.add("Media")
+                    if (cObb && File("$basePath/Obb.bundle.pack").exists()) parts.add("Obb")
+                    if (cId) {
+                        try {
+                            val metaFile = File("$basePath/Meta.txt")
+                            // Ensures the Meta.txt has a valid SSAID entry that isn't blank
+                            if (metaFile.exists() && metaFile.readText().lines().any { it.startsWith("SSAID=") && it.length > 6 }) {
+                                parts.add("Android ID")
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    appPartsMap[app.packageName] = parts.joinToString(" • ")
+                }
+            } else {
+                // Runs a hyper-fast root shell script to verify exactly which folders and IDs exist!
+                val script = java.lang.StringBuilder()
+                selectedApps.forEach { app ->
+                    val pkg = app.packageName
+                    script.append("res=\"\"\n")
+                    if (cApp) script.append("pm path $pkg >/dev/null 2>&1 && res=\"\$res|App\"\n")
+                    if (cData) script.append("([ -d \"/data/data/$pkg\" ] || [ -d \"/data/user_de/0/$pkg\" ]) && res=\"\$res|Data\"\n")
+                    if (cExt) script.append("[ -d \"/data/media/0/Android/data/$pkg\" ] && res=\"\$res|ExtData\"\n")
+                    if (cMed) script.append("[ -d \"/data/media/0/Android/media/$pkg\" ] && res=\"\$res|Media\"\n")
+                    if (cObb) script.append("[ -d \"/data/media/0/Android/obb/$pkg\" ] && res=\"\$res|Obb\"\n")
+                    // Checks the system XML to see if this specific package has generated an Android ID
+                    if (cId) script.append("grep -q \"package=\\\"$pkg\\\"\" /data/system/users/0/settings_ssaid.xml 2>/dev/null && res=\"\$res|Android ID\"\n")
+                    script.append("echo \"$pkg==\$res\"\n")
+                }
+                val out = Shell.cmd("su -mm -c '${script.toString().replace("'", "'\\''")}'").exec().out
+                out.forEach { line ->
+                    val split = line.split("==")
+                    if (split.size == 2) {
+                        val comps = split[1].split("|").filter { it.isNotBlank() }.joinToString(" • ")
+                        appPartsMap[split[0]] = comps
+                    }
+                }
+            }
+            // --- SMART PRE-SCAN LOGIC ENDS ---
+
             val targetData = selectedApps.joinToString("\n") { app ->
                 val sysType = if (app.isSystem) "System" else "User"
                 "${app.packageName}|${app.label}|${app.version}|$sysType"
@@ -171,29 +228,28 @@ object MigratorManager {
             Shell.cmd("su -mm -c \"rm -f /data/local/tmp/shifter_targets.txt && cat '${targetFile.absolutePath}' > /data/local/tmp/shifter_targets.txt && chmod 666 /data/local/tmp/shifter_targets.txt\"").exec()
             targetFile.delete()
 
-            val operation = if (state.migratorMode.name.contains("RESTORE")) "--restore" else "--backup"
+            val operation = if (isRestore) "--restore" else "--backup"
             val compsString = state.globalComponents.sorted().joinToString(" ")
 
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString'\""
-
-            val actText = if (state.migratorMode.name.contains("RESTORE")) "Restoring Apps" else "Backing up Apps"
+            val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
 
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
                     is ShifterEvent.BackupProgress -> {
-                        updateLog("[${event.percent}%] $actText ${event.label} - ${event.size}")
-                        updateProgress(actText, "${event.label} (${event.current}/${event.total})", event.percent)
-                    }
-                    is ShifterEvent.InfoStep -> {
-                        updateLog(" -> ${event.msg}")
+                        // Dynamically pull the exact parts found for THIS app!
+                        val app = selectedApps.find { it.label == event.label }
+                        val activeParts = appPartsMap[app?.packageName] ?: ""
+                        val partsString = if (activeParts.isNotEmpty()) "\nParts: $activeParts" else ""
+
+                        // Sent seamlessly to the notification and UI
+                        updateProgress(actText, "${event.label} (${event.current}/${event.total})$partsString", event.percent)
                     }
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)
-                        updateLog("DONE! Total Size: $smartSize. Time: ${event.timeSec}s")
-                        val actDone = if (state.migratorMode.name.contains("RESTORE")) "Restore Complete!" else "Backup Complete!"
+                        val actDone = if (isRestore) "Restore Complete!" else "Backup Complete!"
                         onComplete(actDone, "Total Size: $smartSize | Time: ${event.timeSec}s")
                     }
-                    is ShifterEvent.RawLog -> updateLog(event.line)
                     else -> {}
                 }
             }

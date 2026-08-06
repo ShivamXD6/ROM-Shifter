@@ -67,7 +67,7 @@ fun MainScreen(viewModel: MainViewModel) {
     )
 
     val dynamicTitle = when {
-        showSettings -> "Settings" // FIX: Updated text exactly as requested!
+        showSettings -> "Settings" 
         appState.flashWizardStep > 0 -> "Auto Flash Wizard"
         appState.migratorMode != MigratorMode.MENU -> {
             when (appState.migratorMode) {

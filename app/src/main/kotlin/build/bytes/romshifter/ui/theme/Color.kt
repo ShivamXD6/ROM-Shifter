@@ -4,7 +4,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// Clean, modern Android fallback colors (For Android 11 and below)
 val LightColorScheme = lightColorScheme(
     primary = Color(0xFF0B57D0),
     onPrimary = Color(0xFFFFFFFF),

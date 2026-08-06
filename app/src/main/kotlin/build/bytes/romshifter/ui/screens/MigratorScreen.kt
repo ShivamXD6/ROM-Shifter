@@ -1,7 +1,6 @@
 package build.bytes.romshifter.ui.screens
 
 import android.widget.Toast
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
@@ -71,7 +69,6 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             title = { Text(if (isBackup) "Telephony Data" else "Restore Telephony Data") },
             text = {
                 Column {
-                    // FIX: Removed unnecessary subtext
                     val options = listOf(
                         "SMS Messages" to doSms,
                         "Call Logs" to doCall,
@@ -99,7 +96,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                             Switch(
                                 checked = state,
                                 onCheckedChange = null,
-                                thumbContent = { // FIX: Added Checked/Cross Icon
+                                thumbContent = {
                                     Icon(
                                         imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
                                         contentDescription = null,
@@ -132,25 +129,6 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(120.dp))
         }
-
-        AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-            Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (appState.isRunning) {
-                        CircularProgressIndicator(progress = { appState.progress / 100f }, modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.onPrimaryContainer, strokeWidth = 3.dp)
-                    } else {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "Done", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp))
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(appState.currentAction, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        if (appState.currentStep.isNotEmpty()) {
-                            Text(appState.currentStep, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -170,16 +148,10 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     }
 
     var showForceRemoveWarning by remember { mutableStateOf(false) }
-    var isTerminalExpanded by remember { mutableStateOf(false) }
-
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
-
-    LaunchedEffect(appState.logs.isEmpty()) {
-        if (appState.logs.isEmpty()) isTerminalExpanded = false
-    }
 
     val compIcons = mapOf(1 to Icons.Default.Android, 2 to Icons.Default.Storage, 3 to Icons.Default.Folder, 4 to Icons.Default.PermMedia, 5 to Icons.Default.Description, 6 to Icons.Default.Smartphone)
     val compNames = mapOf(1 to "App", 2 to "Data", 3 to "ExtData", 4 to "Media", 5 to "Obb", 6 to "Android ID")
@@ -191,7 +163,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             title = { Text("Delete Telephony Backups") },
             text = {
                 Column {
-                    // FIX: Removed unnecessary subtext
                     val options = listOf(
                         "SMS Messages" to delSms,
                         "Call Logs" to delCall,
@@ -218,7 +189,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             Switch(
                                 checked = state,
                                 onCheckedChange = null,
-                                thumbContent = { // FIX: Added Checked/Cross Icon
+                                thumbContent = {
                                     Icon(
                                         imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
                                         contentDescription = null,
@@ -406,7 +377,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        // TRUE M3 BOTTOM ACTION BAR: Fixes selected text alignment and padding
+        
         val selectedCount = appState.appList.count { it.isSelected }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -415,8 +386,8 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         ) {
             Row(
                 modifier = Modifier
-                    .navigationBarsPadding() // Never touches gesture pill
-                    .padding(horizontal = 24.dp, vertical = 16.dp), // Perfectly padded aligned components
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -442,36 +413,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         else -> "Backup"
                     }
                     Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        AnimatedVisibility(visible = appState.logs.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { isTerminalExpanded = !isTerminalExpanded },
-                colors = CardDefaults.cardColors(containerColor = Color.Black)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Column {
-                            Text(appState.currentAction, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Green)
-                            Text(if (isTerminalExpanded) "Tap to minimize logs" else "Tap to expand logs", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        }
-                        if (!appState.isRunning) {
-                            TextButton(onClick = { viewModel.clearLogs() }) { Text("Dismiss", color = MaterialTheme.colorScheme.error) }
-                        } else {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.Green, strokeWidth = 2.dp)
-                        }
-                    }
-
-                    AnimatedVisibility(visible = isTerminalExpanded, enter = expandVertically(), exit = shrinkVertically()) {
-                        Column {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
-                                Text(appState.logs.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = Color.LightGray, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                            }
-                        }
-                    }
                 }
             }
         }

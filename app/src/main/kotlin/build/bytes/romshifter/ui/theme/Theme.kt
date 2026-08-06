@@ -25,7 +25,7 @@ fun ROMShifterTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography, // Assuming this is defined in your Type.kt
+        typography = Typography, 
         content = content
     )
 }

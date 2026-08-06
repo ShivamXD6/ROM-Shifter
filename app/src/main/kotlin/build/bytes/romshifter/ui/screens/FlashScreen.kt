@@ -58,7 +58,7 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
         if (uris.isNotEmpty()) viewModel.processSelectedZips(uris, isAppending)
     }
 
-    // FIX: Ensure users cannot select non-img files (like ZIPs) and display an error toast
+    
     val imgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             build.bytes.romshifter.utils.FlashManager.getPathFromUri(context, uri)?.let { path ->
@@ -73,8 +73,8 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
 
     if (showBackupDialog) {
         LaunchedEffect(Unit) {
-            partitionSearchQuery = "" // Reset search when opened
-            selectedBackupPartitions = emptySet() // Reset selections
+            partitionSearchQuery = "" 
+            selectedBackupPartitions = emptySet() 
             withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions() }
         }
 
@@ -181,7 +181,7 @@ fun FlashTab(context: Context, viewModel: MainViewModel) {
 
     if (showRestoreDialog) {
         LaunchedEffect(Unit) {
-            partitionSearchQuery = "" // Reset search when opened
+            partitionSearchQuery = "" 
             withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions(); backedUpImages = viewModel.getBackedUpImages() }
         }
 

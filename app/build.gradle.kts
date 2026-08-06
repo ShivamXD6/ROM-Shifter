@@ -51,15 +51,15 @@ android {
 }
 
 dependencies {
-    // Root execution
+    
     implementation(libs.libsu.core)
     implementation(libs.libsu.io)
 
-    // UI & System
+    
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.graphics.path)
 
-    // Jetpack Compose BOM
+    
     implementation(platform(libs.androidx.compose.bom))
 
     implementation(libs.androidx.activity.compose)
@@ -72,15 +72,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
 
-    // Lifecycle & ViewModels
+    
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Image Loading
+    
     implementation(libs.coil.compose)
 
-    // Coroutines
+    
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)

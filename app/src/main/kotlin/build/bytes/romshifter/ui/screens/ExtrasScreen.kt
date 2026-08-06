@@ -71,7 +71,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
                     }
                 }
 
-                // Gap for floating navbar
+                
                 Spacer(modifier = Modifier.height(120.dp))
             }
 

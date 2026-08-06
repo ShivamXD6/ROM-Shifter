@@ -32,13 +32,13 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp) // Added vertical padding for clear visual separation
+            .padding(vertical = 8.dp) 
             .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp) // Creates a subtle shadow
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp) 
     ) {
         Row(
             modifier = Modifier.padding(20.dp),
