@@ -2,11 +2,23 @@ package build.bytes.romshifter.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+
+// MD3E Extreme Rounding Shapes (Used globally)
+val ExpressiveShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp), // Used for inner lists and smaller cards
+    large = RoundedCornerShape(30.dp),  // Used globally for Main Cards, Dialogs, BottomBar
+    extraLarge = RoundedCornerShape(30.dp)
+)
 
 @Composable
 fun ROMShifterTheme(
@@ -25,7 +37,8 @@ fun ROMShifterTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography, 
+        typography = Typography,
+        shapes = ExpressiveShapes, // Injecting the MD3E Shapes
         content = content
     )
 }

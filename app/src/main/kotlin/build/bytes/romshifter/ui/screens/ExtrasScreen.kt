@@ -2,25 +2,21 @@ package build.bytes.romshifter.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SecurityUpdateGood
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
@@ -36,9 +32,10 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
 
     if (showMetaWarningDialog) {
         AlertDialog(
+            shape = RoundedCornerShape(30.dp),
             onDismissRequest = { showMetaWarningDialog = false },
-            title = { Text("Meta-OverlayFS Required", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-            text = { Text("You are not using Magisk. To systemize apps via KernelSU or APatch, you must have the Meta-OverlayFS module installed. Please download and flash it in your root manager, then try again.") },
+            title = { Text("Meta-OverlayFS Required", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error) },
+            text = { Text("You are not using Magisk. To systemize apps via KernelSU or APatch, you must have the Meta-OverlayFS module installed. Please download and flash it in your root manager, then try again.", style = MaterialTheme.typography.bodyLarge) },
             confirmButton = {
                 Button(onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases"))
@@ -54,52 +51,37 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    if (appState.migratorMode in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE)) {
-        MigratorActionScreen(appState, viewModel)
-    } else {
-        Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize()) {
-            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                Spacer(modifier = Modifier.height(8.dp))
-                MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }
-                MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") {
-                    scope.launch {
-                        if (viewModel.canSystemize()) {
-                            viewModel.setMigratorMode(MigratorMode.SYSTEMIZE)
-                        } else {
-                            showMetaWarningDialog = true
-                        }
-                    }
-                }
-
-                
-                Spacer(modifier = Modifier.height(120.dp))
+    AnimatedContent(
+        targetState = appState.migratorMode !in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE),
+        transitionSpec = {
+            val goingBack = !initialState && targetState // From Action Screen back to Menu
+            if (goingBack) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                // FASTER 250ms SLIDE
+                slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
-
-            AnimatedVisibility(visible = appState.isRunning || appState.currentStep.isNotEmpty(), enter = expandVertically(), exit = shrinkVertically()) {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (appState.isRunning) {
-                            CircularProgressIndicator(
-                                progress = { appState.progress / 100f },
-                                modifier = Modifier.size(36.dp), color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f), strokeWidth = 4.dp
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                        } else {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "Done", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.width(16.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(appState.currentAction, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            if (appState.currentStep.isNotEmpty()) {
-                                Text(appState.currentStep, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        label = "ExtrasTransition"
+    ) { isMenu ->
+        if (!isMenu) {
+            MigratorActionScreen(appState, viewModel)
+        } else {
+            // Added solid background to prevent transparency bleeding
+            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
+                Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }
+                    MenuCard("Systemize User Apps", Icons.Default.SecurityUpdateGood, "Make user apps un-uninstallable securely") {
+                        scope.launch {
+                            if (viewModel.canSystemize()) {
+                                viewModel.setMigratorMode(MigratorMode.SYSTEMIZE)
+                            } else {
+                                showMetaWarningDialog = true
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(120.dp))
                 }
             }
         }

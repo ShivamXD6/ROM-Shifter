@@ -6,9 +6,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,7 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 
@@ -50,130 +52,186 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
 
     if (showResetDialog) {
         AlertDialog(
+            shape = RoundedCornerShape(30.dp),
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset Application Data", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
-            text = { Text("This will permanently clear application data, remove binary engines, reset configurations, and restart the app. Are you sure?") },
-            confirmButton = { Button(onClick = { showResetDialog = false; viewModel.resetApp(context) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Reset") } },
-            dismissButton = { TextButton(onClick = { showResetDialog = false }) { Text("Cancel") } }
+            title = { Text("Reset Application", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error) },
+            text = { Text("This will permanently clear application data, remove binaries, reset configurations, but doesn't delete Shifter Folder. Run if facing any issues or updated to the latest version", style = MaterialTheme.typography.bodyLarge) },
+            confirmButton = {
+                Button(
+                    onClick = { showResetDialog = false; viewModel.resetApp(context) },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("Reset", style = MaterialTheme.typography.titleMedium) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) { Text("Cancel", style = MaterialTheme.typography.titleMedium) }
+            }
         )
     }
 
     if (showAboutSheet) {
-        ModalBottomSheet(onDismissRequest = { showAboutSheet = false }) {
-            Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp)) {
-                Text("About & Support", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("App info, social links, and donations", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ModalBottomSheet(
+            onDismissRequest = { showAboutSheet = false },
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                Text("About & Support", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                Text("App info, social links, and donations", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://t.me/buildbytes") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://t.me/buildbytes") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Join Telegram", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Join the Build Bytes community", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Join Telegram", style = MaterialTheme.typography.titleMedium)
+                        Text("Join the Build Bytes community", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://www.youtube.com/@BuildBytesX") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://www.youtube.com/@BuildBytesX") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("YouTube Channel", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Subscribe to BuildBytesX", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("YouTube Channel", style = MaterialTheme.typography.titleMedium)
+                        Text("Subscribe to BuildBytesX", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Star on GitHub", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("View source code and releases", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Star on GitHub", style = MaterialTheme.typography.titleMedium)
+                        Text("View source code and releases", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Donate via UPI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Support via GPay, PhonePe, Paytm, BHIM", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Donate via UPI", style = MaterialTheme.typography.titleMedium)
+                        Text("Support via GPay, PhonePe, Paytm, BHIM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clickable { openUriSafely(context, "https://paypal.me/ShivamXD6") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://paypal.me/ShivamXD6") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Donate via PayPal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Support via international cards", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Donate via PayPal", style = MaterialTheme.typography.titleMedium)
+                        Text("Support via international cards", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Made by @ShastikXD | Build Bytes Team", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text("Made by @ShastikXD | Build Bytes Team", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize().verticalScroll(rememberScrollState())) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         ElevatedCard(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(30.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
         ) {
             Column {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(24.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Folder, contentDescription = "Folder", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = "Folder", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Shifter Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("All backups and files are saved here", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Shifter Location", style = MaterialTheme.typography.titleLarge)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("All backups and files are saved here", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { if (!isMoving) launcher.launch(null) }) { Icon(Icons.Default.FolderOpen, contentDescription = "Browse") }
+                        IconButton(onClick = { if (!isMoving) launcher.launch(null) }) { Icon(Icons.Default.FolderOpen, contentDescription = "Browse", modifier = Modifier.size(28.dp)) }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(value = inputPath, onValueChange = { inputPath = it }, singleLine = true, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(20.dp))
+                    OutlinedTextField(
+                        value = inputPath,
+                        onValueChange = { inputPath = it },
+                        singleLine = true,
+                        shape = CircleShape,
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    )
 
                     AnimatedVisibility(visible = isEditing || isMoving, enter = expandVertically(), exit = shrinkVertically()) {
                         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             if (isMoving) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("Saving Directory...", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                    Text("Saving Directory...", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                                 }
                             } else {
-                                Button(onClick = { isMoving = true; viewModel.migrateFolder(inputPath) { isMoving = false } }, shape = RoundedCornerShape(24.dp)) { Text("Apply Path") }
+                                Button(
+                                    onClick = { isMoving = true; viewModel.migrateFolder(inputPath) { isMoving = false } },
+                                    shape = CircleShape,
+                                    modifier = Modifier.height(52.dp)
+                                ) { Text("Apply Path", style = MaterialTheme.typography.titleMedium) }
                             }
                         }
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(modifier = Modifier.fillMaxWidth().clickable { showAboutSheet = true }.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showAboutSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("About & Support", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("App info, social links, and donations", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("About & Support", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("App info, social links, and donations", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(modifier = Modifier.fillMaxWidth().clickable { showResetDialog = true }.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DeleteForever, contentDescription = "Reset", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showResetDialog = true }.padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.errorContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = "Reset", tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(24.dp))
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text("Reset Application", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                        Text("Clear all data and reset engine", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Reset Application", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("Clear all data and remove Binary", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

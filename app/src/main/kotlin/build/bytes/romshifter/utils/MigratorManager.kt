@@ -151,12 +151,17 @@ object MigratorManager {
 
         try {
             if (state.migratorMode == MigratorMode.MANAGE) {
+                var totalFreedKb = 0L
                 selectedApps.forEach { app ->
                     val sysType = if (app.isSystem) "System" else "User"
-                    Shell.cmd("su -mm -c \"rm -rf '$currentPath/Data-Migrated/$sysType/${app.label}'\"").exec()
+                    val appPath = "$currentPath/Data-Migrated/$sysType/${app.label}"
+                    val sizeStr = Shell.cmd("su -mm -c \"du -sk '$appPath' | awk '{print \\\$1}'\"").exec().out.joinToString("").trim()
+                    totalFreedKb += sizeStr.toLongOrNull() ?: 0L
+                    Shell.cmd("su -mm -c \"rm -rf '$appPath'\"").exec()
                 }
+                val formattedSize = formatSize(totalFreedKb.toString())
                 updateProgress("Backups Deleted", "Data Successfully Removed", 100)
-                onComplete("Deletion Complete!", "Freed up storage space.")
+                onComplete("Deletion Complete!", "Freed: $formattedSize") // The ViewModel will automatically append " | Apps: X" to this!
                 return@withContext
             }
 

@@ -1,6 +1,9 @@
 package build.bytes.romshifter.ui.screens
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
@@ -31,10 +34,24 @@ import build.bytes.romshifter.ui.components.ShimmerAppListItem
 
 @Composable
 fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
-    if (appState.migratorMode == MigratorMode.MENU) {
-        MigratorMenu(appState, viewModel)
-    } else {
-        MigratorActionScreen(appState, viewModel)
+    AnimatedContent(
+        targetState = appState.migratorMode == MigratorMode.MENU,
+        transitionSpec = {
+            val goingBack = !initialState && targetState // From Action Screen back to Menu
+            if (goingBack) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                // FASTER 250ms SLIDE (Matches Settings exactly)
+                slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
+            }
+        },
+        label = "MigratorTransition"
+    ) { isMenu ->
+        if (isMenu) {
+            MigratorMenu(appState, viewModel)
+        } else {
+            MigratorActionScreen(appState, viewModel)
+        }
     }
 }
 
@@ -52,10 +69,11 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 
     if (showPermissionWarning) {
         AlertDialog(
+            shape = MaterialTheme.shapes.large,
             onDismissRequest = { showPermissionWarning = false },
-            icon = { Icon(Icons.Default.Security, contentDescription = null) },
+            icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(28.dp)) },
             title = { Text("Permissions Required") },
-            text = { Text("ROM Shifter will automatically grant native Android permissions via root to access SMS, Call Logs, or Contacts. Do you want to continue?") },
+            text = { Text("ROM Shifter will automatically grant native Android permissions via root to access SMS, Call Logs, or Contacts. Do you want to continue?", style = MaterialTheme.typography.bodyLarge) },
             confirmButton = { Button(onClick = { showPermissionWarning = false; pendingNativeAction?.let { (isBackup, flags) -> viewModel.runNativeDataOperation(context, isBackup, flags.first, flags.second, flags.third) } }) { Text("Yes, Start") } },
             dismissButton = { TextButton(onClick = { showPermissionWarning = false }) { Text("Cancel") } }
         )
@@ -64,23 +82,20 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
     if (showNativeBackupDialog || showNativeRestoreDialog) {
         val isBackup = showNativeBackupDialog
         AlertDialog(
+            shape = MaterialTheme.shapes.large,
             onDismissRequest = { showNativeBackupDialog = false; showNativeRestoreDialog = false },
-            icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null) },
+            icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null, modifier = Modifier.size(28.dp)) },
             title = { Text(if (isBackup) "Telephony Data" else "Restore Telephony Data") },
             text = {
                 Column {
-                    val options = listOf(
-                        "SMS Messages" to doSms,
-                        "Call Logs" to doCall,
-                        "Contacts (vCard)" to doContacts
-                    )
-
+                    val options = listOf("SMS Messages" to doSms, "Call Logs" to doCall, "Contacts (vCard)" to doContacts)
                     options.forEach { (label, state) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(if (state) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f) else Color.Transparent)
                                 .clickable {
                                     when (label) {
                                         "SMS Messages" -> doSms = !doSms
@@ -88,21 +103,15 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                                         "Contacts (vCard)" -> doContacts = !doContacts
                                     }
                                 }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(label, fontWeight = FontWeight.Medium)
+                            Text(label, style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = state,
                                 onCheckedChange = null,
-                                thumbContent = {
-                                    Icon(
-                                        imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
+                                thumbContent = { Icon(imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
                             )
                         }
                     }
@@ -118,16 +127,16 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp).fillMaxSize()) {
+    // Added solid background to prevent transparency bleeding
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
             MenuCard("Backup Telephony Data", Icons.Default.Sms, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
             MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Telephony Data from Storage") { showNativeRestoreDialog = true }
             MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
-
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
@@ -158,22 +167,19 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
     if (showNativeDeleteDialog) {
         AlertDialog(
+            shape = MaterialTheme.shapes.large,
             onDismissRequest = { showNativeDeleteDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, null) },
+            icon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(28.dp)) },
             title = { Text("Delete Telephony Backups") },
             text = {
                 Column {
-                    val options = listOf(
-                        "SMS Messages" to delSms,
-                        "Call Logs" to delCall,
-                        "Contacts (vCard)" to delContacts
-                    )
+                    val options = listOf("SMS Messages" to delSms, "Call Logs" to delCall, "Contacts (vCard)" to delContacts)
                     options.forEach { (label, state) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(MaterialTheme.shapes.medium)
                                 .clickable {
                                     when (label) {
                                         "SMS Messages" -> delSms = !delSms
@@ -185,32 +191,18 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(label, fontWeight = FontWeight.Medium)
+                            Text(label, style = MaterialTheme.typography.titleMedium)
                             Switch(
                                 checked = state,
                                 onCheckedChange = null,
-                                thumbContent = {
-                                    Icon(
-                                        imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
+                                thumbContent = { Icon(imageVector = if (state) Icons.Filled.Check else Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
                             )
                         }
                     }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        if (delSms || delCall || delContacts) {
-                            viewModel.deleteNativeBackups(context, delSms, delCall, delContacts)
-                        }
-                        showNativeDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete Data") }
+                Button(onClick = { if (delSms || delCall || delContacts) viewModel.deleteNativeBackups(context, delSms, delCall, delContacts); showNativeDeleteDialog = false }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Delete Data") }
             },
             dismissButton = { TextButton(onClick = { showNativeDeleteDialog = false }) { Text("Cancel") } }
         )
@@ -218,21 +210,17 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
     if (showForceRemoveWarning) {
         AlertDialog(
+            shape = MaterialTheme.shapes.large,
             onDismissRequest = { showForceRemoveWarning = false },
-            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(28.dp)) },
             title = { Text("Enable Force Deletion?") },
-            text = { Text("This will completely wipe the app data from the root partitions to free up space.\n\nWarning: Apps removed this way CANNOT be restored later using ROM Shifter!", color = MaterialTheme.colorScheme.error) },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.setForceRemove(true); showForceRemoveWarning = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("I Understand, Enable") }
-            },
+            text = { Text("This will completely wipe the app data from the root partitions to free up space.\n\nWarning: Apps removed this way CANNOT be restored later using ROM Shifter!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge) },
+            confirmButton = { Button(onClick = { viewModel.setForceRemove(true); showForceRemoveWarning = false }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("I Understand, Enable") } },
             dismissButton = { TextButton(onClick = { showForceRemoveWarning = false }) { Text("Cancel") } }
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Spacer(modifier = Modifier.height(8.dp))
 
         if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
@@ -246,8 +234,10 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.toggleGlobalComponent(entry.key) },
-                        label = { Text(entry.value, style = MaterialTheme.typography.labelMedium) },
-                        leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } }
+                        label = { Text(entry.value, style = MaterialTheme.typography.labelLarge) },
+                        leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } },
+                        shape = CircleShape,
+                        modifier = Modifier.height(36.dp)
                     )
                 }
             }
@@ -257,15 +247,15 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             TextField(
                 value = appState.searchQuery,
                 onValueChange = { viewModel.updateSearchQuery(it) },
-                placeholder = { Text("Search apps...", style = MaterialTheme.typography.bodyMedium) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(20.dp)) },
+                placeholder = { Text("Search apps...", style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(22.dp)) },
                 singleLine = true,
                 shape = CircleShape,
                 colors = TextFieldDefaults.colors(
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).height(52.dp)
             )
 
             Spacer(modifier = Modifier.width(10.dp))
@@ -273,10 +263,10 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
             FilledTonalIconButton(
                 onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) },
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(52.dp),
                 shape = CircleShape
             ) {
-                Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All")
+                Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All", modifier = Modifier.size(22.dp))
             }
         }
 
@@ -285,48 +275,29 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val chipModifier = Modifier.height(36.dp)
+
             if (appState.migratorMode == MigratorMode.DEBLOAT) {
                 item {
-                    FilterChip(
-                        selected = appState.isRestoreDebloatMode,
-                        onClick = { viewModel.toggleRestoreDebloatMode() },
-                        label = { Text("Restore Mode") },
-                        leadingIcon = { Icon(Icons.Default.Restore, null, modifier = Modifier.size(16.dp)) }
-                    )
+                    FilterChip(selected = appState.isRestoreDebloatMode, onClick = { viewModel.toggleRestoreDebloatMode() }, label = { Text("Restore Mode", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Restore, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
                 }
             }
 
             if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.SYSTEMIZE) {
                 item {
-                    FilterChip(
-                        selected = appState.showUserApps,
-                        onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) },
-                        label = { Text("User Apps") },
-                        leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }
-                    )
+                    FilterChip(selected = appState.showUserApps, onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) }, label = { Text("User Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
                 }
                 item {
-                    FilterChip(
-                        selected = appState.showSystemApps,
-                        onClick = { viewModel.toggleSystemApps() },
-                        label = { Text("System Apps") },
-                        leadingIcon = { Icon(Icons.Default.Android, null, modifier = Modifier.size(16.dp)) }
-                    )
+                    FilterChip(selected = appState.showSystemApps, onClick = { viewModel.toggleSystemApps() }, label = { Text("System Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Android, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
                 }
             }
 
             if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
                 item {
                     FilterChip(
-                        selected = appState.forceRemoveEnabled,
-                        onClick = { if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning = true },
-                        label = { Text("Force Deletion") },
-                        leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
-                            selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        selected = appState.forceRemoveEnabled, onClick = { if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning = true },
+                        label = { Text("Force Deletion", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.errorContainer, selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer, selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer)
                     )
                 }
             }
@@ -334,15 +305,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
                 item {
                     FilterChip(
-                        selected = isPrivileged,
-                        onClick = { viewModel.setPrivilegedSystemize(!isPrivileged) },
-                        label = { Text("Privileged Mode") },
-                        leadingIcon = { Icon(Icons.Default.SecurityUpdateGood, null, modifier = Modifier.size(16.dp)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        selected = isPrivileged, onClick = { viewModel.setPrivilegedSystemize(!isPrivileged) },
+                        label = { Text("Privileged Mode", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.SecurityUpdateGood, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer, selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer, selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer)
                     )
                 }
             }
@@ -350,26 +315,20 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             if (appState.migratorMode == MigratorMode.MANAGE) {
                 item {
                     AssistChip(
-                        onClick = { showNativeDeleteDialog = true },
-                        label = { Text("Delete Telephony") },
-                        leadingIcon = { Icon(Icons.Default.SettingsPhone, null, modifier = Modifier.size(16.dp)) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            labelColor = MaterialTheme.colorScheme.onErrorContainer,
-                            leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        onClick = { showNativeDeleteDialog = true }, label = { Text("Delete Telephony", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.SettingsPhone, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
+                        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer, labelColor = MaterialTheme.colorScheme.onErrorContainer, leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer)
                     )
                 }
             }
         }
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
             if (appState.isFetchingApps) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
             } else if (filteredApps.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No apps found.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No apps found.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp, top = 6.dp)) {
                     items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
                         AppListItem(app = app, onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) })
                     }
@@ -377,13 +336,14 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
-        
         val selectedCount = appState.appList.count { it.isSelected }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            shadowElevation = 4.dp
         ) {
+            // STRIPPED: Removed the bottom linear progress bar and action text completely!
             Row(
                 modifier = Modifier
                     .navigationBarsPadding()
@@ -393,17 +353,19 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             ) {
                 Text(
                     text = "$selectedCount Selected",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
+
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Button(
                     onClick = { viewModel.runDynamicOperation() },
                     enabled = !appState.isRunning && selectedCount > 0,
-                    shape = RoundedCornerShape(24.dp),
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.height(48.dp)
+                    modifier = Modifier.height(52.dp).widthIn(min = 120.dp)
                 ) {
                     val act = when (appState.migratorMode) {
                         MigratorMode.MANAGE -> "Delete Apps"
@@ -412,7 +374,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         MigratorMode.SYSTEMIZE -> "Systemize"
                         else -> "Backup"
                     }
-                    Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
