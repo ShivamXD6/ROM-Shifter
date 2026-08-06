@@ -54,11 +54,11 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
     AnimatedContent(
         targetState = appState.migratorMode !in listOf(MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE),
         transitionSpec = {
-            val goingBack = !initialState && targetState // From Action Screen back to Menu
+            val goingBack = !initialState && targetState 
             if (goingBack) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
-                // FASTER 250ms SLIDE
+                
                 slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
         },
@@ -67,7 +67,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
         if (!isMenu) {
             MigratorActionScreen(appState, viewModel)
         } else {
-            // Added solid background to prevent transparency bleeding
+            
             Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))

@@ -161,11 +161,11 @@ object MigratorManager {
                 }
                 val formattedSize = formatSize(totalFreedKb.toString())
                 updateProgress("Backups Deleted", "Data Successfully Removed", 100)
-                onComplete("Deletion Complete!", "Freed: $formattedSize") // The ViewModel will automatically append " | Apps: X" to this!
+                onComplete("Deletion Complete!", "Freed: $formattedSize") 
                 return@withContext
             }
 
-            // --- SMART PRE-SCAN LOGIC BEGINS ---
+            
             val isRestore = state.migratorMode.name.contains("RESTORE")
             val cApp = state.globalComponents.contains(1)
             val cData = state.globalComponents.contains(2)
@@ -176,7 +176,7 @@ object MigratorManager {
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
-                // Instantly checks the backup directory to see which parts were actually saved!
+                
                 selectedApps.forEach { app ->
                     val sysType = if (app.isSystem) "System" else "User"
                     val basePath = "$currentPath/Data-Migrated/$sysType/${app.label}"
@@ -189,7 +189,7 @@ object MigratorManager {
                     if (cId) {
                         try {
                             val metaFile = File("$basePath/Meta.txt")
-                            // Ensures the Meta.txt has a valid SSAID entry that isn't blank
+                            
                             if (metaFile.exists() && metaFile.readText().lines().any { it.startsWith("SSAID=") && it.length > 6 }) {
                                 parts.add("Android ID")
                             }
@@ -198,7 +198,7 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
-                // Runs a hyper-fast root shell script to verify exactly which folders and IDs exist!
+                
                 val script = java.lang.StringBuilder()
                 selectedApps.forEach { app ->
                     val pkg = app.packageName
@@ -208,7 +208,7 @@ object MigratorManager {
                     if (cExt) script.append("[ -d \"/data/media/0/Android/data/$pkg\" ] && res=\"\$res|ExtData\"\n")
                     if (cMed) script.append("[ -d \"/data/media/0/Android/media/$pkg\" ] && res=\"\$res|Media\"\n")
                     if (cObb) script.append("[ -d \"/data/media/0/Android/obb/$pkg\" ] && res=\"\$res|Obb\"\n")
-                    // Checks the system XML to see if this specific package has generated an Android ID
+                    
                     if (cId) script.append("grep -q \"package=\\\"$pkg\\\"\" /data/system/users/0/settings_ssaid.xml 2>/dev/null && res=\"\$res|Android ID\"\n")
                     script.append("echo \"$pkg==\$res\"\n")
                 }
@@ -221,7 +221,7 @@ object MigratorManager {
                     }
                 }
             }
-            // --- SMART PRE-SCAN LOGIC ENDS ---
+            
 
             val targetData = selectedApps.joinToString("\n") { app ->
                 val sysType = if (app.isSystem) "System" else "User"
@@ -242,12 +242,12 @@ object MigratorManager {
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
                     is ShifterEvent.BackupProgress -> {
-                        // Dynamically pull the exact parts found for THIS app!
+                        
                         val app = selectedApps.find { it.label == event.label }
                         val activeParts = appPartsMap[app?.packageName] ?: ""
                         val partsString = if (activeParts.isNotEmpty()) "\nParts: $activeParts" else ""
 
-                        // Sent seamlessly to the notification and UI
+                        
                         updateProgress(actText, "${event.label} (${event.current}/${event.total})$partsString", event.percent)
                     }
                     is ShifterEvent.GlobalDone -> {

@@ -37,11 +37,11 @@ fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
     AnimatedContent(
         targetState = appState.migratorMode == MigratorMode.MENU,
         transitionSpec = {
-            val goingBack = !initialState && targetState // From Action Screen back to Menu
+            val goingBack = !initialState && targetState 
             if (goingBack) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
-                // FASTER 250ms SLIDE (Matches Settings exactly)
+                
                 slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
         },
@@ -127,7 +127,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    // Added solid background to prevent transparency bleeding
+    
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -343,7 +343,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             shadowElevation = 4.dp
         ) {
-            // STRIPPED: Removed the bottom linear progress bar and action text completely!
+            
             Row(
                 modifier = Modifier
                     .navigationBarsPadding()

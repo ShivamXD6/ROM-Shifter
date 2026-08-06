@@ -30,7 +30,7 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .clip(MaterialTheme.shapes.large) // Pulled dynamically from Theme.kt
+            .clip(MaterialTheme.shapes.large) 
             .clickable(onClick = onClick),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -43,7 +43,7 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp) // Adjusted size
+                    .size(52.dp) 
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
@@ -84,14 +84,14 @@ fun AppListItem(app: AppInfo, onToggleSelect: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 2.dp)
-            .clip(MaterialTheme.shapes.medium) // Pulled dynamically
+            .clip(MaterialTheme.shapes.medium) 
             .background(containerColor)
             .clickable { onToggleSelect(app.packageName) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val iconModifier = Modifier
-            .size(48.dp) // Adjusted size
+            .size(48.dp) 
             .clip(MaterialTheme.shapes.small)
 
         if (app.iconBitmap != null) {

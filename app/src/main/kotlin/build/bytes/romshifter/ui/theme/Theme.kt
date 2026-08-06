@@ -11,12 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-// MD3E Extreme Rounding Shapes (Used globally)
+
 val ExpressiveShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp), // Used for inner lists and smaller cards
-    large = RoundedCornerShape(30.dp),  // Used globally for Main Cards, Dialogs, BottomBar
+    medium = RoundedCornerShape(20.dp), 
+    large = RoundedCornerShape(30.dp),  
     extraLarge = RoundedCornerShape(30.dp)
 )
 
@@ -38,7 +38,7 @@ fun ROMShifterTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = ExpressiveShapes, // Injecting the MD3E Shapes
+        shapes = ExpressiveShapes, 
         content = content
     )
 }

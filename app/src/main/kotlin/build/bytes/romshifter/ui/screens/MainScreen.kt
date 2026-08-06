@@ -103,9 +103,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val density = LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
 
-    // FIX: Freezing the Background State
-    // We only update the background layout state when an animation is NOT actively happening.
-    // This stops the background layer from flashing/disappearing during the 50ms state hand-off delay!
+    
+    
+    
     var frozenPreviousAppState by remember {
         mutableStateOf(appState.copy(
             migratorMode = if (showSettings) appState.migratorMode else if (appState.migratorMode != MigratorMode.MENU) MigratorMode.MENU else appState.migratorMode,
@@ -124,7 +124,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        // 1. BACKGROUND LAYER (Parallax sliding in)
+        
         if (backProgress.value > 0f) {
             Box(
                 modifier = Modifier
@@ -137,7 +137,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     .background(MaterialTheme.colorScheme.background)
             ) {
                 AppScaffold(
-                    appState = frozenPreviousAppState, // Stays firmly frozen during the pop
+                    appState = frozenPreviousAppState, 
                     showSettings = false,
                     selectedTab = selectedTab,
                     viewModel = viewModel,
@@ -149,7 +149,7 @@ fun MainScreen(viewModel: MainViewModel) {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f * (1f - backProgress.value))))
         }
 
-        // 2. FOREGROUND LAYER (Current screen sliding away to the right)
+        
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -387,7 +387,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
-        // 1. BACKGROUND PARALLAX LAYER
+        
         if (backProgress.value > 0f) {
             Box(
                 modifier = Modifier
@@ -416,7 +416,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             )
         }
 
-        // 2. FOREGROUND SLIDING LAYER
+        
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -431,7 +431,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 }
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // MAIN CONTENT DRAWN FIRST
+            
             AnimatedContent(
                 targetState = step,
                 transitionSpec = {
@@ -462,7 +462,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 }
             }
 
-            // BACK BUTTON DRAWN SECOND (ON TOP)
+            
             AnimatedVisibility(
                 visible = step > 1,
                 enter = fadeIn(),

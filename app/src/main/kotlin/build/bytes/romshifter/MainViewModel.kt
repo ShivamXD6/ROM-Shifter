@@ -90,7 +90,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateProgressNotification(
         title: String,
         content: String,
-        progress: Int = -1, // Default to -1 so it always triggers the sweeping bar by default
+        progress: Int = -1, 
         max: Int = 100
     ) {
         if (ContextCompat.checkSelfPermission(
@@ -103,7 +103,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val mainText = parts[0]
             val subText = if (parts.size > 1) parts[1] else null
 
-            // Clean display text without percentage crowding if it's indeterminate
+            
             val displayContent = if (progress in 0..100) "$mainText  •  $progress%" else mainText
 
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
@@ -124,7 +124,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (progress in 0..100) {
                 builder.setProgress(max, progress, false)
             } else {
-                // Always use the smooth indeterminate sweeping bar by default
+                
                 builder.setProgress(0, 0, true)
             }
 
@@ -163,7 +163,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList())
     }
 
-    // FIX 4: Correct Back Navigation Step-by-Step
+    
     fun flashWizardStepBack() {
         val currentStep = _uiState.value.flashWizardStep
         if (currentStep > 1) {
@@ -356,7 +356,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             title,
             "Starting Process...",
             -1
-        ) // -1 triggers Indeterminate Native Pulse
+        ) 
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -627,17 +627,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val onComplete: (String, String) -> Unit = { action, step ->
 
-                // NEW: Dynamic Formatting for Completion Notification
+                
                 val finalStepText = when {
                     state.migratorMode == MigratorMode.MANAGE -> {
-                        // Ensure "Freed up storage space." is cleaned up if MigratorManager hasn't been updated to send MB yet
+                        
                         val cleanStep =
                             if (step == "Freed up storage space.") "Freed space" else step
                         if (cleanStep.isNotBlank()) "$cleanStep | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
 
                     else -> {
-                        // Standard generic formatting for all other modes
+                        
                         if (step.isNotBlank()) "$step | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
                 }
