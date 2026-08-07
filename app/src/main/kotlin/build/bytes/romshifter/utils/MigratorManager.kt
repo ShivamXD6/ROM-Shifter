@@ -98,7 +98,8 @@ object MigratorManager {
             "RestoreUser", "RestoreSystem", "AllBackups" -> {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
-                val command = "su -mm -c 'grep -E \"^Name=|^Package=|^Version=\" \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
+                // FIX: Added -H to force filename output, and used -e for safer cross-device shell compatibility
+                val command = "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -110,7 +111,8 @@ object MigratorManager {
                         val kv = line.substring(delimiterIdx + 10)
                         val splitKv = kv.split("=", limit = 2)
                         if (splitKv.size == 2) {
-                            appMap.getOrPut(filePath) { mutableMapOf() }[splitKv[0]] = splitKv[1]
+                            // Trim added to strip invisible shell carriage returns (\r)
+                            appMap.getOrPut(filePath) { mutableMapOf() }[splitKv[0].trim()] = splitKv[1].trim()
                         }
                     }
                 }

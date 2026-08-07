@@ -30,8 +30,8 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = true
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = false
         }
     }
     compileOptions {
