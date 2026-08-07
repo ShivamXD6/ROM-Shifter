@@ -46,6 +46,9 @@ object MigratorManager {
 
         when (type) {
             "User", "System", "AllInstalled" -> {
+                val sysModCmd = "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules/ROM-Shifter/system/product/priv-app /data/adb/modules_update/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/priv-app 2>/dev/null"
+                val systemizedLabels = Shell.cmd(sysModCmd).exec().out.toSet()
+
                 val installedApps = pm.getInstalledApplications(0)
                 val fetchedApps = installedApps.map { app ->
                     async(Dispatchers.IO) {
@@ -58,7 +61,15 @@ object MigratorManager {
                             val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
                             val tinyBitmap = getTinyBitmap(rawIcon)
 
-                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconBitmap = tinyBitmap)
+                            val metaFile = File("$currentPath/Data-Migrated/${if (isSys) "System" else "User"}/$label/Meta.txt")
+                            val bTime = if (metaFile.exists()) {
+                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
+                                "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
+                            } else "No backup on device"
+                            val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
+                            val isSystemizedApp = systemizedLabels.contains(safeLabel)
+
+                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconBitmap = tinyBitmap, backupTime = bTime, isSystemized = isSystemizedApp)
                         } else {
                             null
                         }
@@ -87,8 +98,13 @@ object MigratorManager {
                             val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
                             val tinyBitmap = getTinyBitmap(rawIcon)
 
-                            AppInfo(label = label, packageName = app.packageName, isSystem = isSys, iconBitmap = tinyBitmap)
-                        } else {
+                            val metaFile = File("$currentPath/Data-Migrated/${if (isSys) "System" else "User"}/$label/Meta.txt")
+                            val bTime = if (metaFile.exists()) {
+                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
+                                "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
+                            } else "No backup on device"
+
+                            AppInfo(label = label, packageName = app.packageName, isSystem = isSys, iconBitmap = tinyBitmap, backupTime = bTime, isInstalled = false)                        } else {
                             null
                         }
                     }
@@ -98,7 +114,6 @@ object MigratorManager {
             "RestoreUser", "RestoreSystem", "AllBackups" -> {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
-                // FIX: Added -H to force filename output, and used -e for safer cross-device shell compatibility
                 val command = "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
@@ -111,7 +126,6 @@ object MigratorManager {
                         val kv = line.substring(delimiterIdx + 10)
                         val splitKv = kv.split("=", limit = 2)
                         if (splitKv.size == 2) {
-                            // Trim added to strip invisible shell carriage returns (\r)
                             appMap.getOrPut(filePath) { mutableMapOf() }[splitKv[0].trim()] = splitKv[1].trim()
                         }
                     }
@@ -133,8 +147,15 @@ object MigratorManager {
                             }
                             if (cacheFile.exists() && cacheFile.length() > 0) iconPath = cacheFile.absolutePath
 
-                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconPath = iconPath)
-                        } else null
+                            val metaFile = File("$basePath/Meta.txt")
+                            val bTime = if (metaFile.exists()) {
+                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
+                                "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
+                            } else "No backup on device"
+
+                            val isInst = try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
+
+                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconPath = iconPath, backupTime = bTime, isInstalled = isInst)                        } else null
                     }
                 }
                 apps.addAll(deferredBackups.awaitAll().filterNotNull())
@@ -168,12 +189,16 @@ object MigratorManager {
 
         try {
             if (state.migratorMode == MigratorMode.MANAGE) {
-                val metaPaths = selectedApps.joinToString(" ") { "'$currentPath/Data-Migrated/${if (it.isSystem) "System" else "User"}/${it.label}/Meta.txt'" }
-                val sizeCmd = "su -mm -c \"cat $metaPaths 2>/dev/null | grep '^TotalSize=' | cut -d= -f2 | awk '{s+=\\\$1} END {print s}'\""
+                val baseDir = File(currentPath)
+                if (!baseDir.exists()) {
+                    Shell.cmd("su -c \"mkdir -p '$currentPath/Data-Migrated' '$currentPath/Live-Partition' && touch '$currentPath/.shifter_dir' && touch '$currentPath/.nomedia'\"").exec()
+                }
+                val appPaths = selectedApps.joinToString(" ") { "'$currentPath/Data-Migrated/${if (it.isSystem) "System" else "User"}/${it.label}'" }
+
+                val sizeCmd = "su -mm -c \"du -sk $appPaths 2>/dev/null | awk '{s+=\\\$1} END {print s}'\""
                 val sizeStr = Shell.cmd(sizeCmd).exec().out.joinToString("").trim()
                 val totalFreedKb = sizeStr.toLongOrNull() ?: 0L
 
-                val appPaths = selectedApps.joinToString(" ") { "'$currentPath/Data-Migrated/${if (it.isSystem) "System" else "User"}/${it.label}'" }
                 Shell.cmd("su -mm -c \"rm -rf $appPaths\"").exec()
 
                 val formattedSize = formatSize(totalFreedKb.toString())
@@ -247,12 +272,43 @@ object MigratorManager {
             targetFile.writeText(targetData)
             Shell.cmd("su -mm -c \"rm -f /data/local/tmp/shifter_targets.txt && cat '${targetFile.absolutePath}' > /data/local/tmp/shifter_targets.txt && chmod 666 /data/local/tmp/shifter_targets.txt\"").exec()
             targetFile.delete()
-
             val operation = if (isRestore) "--restore" else "--backup"
             val compsString = state.globalComponents.sorted().joinToString(" ")
 
-            val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString'\""
+            val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
+
+            
+            
+            if (state.migratorMode == MigratorMode.BACKUP_APPS) {
+                val iconScript = java.lang.StringBuilder()
+                selectedApps.forEach { app ->
+                    try {
+                        val rawIcon = context.packageManager.getApplicationIcon(app.packageName)
+                        val bitmap = getTinyBitmap(rawIcon)
+
+                        if (bitmap != null) {
+                            val tempFile = File(context.cacheDir, "icon_${app.packageName}.png")
+                            FileOutputStream(tempFile).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                            val sysType = if (app.isSystem) "System" else "User"
+                            val destDir = "$currentPath/Data-Migrated/$sysType/${app.label}"
+
+                            iconScript.append("mkdir -p '$destDir'\n")
+                            iconScript.append("cp '${tempFile.absolutePath}' '$destDir/Icon.png'\n")
+                            iconScript.append("chmod 644 '$destDir/Icon.png'\n")
+                            iconScript.append("rm -f '${tempFile.absolutePath}'\n")
+                        }
+                    } catch (_: Exception) { }
+                }
+
+                
+                if (iconScript.isNotEmpty()) {
+                    val scriptFile = File(context.cacheDir, "copy_icons.sh")
+                    scriptFile.writeText(iconScript.toString())
+                    Shell.cmd("su -c 'sh \"${scriptFile.absolutePath}\"'").exec()
+                    scriptFile.delete()
+                }
+            }
 
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
@@ -261,8 +317,8 @@ object MigratorManager {
                         val activeParts = appPartsMap[app?.packageName] ?: ""
                         val partsString = if (activeParts.isNotEmpty()) "\nParts: $activeParts" else ""
 
-                        val sizeInfo = if (event.size.isNotBlank() && event.size != "0 KB") " [Size: ${event.size}]" else ""
-
+                        val cleanSize = event.size.replace("\r", "").trim()
+                        val sizeInfo = if (cleanSize.isNotBlank() && cleanSize != "0 KB") " [Size: $cleanSize]" else ""
                         updateProgress(actText, "${event.label}$sizeInfo (${event.current}/${event.total})$partsString", event.percent)
                     }
                     is ShifterEvent.GlobalDone -> {
@@ -275,23 +331,6 @@ object MigratorManager {
                         onComplete(actDone, "Total Size: $smartSize | Time: $timeStr")
                     }
                     else -> {}
-                }
-            }
-
-            if (state.migratorMode == MigratorMode.BACKUP_APPS) {
-                selectedApps.forEach { app ->
-                    try {
-                        val rawIcon = context.packageManager.getApplicationIcon(app.packageName)
-                        val bitmap = getTinyBitmap(rawIcon)
-
-                        if (bitmap != null) {
-                            val tempFile = File(context.cacheDir, "temp_icon.png")
-                            FileOutputStream(tempFile).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                            val sysType = if (app.isSystem) "System" else "User"
-                            Shell.cmd("su -c \"cp '${tempFile.absolutePath}' '$currentPath/Data-Migrated/$sysType/${app.label}/Icon.png' && chmod 644 '$currentPath/Data-Migrated/$sysType/${app.label}/Icon.png'\"").exec()
-                            tempFile.delete()
-                        }
-                    } catch (_: Exception) { }
                 }
             }
         } finally {

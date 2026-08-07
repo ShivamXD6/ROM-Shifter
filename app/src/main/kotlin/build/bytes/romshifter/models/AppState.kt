@@ -13,7 +13,10 @@ data class AppInfo(
     val isSystem: Boolean = false,
     val isSelected: Boolean = false,
     val iconBitmap: Bitmap? = null,
-    val iconPath: String? = null
+    val iconPath: String? = null,
+    val backupTime: String = "",
+    val isInstalled: Boolean = true,
+    val isSystemized: Boolean = false
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)
@@ -31,7 +34,7 @@ data class AppState(
     val searchQuery: String = "",
     val showUserApps: Boolean = true,
     val showSystemApps: Boolean = false,
-    val isRestoreDebloatMode: Boolean = false,
+    val actionFilterState: Int = 0,
     val globalComponents: Set<Int> = setOf(1, 2, 3, 4, 5, 6),
     val hasRoot: Boolean = true,
     val forceRemoveEnabled: Boolean = false,

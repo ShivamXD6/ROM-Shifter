@@ -1,6 +1,7 @@
 package build.bytes.romshifter.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -146,18 +147,44 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     val context = LocalContext.current
     val isPrivileged by viewModel.isPrivilegedSystemize.collectAsState()
-    val filteredApps by remember(appState.appList, appState.searchQuery, appState.showSystemApps, appState.showUserApps, appState.isRestoreDebloatMode) {
+    var showFilters by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+
+    val filteredApps by remember(appState.appList, appState.searchQuery, appState.showSystemApps, appState.showUserApps, appState.actionFilterState) {
         derivedStateOf {
-            appState.appList.filter {
-                val matchesSearch = it.label.contains(appState.searchQuery, ignoreCase = true) || it.packageName.contains(appState.searchQuery, ignoreCase = true)
-                val matchesType = (it.isSystem && appState.showSystemApps) || (!it.isSystem && appState.showUserApps)
-                matchesSearch && (matchesType || appState.isRestoreDebloatMode)
+            appState.appList.filter { app ->
+                val matchesSearch = app.label.contains(appState.searchQuery, ignoreCase = true) || app.packageName.contains(appState.searchQuery, ignoreCase = true)
+
+                val isDebloatedMode = appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2
+                val matchesType = isDebloatedMode || ((app.isSystem && appState.showSystemApps) || (!app.isSystem && appState.showUserApps))
+
+                val matchesAction = when (appState.migratorMode) {
+                    MigratorMode.BACKUP_APPS -> {
+                        if (appState.actionFilterState == 0) true
+                        else if (appState.actionFilterState == 1) app.backupTime == "No backup on device"
+                        else app.backupTime != "No backup on device"
+                    }
+                    MigratorMode.RESTORE_APPS -> {
+                        if (appState.actionFilterState == 0) true
+                        else if (appState.actionFilterState == 1) !app.isInstalled
+                        else app.isInstalled
+                    }
+                    MigratorMode.SYSTEMIZE -> {
+                        if (appState.actionFilterState == 1) !app.isSystem && !app.isSystemized else app.isSystemized
+                    }
+                    MigratorMode.DEBLOAT -> {
+                        if (appState.actionFilterState == 1) app.isInstalled else !app.isInstalled
+                    }
+                    else -> true
+                }
+
+                matchesSearch && matchesType && matchesAction
             }
         }
     }
 
     var showForceRemoveWarning by remember { mutableStateOf(false) }
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
+    var showPrivilegedInfo by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
@@ -220,29 +247,26 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(compNames.entries.toList()) { entry ->
-                    val isSelected = appState.globalComponents.contains(entry.key)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.toggleGlobalComponent(entry.key) },
-                        label = { Text(entry.value, style = MaterialTheme.typography.labelLarge) },
-                        leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } },
-                        shape = CircleShape,
-                        modifier = Modifier.height(36.dp)
-                    )
-                }
+    if (showPrivilegedInfo) {
+        AlertDialog(
+            shape = MaterialTheme.shapes.large,
+            onDismissRequest = { showPrivilegedInfo = false },
+            icon = { Icon(Icons.Default.SecurityUpdateGood, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) },
+            title = { Text("Enable Privileged Mode?") },
+            text = { Text("This grants the application access to restricted, system-level permissions (e.g., secure settings, deep telephony routing, or recent apps integration).\n\nRecommended for: Custom Launchers, Google Dialer/Phone ports, Camera ports, or System UI plugins.", style = MaterialTheme.typography.bodyLarge) },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.setPrivilegedSystemize(true)
+                    showPrivilegedInfo = false
+                }) { Text("Enable") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrivilegedInfo = false }) { Text("Cancel") }
             }
-        }
+        )
+    }
 
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             TextField(
                 value = appState.searchQuery,
@@ -257,124 +281,252 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 ),
                 modifier = Modifier.weight(1f).height(52.dp)
             )
-
             Spacer(modifier = Modifier.width(10.dp))
-
             val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
             FilledTonalIconButton(
                 onClick = { viewModel.selectAllVisibleApps(!allSelected, filteredApps) },
                 modifier = Modifier.size(52.dp),
                 shape = CircleShape
+            ) { Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All", modifier = Modifier.size(22.dp)) }
+        }
+
+        Column {
+            if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(compNames.entries.toList()) { entry ->
+                        val isSelected = appState.globalComponents.contains(entry.key)
+                        FilterChip(
+                            selected = isSelected, onClick = { viewModel.toggleGlobalComponent(entry.key) },
+                            label = { Text(entry.value, style = MaterialTheme.typography.labelLarge) }, leadingIcon = { compIcons[entry.key]?.let { Icon(it, null, modifier = Modifier.size(16.dp)) } },
+                            shape = CircleShape, modifier = Modifier.height(36.dp)
+                        )
+                    }
+                }
+            }
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(if (allSelected) Icons.Default.RemoveDone else Icons.Default.DoneAll, contentDescription = "Select All", modifier = Modifier.size(22.dp))
-            }
-        }
+                val chipModifier = Modifier.height(36.dp)
 
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val chipModifier = Modifier.height(36.dp)
-
-            if (appState.migratorMode == MigratorMode.DEBLOAT) {
-                item {
-                    FilterChip(selected = appState.isRestoreDebloatMode, onClick = { viewModel.toggleRestoreDebloatMode() }, label = { Text("Restore Mode", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Restore, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
+                val actionChipLabel = when (appState.migratorMode) {
+                    MigratorMode.BACKUP_APPS -> when(appState.actionFilterState) { 0 -> "All Apps"; 1 -> "Backup"; else -> "Backed Up" }
+                    MigratorMode.RESTORE_APPS -> when(appState.actionFilterState) { 0 -> "All Apps"; 1 -> "Restore"; else -> "Restored" }
+                    MigratorMode.DEBLOAT -> if (appState.actionFilterState == 1) "Debloat" else "Restore"
+                    MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
+                    else -> ""
                 }
-            }
 
-            if (!appState.isRestoreDebloatMode && appState.migratorMode != MigratorMode.SYSTEMIZE) {
-                item {
-                    FilterChip(selected = appState.showUserApps, onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) }, label = { Text("User Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
+                val actionIcon = when (appState.actionFilterState) {
+                    0 -> Icons.Default.AllInclusive
+                    1 -> Icons.Default.FilterList
+                    else -> Icons.Default.CheckCircle
                 }
-                item {
-                    FilterChip(selected = appState.showSystemApps, onClick = { viewModel.toggleSystemApps() }, label = { Text("System Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Android, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier)
-                }
-            }
 
-            if (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode) {
-                item {
-                    FilterChip(
-                        selected = appState.forceRemoveEnabled, onClick = { if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning = true },
-                        label = { Text("Force Deletion", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.errorContainer, selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer, selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer)
-                    )
+                if (actionChipLabel.isNotEmpty()) {
+                    item {
+                        FilterChip(
+                            selected = appState.actionFilterState != 0,
+                            onClick = { viewModel.toggleActionFilter() },
+                            label = { Text(actionChipLabel, style = MaterialTheme.typography.labelLarge) },
+                            leadingIcon = { Icon(actionIcon, null, modifier = Modifier.size(16.dp)) },
+                            shape = CircleShape,
+                            modifier = chipModifier
+                        )
+                    }
                 }
-            }
 
-            if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
-                item {
-                    FilterChip(
-                        selected = isPrivileged, onClick = { viewModel.setPrivilegedSystemize(!isPrivileged) },
-                        label = { Text("Privileged Mode", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.SecurityUpdateGood, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer, selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer, selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer)
-                    )
+                if (appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)) {
+                    item { FilterChip(selected = appState.showUserApps, onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) }, label = { Text("User Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier) }
+                    item { FilterChip(selected = appState.showSystemApps, onClick = { viewModel.toggleSystemApps() }, label = { Text("System Apps", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.Android, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier) }
                 }
-            }
 
-            if (appState.migratorMode == MigratorMode.MANAGE) {
-                item {
-                    AssistChip(
-                        onClick = { showNativeDeleteDialog = true }, label = { Text("Delete Telephony", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.SettingsPhone, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
-                        colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer, labelColor = MaterialTheme.colorScheme.onErrorContainer, leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer)
-                    )
+                if (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1) {
+                    item {
+                        FilterChip(
+                            selected = appState.forceRemoveEnabled, onClick = { if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning = true },
+                            label = { Text("Force Deletion", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.errorContainer, selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer, selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer)
+                        )
+                    }
                 }
-            }
-        }
 
-        Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp).clip(MaterialTheme.shapes.large).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-            if (appState.isFetchingApps) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
-            } else if (filteredApps.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No apps found.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp, top = 6.dp)) {
-                    items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
-                        AppListItem(app = app, onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) })
+                if (appState.migratorMode == MigratorMode.MANAGE) {
+                    item {
+                        AssistChip(
+                            onClick = { showNativeDeleteDialog = true }, label = { Text("Delete Telephony", style = MaterialTheme.typography.labelLarge) }, leadingIcon = { Icon(Icons.Default.SettingsPhone, null, modifier = Modifier.size(16.dp)) }, shape = CircleShape, modifier = chipModifier,
+                            colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.errorContainer, labelColor = MaterialTheme.colorScheme.onErrorContainer, leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer)
+                        )
                     }
                 }
             }
         }
 
-        val selectedCount = appState.appList.count { it.isSelected }
+        PullToRefreshBox(
+            isRefreshing = appState.isFetchingApps,
+            onRefresh = { viewModel.refreshCurrentList() },
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        ) {
+            if (appState.isFetchingApps) {
+                LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
+            } else if (filteredApps.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No apps found. Pull down to refresh.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp, top = 6.dp)) {
+                items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
+                    
+                    
+                    val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
+                    AppListItem(
+                        app = app,
+                        showBackupTime = showTime,
+                        onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) }
+                    )
+                }
+            }
+        }
+        }
+
+        val showProgressPanel = appState.isRunning || appState.currentStep.isNotEmpty()
+
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             shadowElevation = 4.dp
         ) {
-            
-            Row(
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "$selectedCount Selected",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
+            AnimatedContent(
+                targetState = showProgressPanel,
+                transitionSpec = {
+                    fadeIn(tween(200)) togetherWith fadeOut(tween(200))
+                },
+                label = "BottomBarTransition"
+            ) { isProcessing ->
+                if (isProcessing) {
+                    Column(
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = appState.currentAction,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (appState.currentStep.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = appState.currentStep,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                            if (!appState.isRunning) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.clearLogs() },
+                                    modifier = Modifier.size(40.dp),
+                                    shape = CircleShape
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            } else if (appState.progress in 0..100) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "${appState.progress}%",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
 
-                Button(
-                    onClick = { viewModel.runDynamicOperation() },
-                    enabled = !appState.isRunning && selectedCount > 0,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && !appState.isRestoreDebloatMode)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.height(52.dp).widthIn(min = 120.dp)
-                ) {
-                    val act = when (appState.migratorMode) {
-                        MigratorMode.MANAGE -> "Delete Apps"
-                        MigratorMode.DEBLOAT -> if (appState.isRestoreDebloatMode) "Restore" else "Debloat"
-                        MigratorMode.RESTORE_APPS -> "Restore"
-                        MigratorMode.SYSTEMIZE -> "Systemize"
-                        else -> "Backup"
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if (appState.progress in 0..100) {
+                            LinearProgressIndicator(
+                                progress = { appState.progress / 100f },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        } else {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        }
                     }
-                    Text(if (appState.isRunning) "Processing..." else act, style = MaterialTheme.typography.titleMedium)
+                } else {
+                    val selectedCount = appState.appList.count { it.isSelected }
+                    Row(
+                        modifier = Modifier
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "$selectedCount Selected",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Button(
+                            onClick = { viewModel.runDynamicOperation() },
+                            enabled = selectedCount > 0,
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2) || (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 2)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.height(52.dp).widthIn(min = 120.dp)
+                        ) {
+                            val act = when (appState.migratorMode) {
+                                MigratorMode.MANAGE -> "Delete Apps"
+                                MigratorMode.DEBLOAT -> if (appState.actionFilterState == 2) "Restore Apps" else "Debloat Apps"
+                                MigratorMode.RESTORE_APPS -> "Restore Apps"
+                                MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 2) "De-Systemize" else "Systemize Apps"
+                                else -> "Backup Apps"
+                            }
+                            Text(act, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
                 }
             }
         }

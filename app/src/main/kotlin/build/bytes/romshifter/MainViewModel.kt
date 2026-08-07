@@ -59,6 +59,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val isRooted = Shell.getShell().isRoot
             _uiState.value = _uiState.value.copy(hasRoot = isRooted)
             if (isRooted) {
+                Shell.cmd("su -c 'dumpsys deviceidle whitelist +build.bytes.romshifter'").exec()
+
                 val checkScript =
                     Shell.cmd("su -c '[ -f /data/adb/#Shifter/ROM-Shifter.sh ] && echo YES'")
                         .exec().out.joinToString("")
@@ -90,7 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateProgressNotification(
         title: String,
         content: String,
-        progress: Int = -1, 
+        progress: Int = -1,
         max: Int = 100
     ) {
         if (ContextCompat.checkSelfPermission(
@@ -103,7 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val mainText = parts[0]
             val subText = if (parts.size > 1) parts[1] else null
 
-            
+
             val displayContent = if (progress in 0..100) "$mainText  •  $progress%" else mainText
 
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
@@ -124,7 +126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (progress in 0..100) {
                 builder.setProgress(max, progress, false)
             } else {
-                
+
                 builder.setProgress(0, 0, true)
             }
 
@@ -163,7 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList())
     }
 
-    
+
     fun flashWizardStepBack() {
         val currentStep = _uiState.value.flashWizardStep
         if (currentStep > 1) {
@@ -356,7 +358,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             title,
             "Starting Process...",
             -1
-        ) 
+        )
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -431,12 +433,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleSystemApps() {
         val newState = !_uiState.value.showSystemApps
-        _uiState.value = _uiState.value.copy(showSystemApps = newState)
-        if (newState && !_uiState.value.systemAppsFetched && (_uiState.value.migratorMode == MigratorMode.BACKUP_APPS || _uiState.value.migratorMode == MigratorMode.RESTORE_APPS || _uiState.value.migratorMode == MigratorMode.SYSTEMIZE)) {
-            fetchAppsList(
-                if (_uiState.value.migratorMode == MigratorMode.RESTORE_APPS) "RestoreSystem" else "System",
-                append = true
-            )
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFetchingApps = true)
+            kotlinx.coroutines.delay(150) 
+            _uiState.value = _uiState.value.copy(showSystemApps = newState, isFetchingApps = false)
         }
     }
 
@@ -444,15 +444,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isPrivilegedSystemize.value = enabled
     }
 
-    fun toggleRestoreDebloatMode() {
-        val newState = !_uiState.value.isRestoreDebloatMode
-        _uiState.value = _uiState.value.copy(isRestoreDebloatMode = newState)
-        if (newState) fetchAppsList("Uninstalled") else fetchAppsList("AllInstalled")
+    fun toggleActionFilter() {
+        val mode = _uiState.value.migratorMode
+        val currentState = _uiState.value.actionFilterState
+        
+        val newState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS) {
+            (currentState + 1) % 3
+        } else {
+            if (currentState == 1) 2 else 1
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFetchingApps = true)
+            kotlinx.coroutines.delay(100) 
+
+            if (mode == MigratorMode.DEBLOAT && newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
+                val uninstalled = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "Uninstalled", true, _uiState.value.appList)
+                _uiState.value = _uiState.value.copy(appList = uninstalled, actionFilterState = newState, isFetchingApps = false)
+            } else if (mode == MigratorMode.SYSTEMIZE && !_uiState.value.systemAppsFetched && newState == 2) {
+                val sys = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "System", true, _uiState.value.appList)
+                _uiState.value = _uiState.value.copy(appList = sys, systemAppsFetched = true, actionFilterState = newState, isFetchingApps = false)
+            } else {
+                _uiState.value = _uiState.value.copy(actionFilterState = newState, isFetchingApps = false)
+            }
+        }
     }
 
     fun setMigratorMode(mode: MigratorMode) {
         val showSysApps =
-            (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE)
+            (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE || mode == MigratorMode.SYSTEMIZE)
         _uiState.value = _uiState.value.copy(
             migratorMode = mode,
             appList = emptyList(),
@@ -463,13 +483,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showUserApps = true,
             showSystemApps = showSysApps,
             systemAppsFetched = false,
-            isRestoreDebloatMode = false,
+            
+            actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
             globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
         if (mode == MigratorMode.SYSTEMIZE) isPrivilegedSystemize.value = false
 
         when (mode) {
-            MigratorMode.BACKUP_APPS -> fetchAppsList("User")
+            
+            MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
             MigratorMode.RESTORE_APPS -> {
                 MigratorManager.clearCache(); fetchAppsList("AllBackups")
             }
@@ -479,7 +501,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 MigratorManager.clearCache(); fetchAppsList("AllBackups")
             }
 
-            MigratorMode.SYSTEMIZE -> fetchAppsList("User")
+            MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled") 
             else -> {}
         }
     }
@@ -493,7 +515,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleShowUserApps(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(showUserApps = enabled)
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFetchingApps = true)
+            kotlinx.coroutines.delay(150) 
+            _uiState.value = _uiState.value.copy(showUserApps = enabled, isFetchingApps = false)
+        }
     }
 
     fun toggleGlobalComponent(id: Int) {
@@ -529,59 +555,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun fetchAppsList(type: String, append: Boolean = false) {
-        if (!append) _uiState.value =
-            _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
+        
+        _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
         viewModelScope.launch(Dispatchers.IO) {
-            if (type == "AllInstalled") {
-                val userApps = MigratorManager.fetchAppsList(
-                    getApplication(),
-                    _savedPath.value,
-                    "User",
-                    false,
-                    emptyList()
+            val apps = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, type, append, _uiState.value.appList)
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(
+                    appList = apps,
+                    isFetchingApps = false,
+                    currentAction = if (apps.isEmpty()) "No apps found." else "Operation Completed"
                 )
-                withContext(Dispatchers.Main) {
-                    _uiState.value = _uiState.value.copy(
-                        appList = userApps,
-                        isFetchingApps = true,
-                        currentAction = "Loading system apps in background..."
-                    )
-                }
-
-                val sysApps = MigratorManager.fetchAppsList(
-                    getApplication(),
-                    _savedPath.value,
-                    "System",
-                    false,
-                    emptyList()
-                )
-                withContext(Dispatchers.Main) {
-                    val combined = (userApps + sysApps).sortedBy { it.label.lowercase() }
-                    _uiState.value = _uiState.value.copy(
-                        appList = combined,
-                        isFetchingApps = false,
-                        currentAction = "Operation Completed",
-                        systemAppsFetched = true
-                    )
-                }
-            } else {
-                val apps = MigratorManager.fetchAppsList(
-                    getApplication(),
-                    _savedPath.value,
-                    type,
-                    append,
-                    _uiState.value.appList
-                )
-                withContext(Dispatchers.Main) {
-                    _uiState.value = _uiState.value.copy(
-                        appList = apps,
-                        isFetchingApps = false,
-                        currentAction = if (apps.isEmpty()) "No apps found." else "Operation Completed"
-                    )
-                    if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
-                        _uiState.value = _uiState.value.copy(systemAppsFetched = true)
-                    }
+                if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
+                    _uiState.value = _uiState.value.copy(systemAppsFetched = true)
                 }
             }
         }
@@ -590,12 +576,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun runDynamicOperation() {
         val state = _uiState.value
         val selectedApps =
-            state.appList.filter { it.isSelected && (it.isSystem && state.showSystemApps || !it.isSystem && state.showUserApps || state.isRestoreDebloatMode) }
+            state.appList.filter { it.isSelected && (it.isSystem && state.showSystemApps || !it.isSystem && state.showUserApps || state.actionFilterState == 2) }
         if (selectedApps.isEmpty()) return
+
+        val initText = when (state.migratorMode) {
+            MigratorMode.RESTORE_APPS -> "Restoring..."
+            MigratorMode.DEBLOAT -> if (state.actionFilterState == 2) "Restoring..." else "Debloating..."
+            MigratorMode.SYSTEMIZE -> if (state.actionFilterState == 2) "De-Systemizing..." else "Systemizing..."
+            MigratorMode.MANAGE -> "Deleting..."
+            else -> "Backing Up..."
+        }
 
         _uiState.value = state.copy(
             isRunning = true,
-            currentAction = "Initializing Process...",
+            currentAction = initText,
             currentStep = "Preparing Data...",
             progress = -1
         )
@@ -615,29 +609,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
                 val safeAction = action.ifEmpty { "ROM Shifter" }
-                val desc =
-                    if (step.isNotEmpty()) "$step\nParts: $activeComps" else "Parts: $activeComps"
+                val desc = if (step.isNotEmpty()) "$step\nParts: $activeComps" else "Parts: $activeComps"
                 updateProgressNotification(safeAction, desc, prog)
 
-                val newState = _uiState.value.copy()
-                if (action.isNotEmpty()) _uiState.value = newState.copy(currentAction = action)
-                if (step.isNotEmpty()) _uiState.value = newState.copy(currentStep = step)
-                if (prog >= 0) _uiState.value = newState.copy(progress = prog)
+                
+                _uiState.value = _uiState.value.copy(
+                    currentAction = if (action.isNotEmpty()) action else _uiState.value.currentAction,
+                    currentStep = if (step.isNotEmpty()) desc else _uiState.value.currentStep,
+                    progress = if (prog >= 0) prog else _uiState.value.progress
+                )
             }
 
             val onComplete: (String, String) -> Unit = { action, step ->
 
-                
+
                 val finalStepText = when {
                     state.migratorMode == MigratorMode.MANAGE -> {
-                        
+
                         val cleanStep =
                             if (step == "Freed up storage space.") "Freed space" else step
                         if (cleanStep.isNotBlank()) "$cleanStep | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
 
                     else -> {
-                        
+
                         if (step.isNotBlank()) "$step | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
                 }
@@ -645,11 +640,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 showCompletionNotification(action, finalStepText)
 
                 when (state.migratorMode) {
-                    MigratorMode.DEBLOAT -> {
+                    MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> {
                         MigratorManager.clearCache()
-                        if (state.isRestoreDebloatMode) fetchAppsList("Uninstalled") else fetchAppsList(
-                            "AllInstalled"
-                        )
+                        fetchAppsList("AllInstalled") 
                     }
 
                     MigratorMode.MANAGE -> {
@@ -672,7 +665,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ExtrasManager.runDebloatOperation(
                         context = getApplication(),
                         selectedApps = selectedApps,
-                        isRestore = state.isRestoreDebloatMode,
+                        isRestore = state.actionFilterState == 2,
                         forceRemove = state.forceRemoveEnabled,
                         updateLog = {},
                         updateProgress = updateProgress,
@@ -681,14 +674,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 MigratorMode.SYSTEMIZE -> {
-                    ExtrasManager.runSystemizeOperation(
-                        context = getApplication(),
-                        selectedApps = selectedApps,
-                        isPrivileged = isPrivilegedSystemize.value,
-                        updateLog = {},
-                        updateProgress = updateProgress,
-                        onComplete = onComplete
-                    )
+                    if (state.actionFilterState == 2) {
+                        val appPaths = selectedApps.joinToString(" ") {
+                            val safeLabel = it.label.replace(Regex("[^a-zA-Z0-9_]"), "")
+                            "'/data/adb/modules/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules/ROM-Shifter/system/product/priv-app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/priv-app/$safeLabel'"
+                        }
+                        Shell.cmd("su -c \"rm -rf $appPaths\"").exec()
+                        updateProgress("De-Systemizing", "Removed from module folder", 100)
+                        onComplete("De-Systemize Complete!", "Reboot required to apply changes.")
+                    } else {
+                        ExtrasManager.runSystemizeOperation(
+                            context = getApplication(),
+                            selectedApps = selectedApps,
+                            isPrivileged = isPrivilegedSystemize.value,
+                            updateLog = {},
+                            updateProgress = updateProgress,
+                            onComplete = onComplete
+                        )
+                    }
                 }
 
                 else -> {
@@ -701,6 +704,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         onComplete = onComplete
                     )
                 }
+            }
+        }
+    }
+
+    fun refreshCurrentList() {
+        MigratorManager.clearCache()
+        val currentMode = _uiState.value.migratorMode
+        if (currentMode != MigratorMode.MENU) {
+            when (currentMode) {
+                MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled") 
+                MigratorMode.RESTORE_APPS -> fetchAppsList("AllBackups")
+                MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
+                MigratorMode.MANAGE -> fetchAppsList("AllBackups")
+                else -> {}
             }
         }
     }

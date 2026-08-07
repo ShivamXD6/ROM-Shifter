@@ -8,12 +8,11 @@ ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
 AM_TMP="/data/local/tmp/appmgr_tmp"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-MAIN_DIR="/sdcard/#Shifter"
-BACKUP_BASE="$MAIN_DIR/Data-Migrated"
-LP_DIR="$MAIN_DIR/Live-Partition"
 
 init_shifter() {
-     mkdir -p "$BIN_DIR" "$AM_TMP" "$BACKUP_BASE" "$LP_DIR"
+     mkdir -p "$BIN_DIR" "$AM_TMP"
+     [ -n "$BACKUP_BASE" ] && mkdir -p "$BACKUP_BASE"
+     [ -n "$LP_DIR" ] && mkdir -p "$LP_DIR"
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
@@ -35,10 +34,12 @@ RAW_SIZE() {
 }
 
 FORMAT_SIZE() {
-    awk -v n="${1:-0}" 'BEGIN{
-        if(n>=1048576) printf "%.2f GB\n", n/1048576
-        else if(n>=1024) printf "%.2f MB\n", n/1024
-        else printf "%.2f KB\n", n
+    local raw=$(echo "$1" | tr -d '\r\n ')
+    awk -v n="${raw:-0}" 'BEGIN{
+        n = n + 0
+        if(n >= 1048576) printf "%.2f GB", n/1048576
+        else if(n >= 1024) printf "%.2f MB", n/1024
+        else printf "%d KB", n
     }'
 }
 READID() { grep "package=\"$1\"" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null | sed -n 's/.*value="\([^"]*\)".*/\1/p'; }
@@ -160,7 +161,6 @@ DO_BACKUP() {
     wait
     local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
     SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | awk -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
-
     cat <<EOF > "$APP_DIR/Meta.txt"
 Name=$LABEL
 Version=$VER
@@ -168,12 +168,12 @@ Package=$PKG
 TotalSize=$APP_TOTAL_KB
 AppSize=$OLD_APP
 DataSize=$OLD_DATA
-ExtDataSize=$OLD_EXT
-MediaSize=$OLD_MED
-ObbSize=$OLD_OBB
-SSAID=$OLD_SSAID
-SysPath=$SYS_PATH
 EOF
+    [ "$OLD_EXT" -gt 0 ] && echo "ExtDataSize=$OLD_EXT" >> "$APP_DIR/Meta.txt"
+    [ "$OLD_MED" -gt 0 ] && echo "MediaSize=$OLD_MED" >> "$APP_DIR/Meta.txt"
+    [ "$OLD_OBB" -gt 0 ] && echo "ObbSize=$OLD_OBB" >> "$APP_DIR/Meta.txt"
+    [ -n "$OLD_SSAID" ] && echo "SSAID=$OLD_SSAID" >> "$APP_DIR/Meta.txt"
+    [ "$TYPE" = "System" ] && [ -n "$SYS_PATH" ] && echo "SysPath=$SYS_PATH" >> "$APP_DIR/Meta.txt"
     GETPERM "$PKG" "$APP_DIR/Permissions.txt" &
     echo "ACTION:BACKUP_DONE|PKG:$PKG"
 }
@@ -360,9 +360,8 @@ do_restore() {
         DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$((CURRENT_APP * 100 / TOTAL_APPS))" "$size"
     done < "$AM_TMP/selected_restores_sorted.txt"
     settings put global verifier_verify_adb_installs 1
-
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
-}
+  }
 
 do_remove() {
     local PKG="$1"
@@ -418,14 +417,30 @@ do_systemize() {
     fi
 }
 
-init_shifter
-
 case "$1" in
-    --backup) do_backup "$2" ;;
-    --restore) do_restore "$2" ;;
-    --live-backup) do_live_backup "$3" ;;
-    --live-restore) do_live_restore "$3" "$4" ;;
-    --remove) do_remove "$2" "$3" ;;
-    --restore-debloat) do_restore_debloat "$2" ;;
-    --systemize) do_systemize "$2" "$3" "$4" ;;
+    --backup)
+        MAIN_DIR="${3:-/sdcard/#Shifter}"
+        BACKUP_BASE="$MAIN_DIR/Data-Migrated"
+        init_shifter
+        do_backup "$2"
+        ;;
+    --restore)
+        MAIN_DIR="${3:-/sdcard/#Shifter}"
+        BACKUP_BASE="$MAIN_DIR/Data-Migrated"
+        init_shifter
+        do_restore "$2"
+        ;;
+    --live-backup)
+        MAIN_DIR="${3:-/sdcard/#Shifter}"
+        LP_DIR="$MAIN_DIR/Live-Partition"
+        init_shifter
+        do_live_backup "$2"
+        ;;
+    --live-restore)
+        init_shifter
+        do_live_restore "$2" "$3"
+        ;;
+    --remove) init_shifter; do_remove "$2" "$3" ;;
+    --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
+    --systemize) init_shifter; do_systemize "$2" "$3" "$4" ;;
 esac

@@ -74,7 +74,7 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
 }
 
 @Composable
-fun AppListItem(app: AppInfo, onToggleSelect: (String) -> Unit) {
+fun AppListItem(app: AppInfo, showBackupTime: Boolean = true, onToggleSelect: (String) -> Unit) {
     val containerColor by animateColorAsState(
         targetValue = if (app.isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         label = "item_color"
@@ -84,14 +84,14 @@ fun AppListItem(app: AppInfo, onToggleSelect: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 2.dp)
-            .clip(MaterialTheme.shapes.medium) 
+            .clip(MaterialTheme.shapes.medium)
             .background(containerColor)
             .clickable { onToggleSelect(app.packageName) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val iconModifier = Modifier
-            .size(48.dp) 
+            .size(48.dp)
             .clip(MaterialTheme.shapes.small)
 
         if (app.iconBitmap != null) {
@@ -119,9 +119,24 @@ fun AppListItem(app: AppInfo, onToggleSelect: (String) -> Unit) {
             Text(
                 text = app.packageName,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (app.isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (app.isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(
+                    alpha = 0.8f
+                ) else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
+            if (showBackupTime && app.backupTime.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = app.backupTime,
+                    style = MaterialTheme.typography.labelMedium,
+                    
+                    color = if (app.backupTime == "No backup on device") MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                        alpha = 0.7f
+                    ) else MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Checkbox(
             checked = app.isSelected,
