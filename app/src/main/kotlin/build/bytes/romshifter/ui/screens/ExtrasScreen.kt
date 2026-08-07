@@ -68,7 +68,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
             MigratorActionScreen(appState, viewModel)
         } else {
             
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))
                     MenuCard("Debloat / Restore Apps", Icons.Default.DeleteSweep, "Uninstall and restore System/User apps") { viewModel.setMigratorMode(MigratorMode.DEBLOAT) }

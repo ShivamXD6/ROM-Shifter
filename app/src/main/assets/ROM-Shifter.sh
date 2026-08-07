@@ -24,13 +24,11 @@ CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
 
 RAW_SIZE() {
     local sum=0
-    for p in $1; do
+    for p in "$@"; do
         p=$(echo "$p" | tr -d '\r')
         if [ -n "$p" ] && [ -e "$p" ]; then
-            local base=$(du -sk "$p" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
-            local c1=$(du -sk "$p/cache" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
-            local c2=$(du -sk "$p/code_cache" 2>/dev/null | head -n1 | grep -o '^[0-9]*')
-            sum=$(( sum + ${base:-0} - ${c1:-0} - ${c2:-0} ))
+            local base=$(du -sk "$p" 2>/dev/null | awk '{print $1}')
+            sum=$(( sum + ${base:-0} ))
         fi
     done
     echo "$sum"
@@ -93,6 +91,8 @@ do_live_restore() {
 
 DO_BACKUP() {
     PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; PCT="$7"; SIZE="$8"
+    CUR_APP="${9}"; CUR_DATA="${10}"; CUR_EXT="${11}"; CUR_MED="${12}"; CUR_OBB="${13}"
+
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
     local formatted_size=$(FORMAT_SIZE "$8")
 
@@ -108,27 +108,11 @@ DO_BACKUP() {
         OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     fi
 
-    TMP_SIZES="$AM_TMP/${PKG}_sizes"; mkdir -p "$TMP_SIZES"
-    apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
-
-    CHK 1 && ( echo $(RAW_SIZE "$apks") > "$TMP_SIZES/app" ) &
-    CHK 2 && ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
-    CHK 3 && ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
-    CHK 4 && ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
-    CHK 5 && ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
-    wait
-
-    CUR_APP=$(cat "$TMP_SIZES/app" 2>/dev/null); CUR_APP=${CUR_APP:-0}
-    CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); CUR_DATA=${CUR_DATA:-0}
-    CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}
-    CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}
-    CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
-    rm -rf "$TMP_SIZES"
-
     if CHK 1; then
         if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
-            if [ "$CUR_APP" -gt 0 ] && [ -n "$apks" ]; then
-                echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" &
+            if [ "$CUR_APP" -gt 0 ]; then
+                apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
+                [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" &
             else rm -f "$APP_DIR/App.bundle.pack"; fi
             OLD_APP=$CUR_APP
         fi
@@ -285,33 +269,66 @@ DO_RESTORE() {
 
 do_backup() {
     export APP_COMPS="$1"
-    rm -rf "$AM_TMP/precalc" "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" 2>/dev/null
+    rm -rf "$AM_TMP/precalc" "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" "$AM_TMP/paths.list" "$AM_TMP/du.out" "$AM_TMP/sizes.map" 2>/dev/null
     mkdir -p "$AM_TMP/precalc"
 
+    > "$AM_TMP/paths.list"
     while IFS='|' read -r pkg label ver type || [ -n "$pkg" ]; do
         [ -z "$pkg" ] && continue
-        pkg=$(echo "$pkg" | tr -d '\r'); label=$(echo "$label" | tr -d '\r')
-        ver=$(echo "$ver" | tr -d '\r'); type=$(echo "$type" | tr -d '\r')
+        pkg=$(echo "$pkg" | tr -d '\r')
 
-        size=0
-        CHK 1 && apks=$(pm path "$pkg" 2>/dev/null | sed 's/^package://' | tr -d '\r') && [ -n "$apks" ] && size=$((size + $(RAW_SIZE "$apks") ))
-        CHK 2 && size=$((size + $(RAW_SIZE "/data/data/$pkg") + $(RAW_SIZE "/data/user_de/0/$pkg") ))
-        CHK 3 && size=$((size + $(RAW_SIZE "/data/media/0/Android/data/$pkg") ))
-        CHK 4 && size=$((size + $(RAW_SIZE "/data/media/0/Android/media/$pkg") ))
-        CHK 5 && size=$((size + $(RAW_SIZE "/data/media/0/Android/obb/$pkg") ))
-
-        echo "${size}|${label}|${pkg}|${ver}|${type}" > "$AM_TMP/precalc/$pkg.txt"
+        if CHK 1; then
+            apks=$(pm path "$pkg" 2>/dev/null | sed 's/^package://' | tr -d '\r')
+            for a in $apks; do echo "$a|${pkg}_app" >> "$AM_TMP/paths.list"; done
+        fi
+        CHK 2 && echo "/data/data/$pkg|${pkg}_data" >> "$AM_TMP/paths.list" && echo "/data/user_de/0/$pkg|${pkg}_data" >> "$AM_TMP/paths.list"
+        CHK 3 && echo "/data/media/0/Android/data/$pkg|${pkg}_ext" >> "$AM_TMP/paths.list"
+        CHK 4 && echo "/data/media/0/Android/media/$pkg|${pkg}_med" >> "$AM_TMP/paths.list"
+        CHK 5 && echo "/data/media/0/Android/obb/$pkg|${pkg}_obb" >> "$AM_TMP/paths.list"
     done < "$TARGETS"
 
-    cat "$AM_TMP/precalc/"*.txt > "$AM_TMP/selected_apps_sizes.txt" 2>/dev/null
+    awk -F'|' '{print $1}' "$AM_TMP/paths.list" | tr '\n' '\0' | xargs -0 du -sk 2>/dev/null > "$AM_TMP/du.out"
+
+    awk '
+    NR==FNR {
+        s=$1; sub(/^[0-9]+[ \t]+/, "", $0); size[$0]=s; next
+    }
+    {
+        split($0, a, "|");
+        path = a[1]; id = a[2];
+        if (path in size) total[id] += size[path];
+    }
+    END {
+        for (i in total) print i "=" total[i]
+    }' "$AM_TMP/du.out" "$AM_TMP/paths.list" > "$AM_TMP/sizes.map"
+
+    awk -F'|' '
+    NR==FNR {
+        split($0, a, "="); map[a[1]]=a[2]; next
+    }
+    {
+        pkg=$1; label=$2; ver=$3; type=$4
+        gsub(/\r/, "", pkg); gsub(/\r/, "", label); gsub(/\r/, "", ver); gsub(/\r/, "", type)
+        if(length(pkg) == 0) next;
+
+        s_app = map[pkg "_app"] + 0
+        s_data = map[pkg "_data"] + 0
+        s_ext = map[pkg "_ext"] + 0
+        s_med = map[pkg "_med"] + 0
+        s_obb = map[pkg "_obb"] + 0
+
+        size = s_app + s_data + s_ext + s_med + s_obb
+        print size "|" label "|" pkg "|" ver "|" type "|" s_app "|" s_data "|" s_ext "|" s_med "|" s_obb
+    }' "$AM_TMP/sizes.map" "$TARGETS" > "$AM_TMP/selected_apps_sizes.txt"
+
     TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_apps_sizes.txt")
     sort -t'|' -k1 -n -r "$AM_TMP/selected_apps_sizes.txt" > "$AM_TMP/selected_apps_sorted.txt"
 
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_apps_sorted.txt"); CURRENT_APP=0
 
-    while IFS='|' read -r size label pkg ver type || [ -n "$size" ]; do
+    while IFS='|' read -r size label pkg ver type s_app s_data s_ext s_med s_obb || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
-        DO_BACKUP "$pkg" "$label" "$ver" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$((CURRENT_APP * 100 / TOTAL_APPS))" "$size"
+        DO_BACKUP "$pkg" "$label" "$ver" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$((CURRENT_APP * 100 / TOTAL_APPS))" "$size" "$s_app" "$s_data" "$s_ext" "$s_med" "$s_obb"
     done < "$AM_TMP/selected_apps_sorted.txt"
     wait
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"

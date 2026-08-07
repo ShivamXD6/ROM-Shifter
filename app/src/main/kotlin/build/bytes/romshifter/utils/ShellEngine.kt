@@ -41,13 +41,13 @@ object ShellEngine {
         val info = parts["INFO"]
 
         return when {
-            action == "BACKUP_START" -> ShifterEvent.BackupProgress(
+            action == "BACKUP_START" || action == "RESTORE_START" -> ShifterEvent.BackupProgress(
                 pkg = parts["PKG"] ?: "",
                 label = parts["LABEL"] ?: "",
                 current = parts["CUR"]?.toIntOrNull() ?: 0,
                 total = parts["TOT"]?.toIntOrNull() ?: 0,
                 percent = parts["PCT"]?.toIntOrNull() ?: 0,
-                size = parts["SIZE"] ?: ""
+                size = parts["SIZE"] ?: "",
             )
             info == "STEP" -> ShifterEvent.InfoStep(
                 msg = parts["MSG"] ?: ""

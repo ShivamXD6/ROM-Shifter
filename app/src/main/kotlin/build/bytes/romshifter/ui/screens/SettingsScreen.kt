@@ -140,7 +140,8 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
         ElevatedCard(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             shape = RoundedCornerShape(30.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+            
+            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
             Column {
                 Column(modifier = Modifier.padding(24.dp)) {

@@ -358,7 +358,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
     ) { step ->
         if (step > 0) {
             
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).navigationBarsPadding().padding(16.dp)) {
                 when (step) {
                     1 -> {
                         ElevatedCard(
@@ -602,7 +602,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
             }
         } else {
             
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))
                     MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken recovery touch") { viewModel.openFlashWizard() }

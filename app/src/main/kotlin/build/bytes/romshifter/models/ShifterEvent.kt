@@ -7,7 +7,7 @@ sealed class ShifterEvent {
         val current: Int,
         val total: Int,
         val percent: Int,
-        val size: String
+        val size: String,
     ) : ShifterEvent()
 
     data class InfoStep(val msg: String) : ShifterEvent()

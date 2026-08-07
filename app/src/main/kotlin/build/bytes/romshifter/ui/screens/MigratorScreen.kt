@@ -128,7 +128,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
     }
 
     
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(horizontal = 16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(12.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
@@ -220,7 +220,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)) {
         Spacer(modifier = Modifier.height(8.dp))
 
         if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {

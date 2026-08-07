@@ -103,9 +103,6 @@ fun MainScreen(viewModel: MainViewModel) {
     val density = LocalDensity.current
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
 
-    
-    
-    
     var frozenPreviousAppState by remember {
         mutableStateOf(appState.copy(
             migratorMode = if (showSettings) appState.migratorMode else if (appState.migratorMode != MigratorMode.MENU) MigratorMode.MENU else appState.migratorMode,
@@ -122,9 +119,9 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
 
-        
         if (backProgress.value > 0f) {
             Box(
                 modifier = Modifier
@@ -134,10 +131,10 @@ fun MainScreen(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 AppScaffold(
-                    appState = frozenPreviousAppState, 
+                    appState = frozenPreviousAppState,
                     showSettings = false,
                     selectedTab = selectedTab,
                     viewModel = viewModel,
@@ -146,10 +143,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     onBackClick = {}
                 )
             }
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f * (1f - backProgress.value))))
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value))))
         }
 
-        
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -162,7 +158,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
         ) {
             AppScaffold(
                 appState = appState,
@@ -385,9 +381,9 @@ fun OnboardingWizard(viewModel: MainViewModel) {
     val notifPermLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
 
-        
         if (backProgress.value > 0f) {
             Box(
                 modifier = Modifier
@@ -397,7 +393,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.background)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
             ) {
                 OnboardingStepContent(
                     step = frozenBgStep,
@@ -412,11 +408,10 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             }
             Box(
                 modifier = Modifier.fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f * (1f - backProgress.value)))
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value)))
             )
         }
 
-        
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -429,9 +424,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
         ) {
-            
             AnimatedContent(
                 targetState = step,
                 transitionSpec = {
@@ -447,7 +441,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             ) { currentStep ->
                 Box(
                     modifier = Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
                 ) {
                     OnboardingStepContent(
                         step = currentStep,
@@ -462,7 +456,6 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 }
             }
 
-            
             AnimatedVisibility(
                 visible = step > 1,
                 enter = fadeIn(),
@@ -593,7 +586,7 @@ fun OnboardingStepContent(
 
 @Composable
 fun NoRootScreen() {
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(24.dp), contentAlignment = Alignment.Center) {
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
