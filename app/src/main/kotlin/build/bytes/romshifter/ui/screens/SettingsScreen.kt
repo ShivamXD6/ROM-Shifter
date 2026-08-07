@@ -55,7 +55,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             shape = RoundedCornerShape(30.dp),
             onDismissRequest = { showResetDialog = false },
             title = { Text("Reset Application", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error) },
-            text = { Text("This will permanently clear application data, remove binaries, reset configurations, but doesn't delete Shifter Folder. Run if facing any issues or updated to the latest version", style = MaterialTheme.typography.bodyLarge) },
+            text = { Text("This will permanently clear application data, remove binaries, reset configurations, but doesn't delete Shifter Folder. Run if you're facing any issues", style = MaterialTheme.typography.bodyLarge) },
             confirmButton = {
                 Button(
                     onClick = { showResetDialog = false; viewModel.resetApp(context) },

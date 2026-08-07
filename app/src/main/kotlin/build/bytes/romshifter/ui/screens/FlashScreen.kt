@@ -64,8 +64,6 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
             build.bytes.romshifter.utils.FlashManager.getPathFromUri(context, uri)?.let { path ->
                 if (path.endsWith(".img", ignoreCase = true)) {
                     customImgPath = path
-                } else {
-                    Toast.makeText(context, "Invalid file. Please select a valid .img partition file.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -266,7 +264,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                         }
                     } else {
                         OutlinedButton(
-                            onClick = { imgLauncher.launch(arrayOf("*/*")) },
+                            onClick = { imgLauncher.launch(arrayOf("application/octet-stream")) },
                             shape = CircleShape,
                             modifier = Modifier.fillMaxWidth().height(52.dp)
                         ) {
@@ -364,7 +362,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.large,
-                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                         ) {
                             Column(modifier = Modifier.padding(vertical = 12.dp)) {
                                 val availableWipes = listOf(
@@ -445,7 +443,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                             .offset { IntOffset(0, dragOffset.roundToInt()) }
                                             .animateItem(),
                                         shape = MaterialTheme.shapes.large,
-                                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                                     ) {
                                         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text("${index + 1}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
@@ -573,7 +571,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                             ElevatedCard(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                                 shape = MaterialTheme.shapes.large,
-                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                             ) {
                                 Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -497,8 +497,7 @@ fun OnboardingStepContent(
                     modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Bolt, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
+                    Icon(painter = painterResource(id = R.drawable.ic_home), contentDescription = "ROM Shifter", modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)                }
                 Spacer(Modifier.height(32.dp))
                 Text("Get Started with", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("ROM Shifter", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
