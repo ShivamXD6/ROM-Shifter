@@ -16,7 +16,20 @@ init_shifter() {
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
-COOLDOWN() { while [ "$(jobs | grep -c 'Running')" -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
+COOLDOWN() {
+    local limit="$1" n=0 p alive=""
+    while :; do
+        n=0; alive=""
+        for p in $_cooldown_pids; do
+            if kill -0 "$p" 2>/dev/null; then
+                n=$(( n + 1 )); alive="$alive $p"
+            fi
+        done
+        _cooldown_pids="$alive"
+        [ "$n" -lt "$limit" ] && break
+        sleep 0.1
+    done
+}
 SANITIZE() { echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'; }
 
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
@@ -65,10 +78,12 @@ PKG_INSTALLED() {
 BUNDAPP() {
     COOLDOWN "$((JOBS / 2))"
     tar --exclude="$2/cache" --exclude="$2/code_cache" -cf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.bundle.pack" &
+    LAST_PID=$!; _cooldown_pids="$_cooldown_pids $LAST_PID"
 }
 UNBUNDAPP() {
     COOLDOWN "$((JOBS - 2))"
     "$ZAPDOS" -d -q -c "$1" | tar -xf - -C "$2" 2>/dev/null &
+    LAST_PID=$!; _cooldown_pids="$_cooldown_pids $LAST_PID"
 }
 
 do_live_backup() {
@@ -115,11 +130,13 @@ DO_BACKUP() {
         OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     fi
 
+    local _pids=""
     if CHK 1; then
         if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
             if [ "$CUR_APP" -gt 0 ]; then
                 apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
-                [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" &
+                ([ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack") &
+                _pids="$_pids $!"
             else rm -f "$APP_DIR/App.bundle.pack"; fi
             OLD_APP=$CUR_APP
         fi
@@ -127,8 +144,14 @@ DO_BACKUP() {
     if CHK 2; then
         if [ "$CUR_DATA" != "$OLD_DATA" ] || { [ "$CUR_DATA" -gt 0 ] && [ ! -f "$APP_DIR/Data.bundle.pack" ] && [ ! -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
             if [ "$CUR_DATA" -gt 0 ]; then
-                [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
-                [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
+                if [ -d "/data/data/$PKG" ]; then
+                    BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
+                    _pids="$_pids $LAST_PID"
+                fi
+                if [ -d "/data/user_de/0/$PKG" ]; then
+                    BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
+                    _pids="$_pids $LAST_PID"
+                fi
             else rm -f "$APP_DIR/Data.bundle.pack" "$APP_DIR/UserDe.bundle.pack"; fi
             OLD_DATA=$CUR_DATA
         fi
@@ -137,6 +160,7 @@ DO_BACKUP() {
         if [ "$CUR_EXT" != "$OLD_EXT" ] || { [ "$CUR_EXT" -gt 0 ] && [ ! -f "$APP_DIR/ExtData.bundle.pack" ]; }; then
             if [ "$CUR_EXT" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/data" "$PKG" "$APP_DIR" "ExtData"
+                _pids="$_pids $LAST_PID"
             else rm -f "$APP_DIR/ExtData.bundle.pack"; fi
             OLD_EXT=$CUR_EXT
         fi
@@ -145,6 +169,7 @@ DO_BACKUP() {
         if [ "$CUR_MED" != "$OLD_MED" ] || { [ "$CUR_MED" -gt 0 ] && [ ! -f "$APP_DIR/Media.bundle.pack" ]; }; then
             if [ "$CUR_MED" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/media" "$PKG" "$APP_DIR" "Media"
+                _pids="$_pids $LAST_PID"
             else rm -f "$APP_DIR/Media.bundle.pack"; fi
             OLD_MED=$CUR_MED
         fi
@@ -153,6 +178,7 @@ DO_BACKUP() {
         if [ "$CUR_OBB" != "$OLD_OBB" ] || { [ "$CUR_OBB" -gt 0 ] && [ ! -f "$APP_DIR/Obb.bundle.pack" ]; }; then
             if [ "$CUR_OBB" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/obb" "$PKG" "$APP_DIR" "Obb"
+                _pids="$_pids $LAST_PID"
             else rm -f "$APP_DIR/Obb.bundle.pack"; fi
             OLD_OBB=$CUR_OBB
         fi
@@ -164,22 +190,6 @@ DO_BACKUP() {
         fi
     fi
 
-       while [ "$(jobs | grep -c 'Running')" -gt 0 ] 2>/dev/null; do
-           local cur_app_size=$(du -sk "$APP_DIR" 2>/dev/null | awk '{print $1}')
-           cur_app_size=${cur_app_size:-0}
-           local temp_proc=$(( G_PROCESSED_KB + cur_app_size ))
-           local temp_pct=0
-           if [ "$G_TOTAL_KB" -gt 0 ]; then
-               temp_pct=$(awk -v p="$temp_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
-           else
-               temp_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
-           fi
-           [ "$temp_pct" -gt 100 ] && temp_pct=100
-           echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
-           sleep 0.5
-       done
-       wait
-
        local final_proc=$(( G_PROCESSED_KB + APP_SIZE_KB ))
        local final_pct=0
        if [ "$G_TOTAL_KB" -gt 0 ]; then
@@ -188,6 +198,23 @@ DO_BACKUP() {
            final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
        fi
        [ "$final_pct" -gt 100 ] && final_pct=100
+       while true; do
+           local _any=0
+           for _p in $_pids; do kill -0 "$_p" 2>/dev/null && { _any=1; break; }; done
+           [ "$_any" -eq 0 ] && break
+           local _out_kb=$(du -sk "$APP_DIR"/*.bundle.pack 2>/dev/null | awk '{s+=$1} END{print s+0}')
+           local temp_pct=$(awk -v proc="$G_PROCESSED_KB" -v out="$_out_kb" \
+               -v tot="$G_TOTAL_KB" -v ini="$init_pct" -v fin="$final_pct" \
+               'BEGIN {
+                   if (tot > 0 && out > 0) { v=(proc+out)*100/tot } else { v=ini }
+                   if (v >= fin) v = fin - 1
+                   if (v < ini) v = ini
+                   printf "%.0f", v
+               }')
+           echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
+           sleep 0.5
+       done
+       wait
        echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
 
        local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
@@ -260,47 +287,37 @@ DO_RESTORE() {
         rm -rf "$TMP_SIZES"
     fi
 
+    local _pids=""
     if CHK 2 && { [ -f "$APP_DIR/Data.bundle.pack" ] || [ -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-            [ -f "$APP_DIR/Data.bundle.pack" ] && UNBUNDAPP "$APP_DIR/Data.bundle.pack" "/data/data"
-            [ -f "$APP_DIR/UserDe.bundle.pack" ] && UNBUNDAPP "$APP_DIR/UserDe.bundle.pack" "/data/user_de/0"
+            if [ -f "$APP_DIR/Data.bundle.pack" ]; then
+                UNBUNDAPP "$APP_DIR/Data.bundle.pack" "/data/data"
+                _pids="$_pids $LAST_PID"
+            fi
+            if [ -f "$APP_DIR/UserDe.bundle.pack" ]; then
+                UNBUNDAPP "$APP_DIR/UserDe.bundle.pack" "/data/user_de/0"
+                _pids="$_pids $LAST_PID"
+            fi
         fi
     fi
     if CHK 3 && [ -f "$APP_DIR/ExtData.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
             UNBUNDAPP "$APP_DIR/ExtData.bundle.pack" "/data/media/0/Android/data"
+            _pids="$_pids $LAST_PID"
         fi
     fi
     if CHK 4 && [ -f "$APP_DIR/Media.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
             UNBUNDAPP "$APP_DIR/Media.bundle.pack" "/data/media/0/Android/media"
+            _pids="$_pids $LAST_PID"
         fi
     fi
     if CHK 5 && [ -f "$APP_DIR/Obb.bundle.pack" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
             UNBUNDAPP "$APP_DIR/Obb.bundle.pack" "/data/media/0/Android/obb"
+            _pids="$_pids $LAST_PID"
         fi
     fi
-       while [ "$(jobs | grep -c 'Running')" -gt 0 ] 2>/dev/null; do
-           local cur_ext_size=0
-           local s1=$(du -sk "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
-           local s2=$(du -sk "/data/user_de/0/$PKG" 2>/dev/null | awk '{print $1}')
-           local s3=$(du -sk "/data/media/0/Android/data/$PKG" 2>/dev/null | awk '{print $1}')
-           cur_ext_size=$(( ${s1:-0} + ${s2:-0} + ${s3:-0} ))
-
-           local temp_proc=$(( G_PROCESSED_KB + cur_ext_size ))
-           local temp_pct=0
-           if [ "$G_TOTAL_KB" -gt 0 ]; then
-               temp_pct=$(awk -v p="$temp_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
-           else
-               temp_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
-           fi
-           [ "$temp_pct" -gt 100 ] && temp_pct=100
-           echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
-           sleep 0.5
-       done
-       wait
-
        local final_proc=$(( G_PROCESSED_KB + APP_SIZE_KB ))
        local final_pct=0
        if [ "$G_TOTAL_KB" -gt 0 ]; then
@@ -309,6 +326,28 @@ DO_RESTORE() {
            final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
        fi
        [ "$final_pct" -gt 100 ] && final_pct=100
+       local _prev_pct=$init_pct
+       while true; do
+           local _any=0
+           for _p in $_pids; do kill -0 "$_p" 2>/dev/null && { _any=1; break; }; done
+           [ "$_any" -eq 0 ] && break
+           local _cur_restored=$(du -sk "/data/data/$PKG" "/data/user_de/0/$PKG" \
+               "/data/media/0/Android/data/$PKG" "/data/media/0/Android/media/$PKG" \
+               "/data/media/0/Android/obb/$PKG" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+           local temp_pct=$(awk -v proc="$G_PROCESSED_KB" -v rest="$_cur_restored" \
+               -v tot="$G_TOTAL_KB" -v ini="$init_pct" -v fin="$final_pct" -v prev="$_prev_pct" \
+               'BEGIN { 
+                   if (tot > 0) { v=(proc+rest)*100/tot } else { v=ini }
+                   if (v < prev) v = prev
+                   if (v >= fin) v = fin - 1
+                   if (v < ini) v = ini
+                   printf "%.0f", v
+               }')
+           _prev_pct=$temp_pct
+           echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
+           sleep 0.5
+       done
+       wait
        echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
 
        if CHK 6; then

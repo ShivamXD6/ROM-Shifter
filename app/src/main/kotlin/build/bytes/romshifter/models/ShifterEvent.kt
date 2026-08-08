@@ -10,8 +10,6 @@ sealed class ShifterEvent {
         val size: String,
     ) : ShifterEvent()
 
-    data class BackupDone(val pkg: String) : ShifterEvent()
-
     data class InfoStep(val msg: String) : ShifterEvent()
 
     data class GlobalDone(val totalKb: String, val timeSec: String) : ShifterEvent()
