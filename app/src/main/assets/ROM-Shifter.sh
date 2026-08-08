@@ -7,7 +7,7 @@ BIN_DIR="/data/adb/#Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
 AM_TMP="/data/local/tmp/appmgr_tmp"
-TARGETS="/data/local/tmp/shifter_targets.txt"
+TARGETS="${SHIFTER_TARGETS:-/data/local/tmp/shifter_targets.txt}"
 
 init_shifter() {
      mkdir -p "$BIN_DIR" "$AM_TMP"

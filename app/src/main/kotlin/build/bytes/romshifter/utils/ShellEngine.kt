@@ -49,6 +49,9 @@ object ShellEngine {
                 percent = parts["PCT"]?.toIntOrNull() ?: 0,
                 size = parts["SIZE"] ?: "",
             )
+            action == "BACKUP_DONE" || action == "RESTORE_DONE" -> ShifterEvent.BackupDone(
+                pkg = parts["PKG"] ?: ""
+            )
             info == "STEP" -> ShifterEvent.InfoStep(
                 msg = parts["MSG"] ?: ""
             )

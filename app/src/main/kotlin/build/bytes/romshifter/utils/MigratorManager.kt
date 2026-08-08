@@ -114,7 +114,13 @@ object MigratorManager {
             "RestoreUser", "RestoreSystem", "AllBackups" -> {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
-                val command = "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
+                val shellPath = if (currentPath.startsWith("/storage/emulated/0")) {
+                    currentPath.replace("/storage/emulated/0", "/data/media/0")
+                } else {
+                    currentPath
+                }
+
+                val command = "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$shellPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
