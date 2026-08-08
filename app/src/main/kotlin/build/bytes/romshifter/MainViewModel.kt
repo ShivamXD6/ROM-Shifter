@@ -622,17 +622,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val onComplete: (String, String) -> Unit = { action, step ->
 
-
-                val finalStepText = when {
-                    state.migratorMode == MigratorMode.MANAGE -> {
-
-                        val cleanStep =
-                            if (step == "Freed up storage space.") "Freed space" else step
+                val finalStepText = when (state.migratorMode) {
+                    MigratorMode.MANAGE -> {
+                        val cleanStep = if (step == "Freed up storage space.") "Freed space" else step
                         if (cleanStep.isNotBlank()) "$cleanStep | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
-
+                    MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> step
                     else -> {
-
                         if (step.isNotBlank()) "$step | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
                     }
                 }
