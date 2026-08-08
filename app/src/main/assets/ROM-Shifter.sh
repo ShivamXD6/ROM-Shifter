@@ -91,13 +91,19 @@ do_live_restore() {
 }
 
 DO_BACKUP() {
-    PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; PCT="$7"; SIZE="$8"
-    CUR_APP="${9}"; CUR_DATA="${10}"; CUR_EXT="${11}"; CUR_MED="${12}"; CUR_OBB="${13}"
+    PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; G_TOTAL_KB="$7"; G_PROCESSED_KB="$8"; APP_SIZE_KB="$9"
+    CUR_APP="${10}"; CUR_DATA="${11}"; CUR_EXT="${12}"; CUR_MED="${13}"; CUR_OBB="${14}"
 
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
-    local formatted_size=$(FORMAT_SIZE "$8")
+    local formatted_size=$(FORMAT_SIZE "$APP_SIZE_KB")
 
-    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$formatted_size"
+    local init_pct=0
+    if [ "$G_TOTAL_KB" -gt 0 ]; then
+        init_pct=$(awk -v p="$G_PROCESSED_KB" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+    else
+        init_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
+    fi
+    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$init_pct|SIZE:$formatted_size"
 
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
     if [ -f "$APP_DIR/Meta.txt" ]; then
@@ -158,8 +164,33 @@ DO_BACKUP() {
         fi
     fi
 
-    wait
-    local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
+       while [ "$(jobs | grep -c 'Running')" -gt 0 ] 2>/dev/null; do
+           local cur_app_size=$(du -sk "$APP_DIR" 2>/dev/null | awk '{print $1}')
+           cur_app_size=${cur_app_size:-0}
+           local temp_proc=$(( G_PROCESSED_KB + cur_app_size ))
+           local temp_pct=0
+           if [ "$G_TOTAL_KB" -gt 0 ]; then
+               temp_pct=$(awk -v p="$temp_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+           else
+               temp_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
+           fi
+           [ "$temp_pct" -gt 100 ] && temp_pct=100
+           echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
+           sleep 0.5
+       done
+       wait
+
+       local final_proc=$(( G_PROCESSED_KB + APP_SIZE_KB ))
+       local final_pct=0
+       if [ "$G_TOTAL_KB" -gt 0 ]; then
+           final_pct=$(awk -v p="$final_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+       else
+           final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
+       fi
+       [ "$final_pct" -gt 100 ] && final_pct=100
+       echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
+
+       local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
     SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | awk -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
     cat <<EOF > "$APP_DIR/Meta.txt"
 Name=$LABEL
@@ -179,15 +210,21 @@ EOF
 }
 
 DO_RESTORE() {
-    LABEL="$1"; TYPE="$2"; CUR_IDX="$3"; TOT_IDX="$4"; PCT="$5"; SIZE="$6"
+    LABEL="$1"; TYPE="$2"; CUR_IDX="$3"; TOT_IDX="$4"; G_TOTAL_KB="$5"; G_PROCESSED_KB="$6"; APP_SIZE_KB="$7"
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"
     [ -f "$APP_DIR/Meta.txt" ] || return
     PKG=$(grep "Package=" "$APP_DIR/Meta.txt" | cut -d= -f2); [ -z "$PKG" ] && return
     VER=$(grep "Version=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"
 
-    local formatted_size=$(FORMAT_SIZE "$6")
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$formatted_size"
+    local formatted_size=$(FORMAT_SIZE "$APP_SIZE_KB")
+    local init_pct=0
+    if [ "$G_TOTAL_KB" -gt 0 ]; then
+        init_pct=$(awk -v p="$G_PROCESSED_KB" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+    else
+        init_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
+    fi
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$init_pct|SIZE:$formatted_size"
 
     OLD_APP=$(grep "^AppSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_APP=${OLD_APP:-0}
     OLD_DATA=$(grep "^DataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_DATA=${OLD_DATA:-0}
@@ -244,9 +281,37 @@ DO_RESTORE() {
             UNBUNDAPP "$APP_DIR/Obb.bundle.pack" "/data/media/0/Android/obb"
         fi
     fi
-    wait
+       while [ "$(jobs | grep -c 'Running')" -gt 0 ] 2>/dev/null; do
+           local cur_ext_size=0
+           local s1=$(du -sk "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
+           local s2=$(du -sk "/data/user_de/0/$PKG" 2>/dev/null | awk '{print $1}')
+           local s3=$(du -sk "/data/media/0/Android/data/$PKG" 2>/dev/null | awk '{print $1}')
+           cur_ext_size=$(( ${s1:-0} + ${s2:-0} + ${s3:-0} ))
 
-    if CHK 6; then
+           local temp_proc=$(( G_PROCESSED_KB + cur_ext_size ))
+           local temp_pct=0
+           if [ "$G_TOTAL_KB" -gt 0 ]; then
+               temp_pct=$(awk -v p="$temp_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+           else
+               temp_pct=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
+           fi
+           [ "$temp_pct" -gt 100 ] && temp_pct=100
+           echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$temp_pct|SIZE:$formatted_size"
+           sleep 0.5
+       done
+       wait
+
+       local final_proc=$(( G_PROCESSED_KB + APP_SIZE_KB ))
+       local final_pct=0
+       if [ "$G_TOTAL_KB" -gt 0 ]; then
+           final_pct=$(awk -v p="$final_proc" -v t="$G_TOTAL_KB" 'BEGIN { printf "%.0f", (p * 100) / t }')
+       else
+           final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
+       fi
+       [ "$final_pct" -gt 100 ] && final_pct=100
+       echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
+
+       if CHK 6; then
         CUR_SSAID=$(READID "$PKG")
         if [ -n "$OLD_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
             CHANID "$PKG" "$OLD_SSAID"
@@ -322,16 +387,22 @@ do_backup() {
     }' "$AM_TMP/sizes.map" "$TARGETS" > "$AM_TMP/selected_apps_sizes.txt"
 
     TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_apps_sizes.txt")
-    sort -t'|' -k1 -n -r "$AM_TMP/selected_apps_sizes.txt" > "$AM_TMP/selected_apps_sorted.txt"
+        sort -t'|' -k1 -n -r "$AM_TMP/selected_apps_sizes.txt" > "$AM_TMP/selected_apps_sorted.txt"
 
-    START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_apps_sorted.txt"); CURRENT_APP=0
+      START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_apps_sorted.txt"); CURRENT_APP=0
+              PROCESSED_KB=0
 
-    while IFS='|' read -r size label pkg ver type s_app s_data s_ext s_med s_obb || [ -n "$size" ]; do
-        CURRENT_APP=$((CURRENT_APP + 1))
-        DO_BACKUP "$pkg" "$label" "$ver" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$((CURRENT_APP * 100 / TOTAL_APPS))" "$size" "$s_app" "$s_data" "$s_ext" "$s_med" "$s_obb"
-    done < "$AM_TMP/selected_apps_sorted.txt"
-    wait
-    echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
+              while IFS='|' read -r size label pkg ver type s_app s_data s_ext s_med s_obb || [ -n "$size" ]; do
+                  CURRENT_APP=$((CURRENT_APP + 1))
+                  size=${size:-0}
+
+                  DO_BACKUP "$pkg" "$label" "$ver" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$TOTAL_KB" "$PROCESSED_KB" "$size" "$s_app" "$s_data" "$s_ext" "$s_med" "$s_obb"
+
+                  PROCESSED_KB=$((PROCESSED_KB + size))
+              done < "$AM_TMP/selected_apps_sorted.txt"
+        wait
+
+        echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
 }
 
 do_restore() {
@@ -350,17 +421,23 @@ do_restore() {
         fi
     done < "$TARGETS"
 
-    sort -t'|' -k1 -n -r "$AM_TMP/selected_restores.txt" > "$AM_TMP/selected_restores_sorted.txt"
-    TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores_sorted.txt")
-    START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
+   sort -t'|' -k1 -n -r "$AM_TMP/selected_restores.txt" > "$AM_TMP/selected_restores_sorted.txt"
+       TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores_sorted.txt")
+       START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
+       PROCESSED_KB=0
 
-    settings put global verifier_verify_adb_installs 0
-    while IFS='|' read -r size label type || [ -n "$size" ]; do
-        CURRENT_APP=$((CURRENT_APP + 1))
-        DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$((CURRENT_APP * 100 / TOTAL_APPS))" "$size"
-    done < "$AM_TMP/selected_restores_sorted.txt"
-    settings put global verifier_verify_adb_installs 1
-    echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
+     settings put global verifier_verify_adb_installs 0
+            while IFS='|' read -r size label type || [ -n "$size" ]; do
+                CURRENT_APP=$((CURRENT_APP + 1))
+                size=${size:-0}
+
+                DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$TOTAL_KB" "$PROCESSED_KB" "$size"
+
+                PROCESSED_KB=$((PROCESSED_KB + size))
+            done < "$AM_TMP/selected_restores_sorted.txt"
+       settings put global verifier_verify_adb_installs 1
+
+       echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
   }
 
 do_remove() {
