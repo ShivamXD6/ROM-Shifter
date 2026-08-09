@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "build.bytes.romshifter"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "Eevee"
+        versionName = "Eevee (v1)"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -22,7 +22,7 @@ android {
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
             optimization {
-                enable = true
+                enable = false
             }
         }
     }
