@@ -221,24 +221,27 @@ DO_RESTORE() {
     OLD_OBB=$(grep "^ObbSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_OBB=${OLD_OBB:-0}
     OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     FORCE_DATA=0
-
- if CHK 1 && [ -f "$APP_DIR/App.bundle.pack" ]; then
-     if ! PKG_INSTALLED "$PKG" "$VER"; then
-         "$ZAPDOS" -d -q -c "$APP_DIR/App.bundle.pack" | tar -xf - -C "$TMP_PKG" 2>/dev/null
-         local SESSION_ID=$(cmd package install-create -g 2>/dev/null | tr -dc '0-9')
-         if [ -n "$SESSION_ID" ]; then
-             local apk_count=0
-             for apk in $(find "$TMP_PKG" -type f -name "*.apk" | sort); do
-                 [ -e "$apk" ] || continue
-                 apk_count=$((apk_count + 1))
-                 local apk_size=$(stat -c%s "$apk" 2>/dev/null)
-                 cmd package install-write -S "$apk_size" "$SESSION_ID" "split_${apk_count}" - < "$apk" >/dev/null 2>&1
-             done
-             cmd package install-commit "$SESSION_ID" >/dev/null 2>&1
-         fi
-         FORCE_DATA=1
-     fi
- fi
+    if CHK 1 && [ -f "$APP_DIR/App.bundle.pack" ]; then
+        if ! PKG_INSTALLED "$PKG" "$VER"; then
+            "$ZAPDOS" -d -q -c "$APP_DIR/App.bundle.pack" | tar -xf - -C "$TMP_PKG" 2>/dev/null
+            local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
+            if [ -n "$apks_to_install" ]; then
+                if ! pm install -g --dexopt-compiler-filter skip $apks_to_install >/dev/null 2>&1; then
+                    local SESSION_ID=$(cmd package install-create -g 2>/dev/null | tr -dc '0-9')
+                    if [ -n "$SESSION_ID" ]; then
+                        local apk_count=0
+                        for apk in $apks_to_install; do
+                            apk_count=$((apk_count + 1))
+                            local apk_size=$(stat -c%s "$apk" 2>/dev/null)
+                            cmd package install-write -S "$apk_size" "$SESSION_ID" "split_${apk_count}" - < "$apk" >/dev/null 2>&1
+                        done
+                        cmd package install-commit "$SESSION_ID" >/dev/null 2>&1
+                    fi
+                fi
+            fi
+            FORCE_DATA=1
+        fi
+    fi
 
     pm disable "$PKG" >/dev/null 2>&1
     NEW_UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
