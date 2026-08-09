@@ -278,8 +278,8 @@ object MigratorManager {
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
 
-            
-            
+
+
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
                 selectedApps.forEach { app ->
@@ -301,7 +301,7 @@ object MigratorManager {
                     } catch (_: Exception) { }
                 }
 
-                
+
                 if (iconScript.isNotEmpty()) {
                     val scriptFile = File(context.cacheDir, "copy_icons.sh")
                     scriptFile.writeText(iconScript.toString())
@@ -317,8 +317,10 @@ object MigratorManager {
                         val activeParts = appPartsMap[app?.packageName] ?: ""
                         val partsString = if (activeParts.isNotEmpty()) "\nParts: $activeParts" else ""
 
-                        val cleanSize = event.size.replace("\r", "").trim()
-                        val sizeInfo = if (cleanSize.isNotBlank() && cleanSize != "0 KB") " [Size: $cleanSize]" else ""
+                        val rawKb = event.size.replace(Regex("[^0-9]"), "").toLongOrNull() ?: 0L
+                        val formattedSize = if (rawKb > 0) formatSize(rawKb.toString()) else ""
+                        val sizeInfo = if (formattedSize.isNotEmpty()) " [Size: $formattedSize]" else ""
+
                         updateProgress(actText, "${event.label}$sizeInfo (${event.current}/${event.total})$partsString", event.percent)
                     }
                     is ShifterEvent.GlobalDone -> {

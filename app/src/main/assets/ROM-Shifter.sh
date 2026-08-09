@@ -45,14 +45,61 @@ FORMAT_SIZE() {
 READID() { grep "package=\"$1\"" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null | sed -n 's/.*value="\([^"]*\)".*/\1/p'; }
 CHANID() { sed -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
 GETPERM() {
-    > "$2"; local in=0
-    dumpsys package "$1" 2>/dev/null | while IFS= read -r line; do
-        case "$line" in *runtime\ permissions:*) in=1; continue ;; [![:space:]]*) in=0 ;; esac
-        [ "$in" -eq 1 ] && case "$line" in *granted=true*) perm="${line%%:*}"; echo "${perm#"${perm%%[![:space:]]*}"}" >> "$2" ;; esac
-    done
+    > "$2"
+    { dumpsys package "$1" 2>/dev/null; echo "---APPOPS---"; cmd appops get "$1" 2>/dev/null; } | awk '
+        BEGIN { mode = "pm" }
+        /^---APPOPS---$/ { mode = "appops"; next }
+
+        mode == "pm" {
+            if ($0 ~ /runtime permissions:/) { in_perms=1; next }
+            if ($0 ~ /^[ \t]*[A-Za-z0-9_]+:/ && !($0 ~ /runtime permissions:/)) { in_perms=0 }
+
+            if (in_perms && $1 ~ /^[A-Za-z0-9_]+\.[A-Za-z0-9_.]+:/) {
+                split($1, a, ":")
+                perm = a[1]
+                granted = "false"
+                if ($0 ~ /granted=true/) granted = "true"
+
+                print "PERM:" perm "=" granted
+
+                n = split(perm, b, ".")
+                seen_pm[b[n]] = 1
+            }
+        }
+
+        mode == "appops" {
+            if ($1 ~ /^[ \t]*[A-Za-z0-9_]+:/) {
+                split($0, parts, ":")
+                op = parts[1]; sub(/^[ \t]+/, "", op)
+
+                if (op == "Uid mode") next
+
+                val = parts[2]; sub(/^[ \t]+/, "", val); sub(/;.*$/, "", val); sub(/[ \t]+$/, "", val)
+
+                if (op != "" && !seen_op[op]++ && !seen_pm[op]) {
+                    print "APPOP:" op "=" val
+                }
+            }
+        }
+    ' > "$2"
 }
-SETPERM() { while IFS= read -r perm; do pm grant "$1" "$perm" 2>/dev/null & done < "$2"; }
+
+SETPERM() {
+    awk -v pkg="$1" -F':' '
+        /^PERM:/ {
+            split($2, p, "=")
+            if (p[2] == "true") print "pm grant " pkg " " p[1] " >/dev/null 2>&1"
+            else print "pm revoke " pkg " " p[1] " >/dev/null 2>&1"
+        }
+        /^APPOP:/ {
+            split($2, p, "=")
+            print "cmd appops set " pkg " " p[1] " " p[2] " >/dev/null 2>&1"
+        }
+    ' "$2" | sh &
+}
+
 DELGMS() { rm -f "/data/data/$1/databases/com.google.android.datatransport.events" "/data/data/$1/databases/com.google.android.datatransport.events-journal" "/data/data/$1/no_backup/com.google.android.gms.appid-no-backup" "/data/data/$1/shared_prefs/com.google.android.gms.appid.xml" "/data/data/$1/shared_prefs/com.google.android.gms.measurement.prefs.xml" 2>/dev/null; }
+
 PKG_INSTALLED() {
     pm list packages | grep -q "^package:$1$" || return 1
     [ -z "$2" ] && return 0
@@ -95,9 +142,9 @@ DO_BACKUP() {
     CUR_APP="${9}"; CUR_DATA="${10}"; CUR_EXT="${11}"; CUR_MED="${12}"; CUR_OBB="${13}"
 
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
-    local formatted_size=$(FORMAT_SIZE "$SIZE")
 
-    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$formatted_size"
+
+    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
     if [ -f "$APP_DIR/Meta.txt" ]; then
@@ -173,15 +220,13 @@ DO_BACKUP() {
         local global_pct=$(( BASE_PCT + (app_pct / TOT_IDX) ))
         [ "$global_pct" -gt 100 ] && global_pct=100
 
-        echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$formatted_size"
-        sleep 0.5
+        echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"        sleep 0.5
     done
 
     wait
 
     local final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
-    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
-
+    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
     local APP_TOTAL_KB=$(( OLD_APP + OLD_DATA + OLD_EXT + OLD_MED + OLD_OBB ))
     SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | awk -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
 
@@ -211,8 +256,7 @@ DO_RESTORE() {
     VER=$(grep "Version=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"
 
-    local formatted_size=$(FORMAT_SIZE "$SIZE")
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$formatted_size"
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
     OLD_APP=$(grep "^AppSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_APP=${OLD_APP:-0}
     OLD_DATA=$(grep "^DataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_DATA=${OLD_DATA:-0}
@@ -301,15 +345,14 @@ DO_RESTORE() {
 
         local global_pct=$(( BASE_PCT + (app_pct / TOT_IDX) ))
         [ "$global_pct" -gt 100 ] && global_pct=100
-
-        echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$formatted_size"
+        echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
         sleep 0.5
     done
 
     wait
 
     local final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$formatted_size"
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
 
     if CHK 6; then
         CUR_SSAID=$(READID "$PKG")
