@@ -18,7 +18,7 @@ import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 
-object NativeTelephonyManager {
+object NativeManager {
 
     suspend fun runOperation(
         context: Context,
@@ -42,7 +42,9 @@ object NativeTelephonyManager {
 
         if (isBackup) {
             if (doSms) {
-                updateState("Backing up SMS...", 0)
+                updateState("Backing up SMS, MMS & RCS...", 0)
+
+                
                 val smsFile = File(context.cacheDir, "SMS_DB.json")
                 val writer = JsonWriter(OutputStreamWriter(FileOutputStream(smsFile), "UTF-8"))
                 writer.beginArray()
@@ -57,13 +59,17 @@ object NativeTelephonyManager {
                             if (value != null) writer.name(name).value(value)
                         }
                         writer.endObject()
-                        if (i++ % 100 == 0) updateState("Backing up SMS...", (i * 50) / count)
+                        if (i++ % 100 == 0) updateState("Backing up basic SMS...", (i * 20) / count)
                     }
                 }
                 writer.endArray()
                 writer.close()
                 Shell.cmd("su -c 'cp \"${smsFile.absolutePath}\" \"$backupDir/SMS_DB.json\"'").exec()
                 smsFile.delete()
+
+                
+                updateState("Backing up Advanced MMS & RCS...", 30)
+                Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --backup-msgs \"$backupDir\"'").exec()
             }
             if (doCall) {
                 updateState("Backing up Call Logs...", 50)
@@ -81,7 +87,7 @@ object NativeTelephonyManager {
                             if (value != null) writer.name(name).value(value)
                         }
                         writer.endObject()
-                        if (i++ % 100 == 0) updateState("Backing up Call Logs...", 50 + ((i * 50) / count))
+                        if (i++ % 100 == 0) updateState("Backing up Call Logs...", 50 + ((i * 40) / count))
                     }
                 }
                 writer.endArray()
@@ -113,36 +119,46 @@ object NativeTelephonyManager {
             }
         } else {
             if (doSms) {
-                updateState("Restoring SMS...", 0)
-                val currentSmsApp = Shell.cmd("su -c 'cmd role get-role-holders android.app.role.SMS'").exec().out.joinToString("").trim()
-                Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $pkg'").exec()
-                Shell.cmd("su -c 'appops set $pkg WRITE_SMS allow'").exec()
+                updateState("Restoring SMS, MMS & RCS...", 0)
 
-                val tempSms = File(context.cacheDir, "SMS_DB.json")
-                Shell.cmd("su -c 'cp \"$backupDir/SMS_DB.json\" \"${tempSms.absolutePath}\" && chmod 666 \"${tempSms.absolutePath}\"'").exec()
-                if (tempSms.exists()) {
-                    val reader = JsonReader(InputStreamReader(FileInputStream(tempSms), "UTF-8"))
-                    reader.beginArray()
-                    var i = 0
-                    while (reader.hasNext()) {
-                        val values = ContentValues()
-                        reader.beginObject()
+                val hasRawDbs = Shell.cmd("su -c '[ -d \"$backupDir/Advanced_Msgs/Telephony\" ] && echo YES'").exec().out.joinToString("").trim() == "YES"
+
+                if (hasRawDbs) {
+                    updateState("Injecting Raw MMS & RCS Databases...", 10)
+                    Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --restore-msgs \"$backupDir\"'").exec()
+                } else {
+                    
+                    updateState("Restoring SMS from JSON...", 10)
+                    val currentSmsApp = Shell.cmd("su -c 'cmd role get-role-holders android.app.role.SMS'").exec().out.joinToString("").trim()
+                    Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $pkg'").exec()
+                    Shell.cmd("su -c 'appops set $pkg WRITE_SMS allow'").exec()
+
+                    val tempSms = File(context.cacheDir, "SMS_DB.json")
+                    Shell.cmd("su -c 'cp \"$backupDir/SMS_DB.json\" \"${tempSms.absolutePath}\" && chmod 666 \"${tempSms.absolutePath}\"'").exec()
+                    if (tempSms.exists()) {
+                        val reader = JsonReader(InputStreamReader(FileInputStream(tempSms), "UTF-8"))
+                        reader.beginArray()
+                        var i = 0
                         while (reader.hasNext()) {
-                            val name = reader.nextName()
-                            if (reader.peek() == JsonToken.NULL) { reader.nextNull() }
-                            else { val value = reader.nextString(); if (name != "_id") values.put(name, value) }
+                            val values = ContentValues()
+                            reader.beginObject()
+                            while (reader.hasNext()) {
+                                val name = reader.nextName()
+                                if (reader.peek() == JsonToken.NULL) { reader.nextNull() }
+                                else { val value = reader.nextString(); if (name != "_id") values.put(name, value) }
+                            }
+                            reader.endObject()
+                            try { context.contentResolver.insert("content://sms".toUri(), values) } catch (_: Exception) {}
+                            if (i++ % 100 == 0) updateState("Restoring SMS...", (i * 40) / 1000)
                         }
-                        reader.endObject()
-                        try { context.contentResolver.insert("content://sms".toUri(), values) } catch (_: Exception) {}
-                        if (i++ % 100 == 0) updateState("Restoring SMS...", (i * 50) / 1000)
+                        reader.endArray()
+                        reader.close()
+                        tempSms.delete()
                     }
-                    reader.endArray()
-                    reader.close()
-                    tempSms.delete()
-                }
 
-                if (currentSmsApp.isNotEmpty()) {
-                    Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $currentSmsApp'").exec()
+                    if (currentSmsApp.isNotEmpty()) {
+                        Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $currentSmsApp'").exec()
+                    }
                 }
             }
             if (doCall) {
@@ -164,7 +180,7 @@ object NativeTelephonyManager {
                         }
                         reader.endObject()
                         try { context.contentResolver.insert(android.provider.CallLog.Calls.CONTENT_URI, values) } catch (_: Exception) {}
-                        if (i++ % 100 == 0) updateState("Restoring Call Logs...", 50 + ((i * 50) / 1000))
+                        if (i++ % 100 == 0) updateState("Restoring Call Logs...", 50 + ((i * 40) / 1000))
                     }
                     reader.endArray()
                     reader.close()

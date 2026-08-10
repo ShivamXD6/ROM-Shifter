@@ -5,7 +5,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -23,7 +22,7 @@ import build.bytes.romshifter.utils.ExtrasManager
 import build.bytes.romshifter.utils.BackendInstaller
 import build.bytes.romshifter.utils.FlashManager
 import build.bytes.romshifter.utils.MigratorManager
-import build.bytes.romshifter.utils.NativeTelephonyManager
+import build.bytes.romshifter.utils.NativeManager
 import build.bytes.romshifter.utils.SettingsManager
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
@@ -350,15 +349,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentStep = "Processing via ContentResolver...",
             progress = -1
         )
-        updateProgressNotification(
-            title,
-            "Starting Process...",
-            -1
-        )
+        updateProgressNotification(title, "Starting Process...", -1)
+
+        
+        val selectedItems = mutableListOf<String>()
+        if (doSms) selectedItems.add("SMS")
+        if (doCall) selectedItems.add("Call Logs")
+        if (doContacts) selectedItems.add("Contacts")
+        val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                NativeTelephonyManager.runOperation(
+                NativeManager.runOperation(
                     context,
                     isBackup,
                     doSms,
@@ -371,11 +373,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 withContext(Dispatchers.Main) {
                     val finalMsg = if (isBackup) "Backup Complete!" else "Restore Complete!"
-                    showCompletionNotification(finalMsg, "Task finished successfully.")
+                    val finalDesc = "$itemsProcessed"
+
+                    showCompletionNotification(finalMsg, finalDesc)
                     _uiState.value = _uiState.value.copy(
                         isRunning = false,
                         currentAction = finalMsg,
-                        currentStep = "Done.",
+                        currentStep = finalDesc, 
                         progress = 100
                     )
                 }

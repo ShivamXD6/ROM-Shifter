@@ -37,6 +37,8 @@ import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.AppListItem
 import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.ShimmerAppListItem
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 
 @Composable
 fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
@@ -71,7 +73,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 
     var doSms by remember { mutableStateOf(true) }
     var doCall by remember { mutableStateOf(true) }
-    var doContacts by remember { mutableStateOf(true) }
+    var doContacts by remember { mutableStateOf(false) }
 
     if (showPermissionWarning) {
         AlertDialog(
@@ -91,8 +93,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             shape = MaterialTheme.shapes.large,
             onDismissRequest = { showNativeBackupDialog = false; showNativeRestoreDialog = false },
             icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null, modifier = Modifier.size(28.dp)) },
-            title = { Text(if (isBackup) "Telephony Data" else "Restore Telephony Data") },
-            text = {
+            title = { Text(if (isBackup) "Backup Native Data" else "Restore Native Data") },            text = {
                 Column {
                     val options = listOf("SMS Messages" to doSms, "Call Logs" to doCall, "Contacts (vCard)" to doContacts)
                     options.forEach { (label, state) ->
@@ -125,8 +126,25 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             },
             confirmButton = {
                 Button(onClick = {
-                    if (doSms || doCall || doContacts) { pendingNativeAction = Pair(isBackup, Triple(doSms, doCall, doContacts)); showPermissionWarning = true }
-                    showNativeBackupDialog = false; showNativeRestoreDialog = false
+                    if (doSms || doCall || doContacts) {
+                        
+                        val needsSms = doSms && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED
+                        val needsCall = doCall && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED
+                        val needsContacts = doContacts && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
+
+                        if (needsSms || needsCall || needsContacts) {
+                            pendingNativeAction = Pair(isBackup, Triple(doSms, doCall, doContacts))
+                            showPermissionWarning = true
+                        } else {
+                            
+                            viewModel.runNativeDataOperation(context, isBackup, doSms, doCall, doContacts)
+                            showNativeBackupDialog = false
+                            showNativeRestoreDialog = false
+                        }
+                    } else {
+                        showNativeBackupDialog = false
+                        showNativeRestoreDialog = false
+                    }
                 }) { Text(if (isBackup) "Backup" else "Restore") }
             },
             dismissButton = { TextButton(onClick = { showNativeBackupDialog = false; showNativeRestoreDialog = false }) { Text("Cancel") } }
@@ -139,8 +157,8 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             Spacer(modifier = Modifier.height(12.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
-            MenuCard("Backup Telephony Data", Icons.Default.Sms, "Backup SMS, Calls, and Contacts") { showNativeBackupDialog = true }
-            MenuCard("Restore Telephony Data", Icons.Default.SettingsPhone, "Restore Telephony Data from Storage") { showNativeRestoreDialog = true }
+            MenuCard("Backup Native Data", Icons.Default.Sms, "Backup SMS, Calls, and ROM Data") { showNativeBackupDialog = true }
+            MenuCard("Restore Native Data", Icons.Default.SettingsPhone, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
             MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
             Spacer(modifier = Modifier.height(100.dp))
         }
@@ -214,7 +232,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             shape = MaterialTheme.shapes.large,
             onDismissRequest = { showNativeDeleteDialog = false },
             icon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(28.dp)) },
-            title = { Text("Delete Telephony Backups") },
+            title = { Text("Erase Native Backups") },
             text = {
                 Column {
                     val options = listOf(
@@ -551,7 +569,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             onClick = { showNativeDeleteDialog = true },
                             label = {
                                 Text(
-                                    "Delete Telephony",
+                                    "Erase Native",
                                     style = MaterialTheme.typography.labelLarge
                                 )
                             },
