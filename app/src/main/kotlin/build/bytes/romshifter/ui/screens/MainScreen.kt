@@ -4,11 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.BackEventCompat
+import kotlin.system.exitProcess
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.*
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -205,7 +211,19 @@ fun AppScaffold(
         else -> "ROM Shifter"
     }
 
+    val isHome = dynamicTitle == "ROM Shifter"
     val isBackEnabled = !appState.isRunning && (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
+    val logoAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logoAlpha"
+    )
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -214,12 +232,15 @@ fun AppScaffold(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (dynamicTitle == "ROM Shifter") {
+                        
+                        if (isHome) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_home),
                                 contentDescription = "Logo",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .graphicsLayer { alpha = if (appState.isRunning) logoAlpha else 1f }
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                         }
@@ -236,10 +257,22 @@ fun AppScaffold(
                     }
                 },
                 actions = {
-                    if (appState.migratorMode == MigratorMode.MENU && !showSettings && appState.flashWizardStep == 0) {
+                    if (isHome) {
+                        
                         IconButton(onClick = { onSettingsToggle(true) }) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(26.dp))
                         }
+                    } else {
+                        
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_home),
+                            contentDescription = "Logo",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .size(30.dp)
+                                .graphicsLayer { alpha = if (appState.isRunning) logoAlpha else 1f }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -251,13 +284,17 @@ fun AppScaffold(
             AnimatedContent(
                 targetState = showSettings to selectedTab,
                 transitionSpec = {
-                    val goingBack = initialState.first && !targetState.first
-                    if (goingBack) {
+                    val (initialSettings, initialTab) = initialState
+                    val (targetSettings, targetTab) = targetState
+
+                    if (initialSettings && !targetSettings) {
                         EnterTransition.None togetherWith ExitTransition.None
-                    } else if (!initialState.first && targetState.first) {
+                    } else if (!initialSettings && targetSettings) {
                         slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
                     } else {
-                        fadeIn(tween(250)) togetherWith fadeOut(tween(250))
+                        val direction = if (initialTab < targetTab) 1 else -1
+                        (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { (it * 0.2f * direction).toInt() } + fadeIn(tween(300))) togetherWith
+                                (slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { (it * -0.2f * direction).toInt() } + fadeOut(tween(300)))
                     }
                 },
                 label = "AppContentTransition",
@@ -485,6 +522,18 @@ fun OnboardingStepContent(
     permLauncher: androidx.activity.compose.ManagedActivityResultLauncher<Array<String>, Map<String, @JvmSuppressWildcards Boolean>>,
     notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>
 ) {
+    
+    val iconScale = remember { Animatable(0.3f) }
+    LaunchedEffect(step) {
+        iconScale.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow
+            )
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -493,10 +542,15 @@ fun OnboardingStepContent(
         when (step) {
             1 -> {
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(painter = painterResource(id = R.drawable.ic_home), contentDescription = "ROM Shifter", modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)                }
+                    Icon(painter = painterResource(id = R.drawable.ic_home), contentDescription = "ROM Shifter", modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
                 Spacer(Modifier.height(32.dp))
                 Text("Get Started with", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("ROM Shifter", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
@@ -507,7 +561,11 @@ fun OnboardingStepContent(
             }
             2 -> {
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Folder, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -529,7 +587,11 @@ fun OnboardingStepContent(
                 }
 
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Security, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -553,7 +615,11 @@ fun OnboardingStepContent(
             }
             4 -> {
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Favorite, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -581,9 +647,28 @@ fun OnboardingStepContent(
         }
     }
 }
-
 @Composable
 fun NoRootScreen() {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.90f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(24.dp), contentAlignment = Alignment.Center) {
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
@@ -592,7 +677,11 @@ fun NoRootScreen() {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
                 Box(
-                    modifier = Modifier.size(100.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f)),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale }
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onErrorContainer.copy(alpha = pulseAlpha)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Warning, contentDescription = "No Root", tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(56.dp))
@@ -601,6 +690,20 @@ fun NoRootScreen() {
                 Text("Root Access Required", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onErrorContainer)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, restart the app.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onErrorContainer)
+
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                Button(
+                    onClick = { exitProcess(0) }, 
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Restart App", style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }

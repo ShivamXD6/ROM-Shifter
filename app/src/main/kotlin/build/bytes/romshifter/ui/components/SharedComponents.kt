@@ -3,18 +3,23 @@ package build.bytes.romshifter.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,12 +31,26 @@ import coil.compose.AsyncImage
 
 @Composable
 fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () -> Unit) {
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "MenuCardBounce"
+    )
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .clip(MaterialTheme.shapes.large) 
-            .clickable(onClick = onClick),
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(MaterialTheme.shapes.large)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick
+            ),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
@@ -43,7 +62,7 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp) 
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
@@ -80,13 +99,27 @@ fun AppListItem(app: AppInfo, showBackupTime: Boolean = true, onToggleSelect: (S
         label = "item_color"
     )
 
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "AppListItemBounce"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 2.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(MaterialTheme.shapes.medium)
             .background(containerColor)
-            .clickable { onToggleSelect(app.packageName) }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = { onToggleSelect(app.packageName) }
+            )
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -129,7 +162,6 @@ fun AppListItem(app: AppInfo, showBackupTime: Boolean = true, onToggleSelect: (S
                 Text(
                     text = app.backupTime,
                     style = MaterialTheme.typography.labelMedium,
-                    
                     color = if (app.backupTime == "No backup on device") MaterialTheme.colorScheme.onSurfaceVariant.copy(
                         alpha = 0.7f
                     ) else MaterialTheme.colorScheme.primary,

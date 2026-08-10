@@ -38,11 +38,11 @@ fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
     AnimatedContent(
         targetState = appState.migratorMode == MigratorMode.MENU,
         transitionSpec = {
-            val goingBack = !initialState && targetState 
+            val goingBack = !initialState && targetState
             if (goingBack) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
-                
+
                 slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
         },
@@ -128,7 +128,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    
+
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -388,19 +388,22 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     Text("No apps found. Pull down to refresh.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp, top = 6.dp)) {
-                items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
-                    
-                    
-                    val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
-                    AppListItem(
-                        app = app,
-                        showBackupTime = showTime,
-                        onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) }
-                    )
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 12.dp, top = 6.dp)) {
+                    items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
+
+                        val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
+
+                        
+                        Box(modifier = Modifier.animateItem()) {
+                            AppListItem(
+                                app = app,
+                                showBackupTime = showTime,
+                                onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) }
+                            )
+                        }
+                    }
                 }
             }
-        }
         }
 
         val showProgressPanel = appState.isRunning || appState.currentStep.isNotEmpty()
@@ -499,12 +502,28 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "$selectedCount Selected",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+
+                        
+                        AnimatedContent(
+                            targetState = selectedCount,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                            (slideOutVertically { height -> -height } + fadeOut())
+                                } else {
+                                    (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                            (slideOutVertically { height -> height } + fadeOut())
+                                }
+                            },
+                            label = "CountAnimation",
                             modifier = Modifier.weight(1f)
-                        )
+                        ) { count ->
+                            Text(
+                                text = "$count Selected",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
 
                         Spacer(modifier = Modifier.width(12.dp))
 

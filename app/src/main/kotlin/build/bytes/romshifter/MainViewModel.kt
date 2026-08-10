@@ -428,12 +428,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleSystemApps() {
-        val newState = !_uiState.value.showSystemApps
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isFetchingApps = true)
-            kotlinx.coroutines.delay(150) 
-            _uiState.value = _uiState.value.copy(showSystemApps = newState, isFetchingApps = false)
-        }
+        
+        _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
+    }
+
+    fun toggleShowUserApps(enabled: Boolean) {
+        
+        _uiState.value = _uiState.value.copy(showUserApps = enabled)
     }
 
     fun setPrivilegedSystemize(enabled: Boolean) {
@@ -443,26 +444,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleActionFilter() {
         val mode = _uiState.value.migratorMode
         val currentState = _uiState.value.actionFilterState
-        
+
         val newState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS) {
             (currentState + 1) % 3
         } else {
             if (currentState == 1) 2 else 1
         }
 
-        viewModelScope.launch {
+        if (mode == MigratorMode.DEBLOAT && newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
             _uiState.value = _uiState.value.copy(isFetchingApps = true)
-            kotlinx.coroutines.delay(100) 
-
-            if (mode == MigratorMode.DEBLOAT && newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
+            viewModelScope.launch {
                 val uninstalled = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "Uninstalled", true, _uiState.value.appList)
                 _uiState.value = _uiState.value.copy(appList = uninstalled, actionFilterState = newState, isFetchingApps = false)
-            } else if (mode == MigratorMode.SYSTEMIZE && !_uiState.value.systemAppsFetched && newState == 2) {
+            }
+        } else if (mode == MigratorMode.SYSTEMIZE && !_uiState.value.systemAppsFetched && newState == 2) {
+            _uiState.value = _uiState.value.copy(isFetchingApps = true)
+            viewModelScope.launch {
                 val sys = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "System", true, _uiState.value.appList)
                 _uiState.value = _uiState.value.copy(appList = sys, systemAppsFetched = true, actionFilterState = newState, isFetchingApps = false)
-            } else {
-                _uiState.value = _uiState.value.copy(actionFilterState = newState, isFetchingApps = false)
             }
+        } else {
+            
+            _uiState.value = _uiState.value.copy(actionFilterState = newState)
         }
     }
 
@@ -508,14 +511,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setForceRemove(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(forceRemoveEnabled = enabled)
-    }
-
-    fun toggleShowUserApps(enabled: Boolean) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isFetchingApps = true)
-            kotlinx.coroutines.delay(150) 
-            _uiState.value = _uiState.value.copy(showUserApps = enabled, isFetchingApps = false)
-        }
     }
 
     fun toggleGlobalComponent(id: Int) {
