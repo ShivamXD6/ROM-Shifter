@@ -11,6 +11,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -93,12 +95,16 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
 }
 
 @Composable
-fun AppListItem(app: AppInfo, showBackupTime: Boolean = true, onToggleSelect: (String) -> Unit) {
+fun AppListItem(
+    app: AppInfo,
+    showBackupTime: Boolean = true,
+    isMonochrome: Boolean = false, 
+    onToggleSelect: (String) -> Unit
+) {
     val containerColor by animateColorAsState(
         targetValue = if (app.isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         label = "item_color"
     )
-
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -127,13 +133,29 @@ fun AppListItem(app: AppInfo, showBackupTime: Boolean = true, onToggleSelect: (S
             .size(48.dp)
             .clip(MaterialTheme.shapes.small)
 
+        
+        val imageColorFilter = if (isMonochrome) {
+            ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+        } else null
+
         if (app.iconBitmap != null) {
-            Image(bitmap = app.iconBitmap.asImageBitmap(), contentDescription = "App Icon", modifier = iconModifier)
+            Image(
+                bitmap = app.iconBitmap.asImageBitmap(),
+                contentDescription = "App Icon",
+                colorFilter = imageColorFilter, 
+                modifier = iconModifier
+            )
         } else if (app.iconPath != null) {
-            AsyncImage(model = app.iconPath, contentDescription = "App Icon", modifier = iconModifier)
+            AsyncImage(
+                model = app.iconPath,
+                contentDescription = "App Icon",
+                colorFilter = imageColorFilter, 
+                modifier = iconModifier
+            )
         } else {
             val letter = app.label.firstOrNull()?.uppercase() ?: "?"
-            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(getAvatarColor(app.label)), contentAlignment = Alignment.Center) {
+            val bgColor = if (isMonochrome) Color.Gray else getAvatarColor(app.label) 
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(bgColor), contentAlignment = Alignment.Center) {
                 Text(text = letter, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 22.sp)
             }
         }
