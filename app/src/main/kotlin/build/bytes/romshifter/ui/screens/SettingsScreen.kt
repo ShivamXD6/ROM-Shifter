@@ -34,7 +34,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     LaunchedEffect(savedPath) { if (!isMoving) inputPath = savedPath }
     val isEditing = inputPath != savedPath
 
-    var showResetDialog by remember { mutableStateOf(false) }
     var showAboutSheet by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -48,25 +47,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             isMoving = true
             viewModel.migrateFolder(finalPath) { isMoving = false }
         }
-    }
-
-    if (showResetDialog) {
-        AlertDialog(
-            shape = RoundedCornerShape(30.dp),
-            onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset Application", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error) },
-            text = { Text("This will permanently clear application data, remove binaries, reset configurations, but doesn't delete Shifter Folder. Run if you're facing any issues", style = MaterialTheme.typography.bodyLarge) },
-            confirmButton = {
-                Button(
-                    onClick = { showResetDialog = false; viewModel.resetApp(context) },
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Reset", style = MaterialTheme.typography.titleMedium) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Cancel", style = MaterialTheme.typography.titleMedium) }
-            }
-        )
     }
 
     if (showAboutSheet) {
@@ -140,7 +120,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
         ElevatedCard(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             shape = RoundedCornerShape(30.dp),
-            
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
             Column {
@@ -211,28 +190,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         Text("About & Support", style = MaterialTheme.typography.titleLarge)
                         Spacer(modifier = Modifier.height(2.dp))
                         Text("App info, social links, and donations", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                Row(
-                    modifier = Modifier.fillMaxWidth().clickable { showResetDialog = true }.padding(horizontal = 24.dp, vertical = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.errorContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.DeleteForever, contentDescription = "Reset", tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(24.dp))
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Reset Application", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("Clear all data and remove Binary", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

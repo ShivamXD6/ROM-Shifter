@@ -336,10 +336,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun resetApp(context: Context) {
-        SettingsManager.resetApp(context)
-    }
-
     fun runNativeDataOperation(
         context: Context,
         isBackup: Boolean,

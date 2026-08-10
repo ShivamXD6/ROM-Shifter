@@ -30,20 +30,4 @@ object SettingsManager {
         }
         return null
     }
-
-    fun resetApp(context: Context) {
-        val pkg = context.packageName
-        Shell.cmd("rm -rf '/data/adb/#Shifter'").exec()
-        Shell.cmd("pm clear $pkg").exec()
-    }
-
-    fun exportLogs(logs: List<String>, savedPath: String, cacheDir: File) {
-        val logData = logs.joinToString("\n")
-        val targetFile = "$savedPath/Debug_Logs.txt"
-        val tempLog = File(cacheDir, "temp_logs.txt")
-        tempLog.writeText(logData)
-
-        Shell.cmd("cp '${tempLog.absolutePath}' '$targetFile' && chmod 666 '$targetFile'").exec()
-        tempLog.delete()
-    }
 }
