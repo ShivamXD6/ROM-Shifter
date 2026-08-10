@@ -600,7 +600,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
                 val safeAction = action.ifEmpty { "ROM Shifter" }
-                val desc = if (step.isNotEmpty()) "$step\nParts: $activeComps" else "Parts: $activeComps"
+                val desc = if (step.isNotEmpty()) "$step\n- $activeComps" else "- $activeComps"
                 updateProgressNotification(safeAction, desc, prog)
 
                 

@@ -11,6 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -45,6 +47,7 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 
 fun openUriSafely(context: Context, uriString: String) {
     try {
@@ -208,11 +211,13 @@ fun AppScaffold(
                 MigratorMode.SYSTEMIZE -> "Systemize User Apps"
             }
         }
+
         else -> "ROM Shifter"
     }
 
     val isHome = dynamicTitle == "ROM Shifter"
-    val isBackEnabled = !appState.isRunning && (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0)
+    val isBackEnabled =
+        !appState.isRunning && (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0)
 
     val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
     val logoAlpha by infiniteTransition.animateFloat(
@@ -232,7 +237,7 @@ fun AppScaffold(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        
+
                         if (isHome) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_home),
@@ -240,7 +245,9 @@ fun AppScaffold(
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .size(30.dp)
-                                    .graphicsLayer { alpha = if (appState.isRunning) logoAlpha else 1f }
+                                    .graphicsLayer {
+                                        alpha = if (appState.isRunning) logoAlpha else 1f
+                                    }
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                         }
@@ -253,17 +260,28 @@ fun AppScaffold(
                 },
                 navigationIcon = {
                     if (isBackEnabled) {
-                        IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(26.dp)) }
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                "Back",
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
                     }
                 },
                 actions = {
                     if (isHome) {
-                        
+
                         IconButton(onClick = { onSettingsToggle(true) }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(26.dp))
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(26.dp)
+                            )
                         }
                     } else {
-                        
+
                         Icon(
                             painter = painterResource(id = R.drawable.ic_home),
                             contentDescription = "Logo",
@@ -290,11 +308,26 @@ fun AppScaffold(
                     if (initialSettings && !targetSettings) {
                         EnterTransition.None togetherWith ExitTransition.None
                     } else if (!initialSettings && targetSettings) {
-                        slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
+                        slideInHorizontally(
+                            tween(
+                                250,
+                                easing = FastOutSlowInEasing
+                            )
+                        ) { it } togetherWith fadeOut(tween(250))
                     } else {
                         val direction = if (initialTab < targetTab) 1 else -1
-                        (slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { (it * 0.2f * direction).toInt() } + fadeIn(tween(300))) togetherWith
-                                (slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { (it * -0.2f * direction).toInt() } + fadeOut(tween(300)))
+                        (slideInHorizontally(
+                            tween(
+                                300,
+                                easing = FastOutSlowInEasing
+                            )
+                        ) { (it * 0.2f * direction).toInt() } + fadeIn(tween(300))) togetherWith
+                                (slideOutHorizontally(
+                                    tween(
+                                        300,
+                                        easing = FastOutSlowInEasing
+                                    )
+                                ) { (it * -0.2f * direction).toInt() } + fadeOut(tween(300)))
                     }
                 },
                 label = "AppContentTransition",
@@ -314,32 +347,97 @@ fun AppScaffold(
             AnimatedVisibility(
                 visible = !showSettings && appState.flashWizardStep == 0 && appState.migratorMode == MigratorMode.MENU,
                 enter = EnterTransition.None,
-                exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(400, easing = FastOutLinearInEasing)) + fadeOut(tween(400)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(400, easing = FastOutLinearInEasing)
+                ) + fadeOut(tween(400)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                NavigationBar(
+                
+                Surface(
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
                         .height(80.dp)
+                        .fillMaxWidth()
                         .clip(MaterialTheme.shapes.large),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 0.dp
                 ) {
-                    tabs.forEachIndexed { index, tab ->
-                        NavigationBarItem(
-                            icon = { Icon(imageVector = tab.second, contentDescription = tab.first, modifier = Modifier.size(24.dp)) },
-                            label = { Text(text = tab.third, style = MaterialTheme.typography.labelMedium) },
-                            selected = selectedTab == index,
-                            onClick = { onTabSelect(index) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        tabs.forEachIndexed { index, tab ->
+                            val isSelected = selectedTab == index
+
+                            val yOffset by animateDpAsState(
+                                targetValue = if (isSelected) (-6).dp else 0.dp,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                label = "tabYOffset"
                             )
-                        )
+                            val iconScale by animateFloatAsState(
+                                targetValue = if (isSelected) 1.12f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                label = "tabIconScale"
+                            )
+
+                            
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null 
+                                    ) {
+                                        onTabSelect(index)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.offset(y = yOffset)
+                                ) {
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .graphicsLayer {
+                                                scaleX = iconScale; scaleY = iconScale
+                                            }
+                                            .size(width = 56.dp, height = 32.dp)
+                                            .background(
+                                                color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.second,
+                                            contentDescription = tab.first,
+                                            tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Text(
+                                        text = tab.third,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -143,7 +143,6 @@ DO_BACKUP() {
 
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
 
-
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
@@ -171,7 +170,7 @@ DO_BACKUP() {
                 [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
                 [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
             else rm -f "$APP_DIR/Data.bundle.pack" "$APP_DIR/UserDe.bundle.pack"; fi
-            OLD_DATA=$CUR_DATA
+                OLD_DATA=$CUR_DATA
         fi
     fi
     if CHK 3; then
@@ -220,7 +219,8 @@ DO_BACKUP() {
         local global_pct=$(( BASE_PCT + (app_pct / TOT_IDX) ))
         [ "$global_pct" -gt 100 ] && global_pct=100
 
-        echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"        sleep 0.5
+        echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
+        sleep 0.5
     done
 
     wait
