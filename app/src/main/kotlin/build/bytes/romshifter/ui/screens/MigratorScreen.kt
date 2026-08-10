@@ -2,7 +2,12 @@ package build.bytes.romshifter.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import build.bytes.romshifter.utils.getAvatarColor
+import coil.compose.AsyncImage
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -393,7 +398,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
                         val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
 
-                        
                         Box(modifier = Modifier.animateItem()) {
                             AppListItem(
                                 app = app,
@@ -422,6 +426,18 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 label = "BottomBarTransition"
             ) { isProcessing ->
                 if (isProcessing) {
+                    
+                    val processingApp = remember(appState.currentAction, appState.currentStep) {
+                        appState.appList.firstOrNull { app ->
+                            app.isSelected && (
+                                    appState.currentAction.contains(app.label, ignoreCase = true) ||
+                                            appState.currentStep.contains(app.label, ignoreCase = true) ||
+                                            appState.currentAction.contains(app.packageName, ignoreCase = true) ||
+                                            appState.currentStep.contains(app.packageName, ignoreCase = true)
+                                    )
+                        }
+                    }
+
                     Column(
                         modifier = Modifier
                             .navigationBarsPadding()
@@ -432,6 +448,31 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            
+                            AnimatedVisibility(
+                                visible = processingApp != null,
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut()
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val iconModifier = Modifier
+                                        .size(42.dp)
+                                        .clip(MaterialTheme.shapes.small)
+
+                                    if (processingApp?.iconBitmap != null) {
+                                        Image(bitmap = processingApp.iconBitmap.asImageBitmap(), contentDescription = null, modifier = iconModifier)
+                                    } else if (processingApp?.iconPath != null) {
+                                        AsyncImage(model = processingApp.iconPath, contentDescription = null, modifier = iconModifier)
+                                    } else if (processingApp != null) {
+                                        val letter = processingApp.label.firstOrNull()?.uppercase() ?: "?"
+                                        Box(modifier = iconModifier.background(getAvatarColor(processingApp.label)), contentAlignment = Alignment.Center) {
+                                            Text(text = letter, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 20.sp)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                }
+                            }
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = appState.currentAction,
@@ -503,7 +544,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
 
-                        
                         AnimatedContent(
                             targetState = selectedCount,
                             transitionSpec = {
@@ -521,10 +561,10 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             Text(
                                 text = "$count Selected",
                                 style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
                             )
                         }
-
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Button(
