@@ -11,29 +11,41 @@ android {
         applicationId = "build.bytes.romshifter"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        versionCode = (project.findProperty("VERSION_CODE") ?: "1").toString().toInt()
         versionName = "Eevee (v1)"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("release.keystore")
+            if (System.getenv("KEYSTORE_PASSWORD") != null) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
-            optimization {
-                enable = false
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
     splits {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86_64")
             isUniversalApk = false
+            include("armeabi-v7a", "arm64-v8a")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -50,36 +62,23 @@ android {
 }
 
 dependencies {
-    
     implementation(libs.libsu.core)
     implementation(libs.libsu.io)
-
-    
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.graphics.path)
-
-    
     implementation(platform(libs.androidx.compose.bom))
-
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.material3)
-
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
-
-    
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-
-    
     implementation(libs.coil.compose)
-
-    
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)

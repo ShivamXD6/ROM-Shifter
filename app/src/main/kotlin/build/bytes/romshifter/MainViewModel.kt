@@ -713,7 +713,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 MigratorMode.RESTORE_APPS -> fetchAppsList("AllBackups")
                 MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
                 MigratorMode.MANAGE -> fetchAppsList("AllBackups")
-                else -> {}
             }
         }
     }

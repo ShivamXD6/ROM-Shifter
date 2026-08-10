@@ -200,7 +200,6 @@ fun AppScaffold(
                 MigratorMode.MANAGE -> "Manage Backups"
                 MigratorMode.DEBLOAT -> "Debloat / Restore Apps"
                 MigratorMode.SYSTEMIZE -> "Systemize User Apps"
-                else -> "ROM Shifter"
             }
         }
         else -> "ROM Shifter"
