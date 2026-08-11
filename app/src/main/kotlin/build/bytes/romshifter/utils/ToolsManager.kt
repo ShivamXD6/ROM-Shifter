@@ -3,12 +3,11 @@ package build.bytes.romshifter.utils
 import android.content.Context
 import android.os.PowerManager
 import build.bytes.romshifter.models.AppInfo
-import build.bytes.romshifter.models.ShifterEvent
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-object ExtrasManager {
+object ToolsManager {
 
     suspend fun runDebloatOperation(
         context: Context, selectedApps: List<AppInfo>, isRestore: Boolean, forceRemove: Boolean,

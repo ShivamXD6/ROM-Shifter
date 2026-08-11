@@ -25,7 +25,7 @@ import build.bytes.romshifter.ui.components.MenuCard
 import kotlinx.coroutines.launch
 
 @Composable
-fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
+fun ToolsTab(appState: AppState, viewModel: MainViewModel) {
     val context = LocalContext.current
     var showMetaWarningDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -62,7 +62,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
                 slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
         },
-        label = "ExtrasTransition"
+        label = "ToolsTransition"
     ) { isMenu ->
         if (!isMenu) {
             MigratorActionScreen(appState, viewModel)

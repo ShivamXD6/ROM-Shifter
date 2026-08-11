@@ -194,7 +194,7 @@ fun AppScaffold(
     val tabs = listOf(
         Triple("Flash", Icons.Default.FlashOn, "Flash"),
         Triple("Migrate", Icons.Default.CloudSync, "Migrate"),
-        Triple("Extras", Icons.Default.Build, "Extras")
+        Triple("Tools", Icons.Default.Build, "Tools")
     )
 
     val dynamicTitle = when {
@@ -337,7 +337,7 @@ fun AppScaffold(
                     when (currentTab) {
                         0 -> FlashTab(appState, LocalContext.current, viewModel)
                         1 -> MigratorTab(appState, viewModel)
-                        2 -> ExtrasTab(appState, viewModel)
+                        2 -> ToolsTab(appState, viewModel)
                     }
                 }
             }

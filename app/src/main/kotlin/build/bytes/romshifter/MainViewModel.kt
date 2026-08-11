@@ -18,7 +18,7 @@ import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
-import build.bytes.romshifter.utils.ExtrasManager
+import build.bytes.romshifter.utils.ToolsManager
 import build.bytes.romshifter.utils.BackendInstaller
 import build.bytes.romshifter.utils.FlashManager
 import build.bytes.romshifter.utils.MigratorManager
@@ -652,7 +652,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             when (state.migratorMode) {
                 MigratorMode.DEBLOAT -> {
-                    ExtrasManager.runDebloatOperation(
+                    ToolsManager.runDebloatOperation(
                         context = getApplication(),
                         selectedApps = selectedApps,
                         isRestore = state.actionFilterState == 2,
@@ -673,7 +673,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         updateProgress("De-Systemizing", "Removed from module folder", 100)
                         onComplete("De-Systemize Complete!", "Reboot required to apply changes.")
                     } else {
-                        ExtrasManager.runSystemizeOperation(
+                        ToolsManager.runSystemizeOperation(
                             context = getApplication(),
                             selectedApps = selectedApps,
                             isPrivileged = isPrivilegedSystemize.value,
