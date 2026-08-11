@@ -45,6 +45,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val savedPath: StateFlow<String> = _savedPath.asStateFlow()
     val isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
 
+    private val _themeMode = MutableStateFlow(prefs.getInt("theme_mode", 0))
+    val themeMode: StateFlow<Int> = _themeMode.asStateFlow()
+
+    fun setTheme(mode: Int) {
+        _themeMode.value = mode
+        prefs.edit { putInt("theme_mode", mode) }
+    }
+
     val isPrivilegedSystemize = MutableStateFlow(false)
 
     private val notificationManager = NotificationManagerCompat.from(application)
@@ -103,8 +111,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val parts = content.split("\n")
             val mainText = parts[0]
             val subText = if (parts.size > 1) parts[1] else null
-
-
             val displayContent = if (progress in 0..100) "$mainText  •  $progress%" else mainText
 
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
@@ -163,8 +169,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openFlashWizard() {
         _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList())
     }
-
-
     fun flashWizardStepBack() {
         val currentStep = _uiState.value.flashWizardStep
         if (currentStep > 1) {
@@ -349,8 +353,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             progress = -1
         )
         updateProgressNotification(title, "Starting Process...", -1)
-
-        
         val selectedItems = mutableListOf<String>()
         if (doSms) selectedItems.add("SMS")
         if (doCall) selectedItems.add("Call Logs")
@@ -431,12 +433,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleSystemApps() {
-        
+
         _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
     }
 
     fun toggleShowUserApps(enabled: Boolean) {
-        
+
         _uiState.value = _uiState.value.copy(showUserApps = enabled)
     }
 
@@ -467,7 +469,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(appList = sys, systemAppsFetched = true, actionFilterState = newState, isFetchingApps = false)
             }
         } else {
-            
+
             _uiState.value = _uiState.value.copy(actionFilterState = newState)
         }
     }
@@ -485,14 +487,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showUserApps = true,
             showSystemApps = showSysApps,
             systemAppsFetched = false,
-            
+
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
             globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
         if (mode == MigratorMode.SYSTEMIZE) isPrivilegedSystemize.value = false
 
         when (mode) {
-            
+
             MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
             MigratorMode.RESTORE_APPS -> {
                 MigratorManager.clearCache(); fetchAppsList("AllBackups")
@@ -503,7 +505,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 MigratorManager.clearCache(); fetchAppsList("AllBackups")
             }
 
-            MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled") 
+            MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
             else -> {}
         }
     }
@@ -549,7 +551,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun fetchAppsList(type: String, append: Boolean = false) {
-        
+
         _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -605,8 +607,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val safeAction = action.ifEmpty { "ROM Shifter" }
                 val desc = if (step.isNotEmpty()) "$step\n- $activeComps" else "- $activeComps"
                 updateProgressNotification(safeAction, desc, prog)
-
-                
                 _uiState.value = _uiState.value.copy(
                     currentAction = if (action.isNotEmpty()) action else _uiState.value.currentAction,
                     currentStep = if (step.isNotEmpty()) desc else _uiState.value.currentStep,

@@ -58,7 +58,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
             if (goingBack) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
-                
+
                 slideInHorizontally(tween(250, easing = FastOutSlowInEasing)) { it } togetherWith fadeOut(tween(250))
             }
         },
@@ -67,7 +67,7 @@ fun ExtrasTab(appState: AppState, viewModel: MainViewModel) {
         if (!isMenu) {
             MigratorActionScreen(appState, viewModel)
         } else {
-            
+
             Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))

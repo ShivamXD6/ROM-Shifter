@@ -355,7 +355,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
         label = "FlashWizardSteps"
     ) { step ->
         if (step > 0) {
-            
+
             Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).navigationBarsPadding().padding(16.dp)) {
                 when (step) {
                     1 -> {
@@ -599,7 +599,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                 }
             }
         } else {
-            
+
             Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -27,20 +29,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
+            val themeMode by viewModel.themeMode.collectAsState()
             val systemDark = isSystemInDarkTheme()
+
+            val isDark = when (themeMode) {
+                1 -> false
+                2, 3, 4 -> true
+                else -> systemDark
+            }
 
             val view = LocalView.current
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = this@MainActivity.window
-                    
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !systemDark
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !systemDark
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
                 }
             }
 
-            
-            ROMShifterTheme {
+            ROMShifterTheme(themeMode = themeMode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(viewModel = viewModel)
                 }

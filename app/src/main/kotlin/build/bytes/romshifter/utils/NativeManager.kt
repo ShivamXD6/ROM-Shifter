@@ -43,8 +43,6 @@ object NativeManager {
         if (isBackup) {
             if (doSms) {
                 updateState("Backing up SMS, MMS & RCS...", 0)
-
-                
                 val smsFile = File(context.cacheDir, "SMS_DB.json")
                 val writer = JsonWriter(OutputStreamWriter(FileOutputStream(smsFile), "UTF-8"))
                 writer.beginArray()
@@ -66,8 +64,6 @@ object NativeManager {
                 writer.close()
                 Shell.cmd("su -c 'cp \"${smsFile.absolutePath}\" \"$backupDir/SMS_DB.json\"'").exec()
                 smsFile.delete()
-
-                
                 updateState("Backing up Advanced MMS & RCS...", 30)
                 Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --backup-msgs \"$backupDir\"'").exec()
             }
@@ -127,7 +123,7 @@ object NativeManager {
                     updateState("Injecting Raw MMS & RCS Databases...", 10)
                     Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --restore-msgs \"$backupDir\"'").exec()
                 } else {
-                    
+
                     updateState("Restoring SMS from JSON...", 10)
                     val currentSmsApp = Shell.cmd("su -c 'cmd role get-role-holders android.app.role.SMS'").exec().out.joinToString("").trim()
                     Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $pkg'").exec()

@@ -1,6 +1,8 @@
 package build.bytes.romshifter.ui.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -31,6 +33,8 @@ import build.bytes.romshifter.MainViewModel
 @Composable
 fun SettingsTab(context: Context, viewModel: MainViewModel) {
     val savedPath by viewModel.savedPath.collectAsState()
+    val currentTheme by viewModel.themeMode.collectAsState()
+
     var inputPath by remember { mutableStateOf(savedPath) }
     var isMoving by remember { mutableStateOf(false) }
 
@@ -38,6 +42,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     val isEditing = inputPath != savedPath
 
     var showAboutSheet by remember { mutableStateOf(false) }
+    var showThemeSheet by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -49,6 +54,36 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             inputPath = finalPath
             isMoving = true
             viewModel.migrateFolder(finalPath) { isMoving = false }
+        }
+    }
+
+    if (showThemeSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showThemeSheet = false },
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                Text("Choose Theme", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val options = listOf(0 to "System Default", 1 to "Light", 2 to "Dark", 3 to "Amoled (Accent)", 4 to "Amoled (Dynamic)")
+                options.forEach { (value, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { viewModel.setTheme(value); showThemeSheet = false }
+                            .padding(vertical = 14.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label, style = MaterialTheme.typography.titleMedium, color = if (currentTheme == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        if (currentTheme == value) Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 
@@ -90,24 +125,6 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Donate via UPI", style = MaterialTheme.typography.titleMedium)
-                        Text("Support via GPay, PhonePe, Paytm, BHIM", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://paypal.me/ShivamXD6") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Donate via PayPal", style = MaterialTheme.typography.titleMedium)
-                        Text("Support via international cards", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(16.dp))
@@ -124,7 +141,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp)
-                .animateContentSize(animationSpec = tween(350, easing = FastOutSlowInEasing)), 
+                .animateContentSize(animationSpec = tween(350, easing = FastOutSlowInEasing)),
             shape = RoundedCornerShape(30.dp),
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
         ) {
@@ -132,14 +149,9 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Folder, contentDescription = "Folder", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
-                        }
+                        ) { Icon(Icons.Default.Folder, contentDescription = "Folder", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp)) }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Shifter Location", style = MaterialTheme.typography.titleLarge)
@@ -179,16 +191,27 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showThemeSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Palette, contentDescription = "Theme", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Appearance", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val themeText = when(currentTheme) { 1 -> "Light"; 2 -> "Dark"; 3 -> "Amoled (Accent)"; 4 -> "Amoled (Dynamic)"; else -> "System Default" }
+                        Text("Theme: $themeText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                Row(
                     modifier = Modifier.fillMaxWidth().clickable { showAboutSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Info, contentDescription = "About", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
                     }
                     Spacer(modifier = Modifier.width(16.dp))

@@ -277,9 +277,6 @@ object MigratorManager {
 
             val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
-
-
-
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
                 selectedApps.forEach { app ->
@@ -300,8 +297,6 @@ object MigratorManager {
                         }
                     } catch (_: Exception) { }
                 }
-
-
                 if (iconScript.isNotEmpty()) {
                     val scriptFile = File(context.cacheDir, "copy_icons.sh")
                     scriptFile.writeText(iconScript.toString())

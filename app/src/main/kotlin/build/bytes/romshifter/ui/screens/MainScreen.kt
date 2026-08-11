@@ -127,8 +127,6 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
     }
-
-    
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
 
         if (backProgress.value > 0f) {
@@ -353,7 +351,7 @@ fun AppScaffold(
                 ) + fadeOut(tween(400)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                
+
                 Surface(
                     modifier = Modifier
                         .navigationBarsPadding()
@@ -388,8 +386,6 @@ fun AppScaffold(
                                 ),
                                 label = "tabIconScale"
                             )
-
-                            
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -407,7 +403,7 @@ fun AppScaffold(
                                     verticalArrangement = Arrangement.Center,
                                     modifier = Modifier.offset(y = yOffset)
                                 ) {
-                                    
+
                                     Box(
                                         modifier = Modifier
                                             .graphicsLayer {
@@ -514,8 +510,6 @@ fun OnboardingWizard(viewModel: MainViewModel) {
         }
     val notifPermLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
-    
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
 
         if (backProgress.value > 0f) {
@@ -620,7 +614,7 @@ fun OnboardingStepContent(
     permLauncher: androidx.activity.compose.ManagedActivityResultLauncher<Array<String>, Map<String, @JvmSuppressWildcards Boolean>>,
     notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>
 ) {
-    
+
     val iconScale = remember { Animatable(0.3f) }
     LaunchedEffect(step) {
         iconScale.animateTo(
@@ -790,7 +784,7 @@ fun NoRootScreen() {
                 Text("Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, restart the app.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onErrorContainer)
 
                 Spacer(modifier = Modifier.height(32.dp))
-                
+
                 Button(
                     onClick = { exitProcess(0) }, 
                     shape = CircleShape,

@@ -8,37 +8,72 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-
 
 val ExpressiveShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp), 
-    large = RoundedCornerShape(30.dp),  
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(30.dp),
     extraLarge = RoundedCornerShape(30.dp)
 )
 
 @Composable
 fun ROMShifterTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: Int = 0,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val systemDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+
+    val isDark = when (themeMode) {
+        1 -> false
+        2, 3, 4 -> true
+        else -> systemDark
+    }
+
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
+        themeMode == 0 -> {
+            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            } else {
+                if (systemDark) DarkColorScheme else LightColorScheme
+            }
         }
-        darkTheme -> DarkColorScheme
+
+        themeMode == 1 -> LightColorScheme
+
+        themeMode == 2 -> DarkColorScheme
+
+        themeMode == 3 -> AmoledAccentColorScheme
+
+        themeMode == 4 -> {
+            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicDarkColorScheme(context).copy(
+                    background = Color(0xFF000000),
+                    surface = Color(0xFF000000),
+                    surfaceVariant = Color(0xFF000000),
+                    surfaceContainerLowest = Color(0xFF000000),
+                    surfaceContainerLow = Color(0xFF000000),
+                    surfaceContainer = Color(0xFF000000),
+                    surfaceContainerHigh = Color(0xFF070707),
+                    surfaceContainerHighest = Color(0xFF0F0F0F)
+                )
+            } else {
+                AmoledAccentColorScheme
+            }
+        }
         else -> LightColorScheme
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = ExpressiveShapes, 
+        shapes = ExpressiveShapes,
         content = content
     )
 }

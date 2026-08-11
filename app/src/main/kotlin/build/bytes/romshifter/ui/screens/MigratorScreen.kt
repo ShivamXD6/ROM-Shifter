@@ -127,7 +127,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             confirmButton = {
                 Button(onClick = {
                     if (doSms || doCall || doContacts) {
-                        
+
                         val needsSms = doSms && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED
                         val needsCall = doCall && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED
                         val needsContacts = doContacts && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
@@ -136,7 +136,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                             pendingNativeAction = Pair(isBackup, Triple(doSms, doCall, doContacts))
                             showPermissionWarning = true
                         } else {
-                            
+
                             viewModel.runNativeDataOperation(context, isBackup, doSms, doCall, doContacts)
                             showNativeBackupDialog = false
                             showNativeRestoreDialog = false
@@ -150,8 +150,6 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             dismissButton = { TextButton(onClick = { showNativeBackupDialog = false; showNativeRestoreDialog = false }) { Text("Cancel") } }
         )
     }
-
-
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -190,8 +188,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2
                 val matchesType =
                     isDebloatedMode || ((app.isSystem && appState.showSystemApps) || (!app.isSystem && appState.showUserApps))
-
-                
                 val matchesAction = when (appState.migratorMode) {
                     MigratorMode.SYSTEMIZE -> {
                         if (appState.actionFilterState == 1) !app.isSystem && !app.isSystemized else app.isSystemized

@@ -132,8 +132,6 @@ fun AppListItem(
         val iconModifier = Modifier
             .size(48.dp)
             .clip(MaterialTheme.shapes.small)
-
-        
         val imageColorFilter = if (isMonochrome) {
             ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
         } else null
