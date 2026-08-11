@@ -370,7 +370,7 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                     "cache" to "Cache",
                                     "data" to "Data (Keeps internal storage)",
                                     "metadata" to "Metadata",
-                                    "system" to "System (Legacy / Non-Dynamic)"
+                                    "system" to "System (For Non-Dynamic)"
                                 )
 
                                 availableWipes.forEach { (partId, label) ->

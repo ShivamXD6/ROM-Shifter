@@ -264,7 +264,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getAllPartitions(): List<String> {
         val parts = FlashManager.getAllPartitions().toMutableList()
-        if (!parts.contains("data")) parts.add("data")
         return parts.sorted()
     }
 

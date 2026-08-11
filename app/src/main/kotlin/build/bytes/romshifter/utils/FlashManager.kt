@@ -64,10 +64,16 @@ object FlashManager {
         script.append("reboot system\n")
 
         val safeScript = script.toString().replace("'", "'\\''")
-        Shell.cmd("su -mm -c \"mkdir -p /cache/recovery && echo '$safeScript' > /cache/recovery/openrecoveryscript && chmod 666 /cache/recovery/openrecoveryscript\"").exec()
+
+        val shellCommand = "su -mm -c \"mkdir -p /cache/recovery /data/cache/recovery 2>/dev/null; " +
+                "echo '$safeScript' > /cache/recovery/openrecoveryscript 2>/dev/null; " +
+                "echo '$safeScript' > /data/cache/recovery/openrecoveryscript 2>/dev/null; " +
+                "chmod 666 /cache/recovery/openrecoveryscript /data/cache/recovery/openrecoveryscript 2>/dev/null\""
+        Shell.cmd(shellCommand).exec()
     }
 
-    fun restartFlashWizard() { Shell.cmd("su -mm -c \"rm -f /cache/recovery/openrecoveryscript\"").exec() }
+    fun restartFlashWizard() { Shell.cmd("su -mm -c \"rm -f /cache/recovery/openrecoveryscript /data/cache/recovery/openrecoveryscript 2>/dev/null\"").exec() }
+
     fun executeFlashNow() { Shell.cmd("su -mm -c \"sync; reboot recovery\"").exec() }
 
     fun getAllPartitions(): List<String> {
@@ -76,7 +82,13 @@ object FlashManager {
         for (path in paths) {
             val out = Shell.cmd("su -c ls -1 $path").exec().out
             if (out.isNotEmpty() && !out[0].contains("No such file")) {
-                return out.asSequence().filter { it.isNotBlank() }.map { it.replace(Regex("_[ab]$"), "") }.filterNot { blockedPartitions.contains(it) }.distinct().sorted().toList()
+                return out.asSequence()
+                    .filter { it.isNotBlank() }
+                    .map { it.trim().replace(Regex("_[ab]$"), "") }
+                    .filterNot { blockedPartitions.contains(it) }
+                    .distinct()
+                    .sorted()
+                    .toList()
             }
         }
         return emptyList()
@@ -91,7 +103,11 @@ object FlashManager {
     }
 
     fun runLiveOperation(action: String, partition: String, customPath: String?, savedPath: String) {
-        val arg2 = if (action == "--live-restore") customPath ?: "$savedPath/Live-Partition/${partition}_backup.img" else ""
-        Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$savedPath' '$partition' '$arg2'\"").exec()
+        if (action == "--live-backup") {
+            Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$partition' '$savedPath'\"").exec()
+        } else {
+            val imgPath = customPath ?: "$savedPath/Live-Partition/${partition}_backup.img"
+            Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$partition' '$imgPath'\"").exec()
+        }
     }
 }
