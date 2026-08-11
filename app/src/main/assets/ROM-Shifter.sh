@@ -111,11 +111,12 @@ PKG_INSTALLED() {
 }
 BUNDAPP() {
     COOLDOWN "$((JOBS / 2))"
-    tar --exclude="$2/cache" --exclude="$2/code_cache" -cf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.bundle.pack" &
+    tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.bundle.pack" &
 }
+
 UNBUNDAPP() {
     COOLDOWN "$((JOBS - 2))"
-    "$ZAPDOS" -d -q -c "$1" | tar -xf - -C "$2" 2>/dev/null &
+    "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
 }
 
 do_live_backup() {
@@ -140,11 +141,8 @@ do_live_restore() {
 DO_BACKUP() {
     PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; PCT="$7"; SIZE="$8"
     CUR_APP="${9}"; CUR_DATA="${10}"; CUR_EXT="${11}"; CUR_MED="${12}"; CUR_OBB="${13}"
-
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
-
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
-
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
     if [ -f "$APP_DIR/Meta.txt" ]; then
         OLD_APP=$(grep "^AppSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_APP=${OLD_APP:-0}
@@ -362,11 +360,17 @@ DO_RESTORE() {
     [ -f "$APP_DIR/Permissions.txt" ] && SETPERM "$PKG" "$APP_DIR/Permissions.txt"
 
     if [ -n "$NEW_UID" ]; then
-        chown -R "$NEW_UID:$NEW_UID" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
-        restorecon -R "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
-        [ -n "$ADGID" ] && chown -R "$NEW_UID:$ADGID" "/data/media/0/Android/data/$PKG" 2>/dev/null
-        [ -n "$AMGID" ] && chown -R "$NEW_UID:$AMGID" "/data/media/0/Android/media/$PKG" 2>/dev/null
-        [ -n "$AOGID" ] && chown -R "$NEW_UID:$AOGID" "/data/media/0/Android/obb/$PKG" 2>/dev/null
+        chown -hR "$NEW_UID:$NEW_UID" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
+        [ -n "$ADGID" ] && chown -hR "$NEW_UID:$ADGID" "/data/media/0/Android/data/$PKG" 2>/dev/null
+        [ -n "$AMGID" ] && chown -hR "$NEW_UID:$AMGID" "/data/media/0/Android/media/$PKG" 2>/dev/null
+        [ -n "$AOGID" ] && chown -hR "$NEW_UID:$AOGID" "/data/media/0/Android/obb/$PKG" 2>/dev/null
+
+        APP_CTX=$(ls -dZ "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
+        if [ -n "$APP_CTX" ] && [ "$APP_CTX" != "?" ]; then
+            chcon -hR "$APP_CTX" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
+        else
+            restorecon -R "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
+        fi
         DELGMS "$PKG"
     fi
     pm enable "$PKG" >/dev/null 2>&1; rm -rf "$TMP_PKG"
