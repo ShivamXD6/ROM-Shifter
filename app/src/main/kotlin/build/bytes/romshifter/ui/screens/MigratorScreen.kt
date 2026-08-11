@@ -623,11 +623,8 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 ) {
                     items(filteredApps, key = { it.packageName }, contentType = { "app" }) { app ->
 
-                        val showTime =
-                            appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
-
-                        val isMonochrome =
-                            appState.migratorMode == MigratorMode.RESTORE_APPS && !app.isInstalled
+                        val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
+                        val isMonochrome = (appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE) && !app.isInstalled
 
                         Box(modifier = Modifier.animateItem()) {
                             AppListItem(

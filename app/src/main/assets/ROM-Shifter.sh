@@ -268,19 +268,17 @@ DO_RESTORE() {
     if CHK 1 && [ -f "$APP_DIR/App.bundle.pack" ]; then
         if ! PKG_INSTALLED "$PKG" "$VER"; then
             "$ZAPDOS" -d -q -c "$APP_DIR/App.bundle.pack" | tar -xf - -C "$TMP_PKG" 2>/dev/null
+            chmod 777 "$TMP_PKG"/*.apk 2>/dev/null
             local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
             if [ -n "$apks_to_install" ]; then
-                if ! pm install -g --dexopt-compiler-filter skip $apks_to_install >/dev/null 2>&1; then
-                    local SESSION_ID=$(cmd package install-create -g 2>/dev/null | tr -dc '0-9')
-                    if [ -n "$SESSION_ID" ]; then
-                        local apk_count=0
-                        for apk in $apks_to_install; do
-                            apk_count=$((apk_count + 1))
-                            local apk_size=$(stat -c%s "$apk" 2>/dev/null)
-                            cmd package install-write -S "$apk_size" "$SESSION_ID" "split_${apk_count}" - < "$apk" >/dev/null 2>&1
-                        done
-                        cmd package install-commit "$SESSION_ID" >/dev/null 2>&1
-                    fi
+                local SESSION_ID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')
+                if [ -n "$SESSION_ID" ]; then
+                    local apk_count=0
+                    for apk in $apks_to_install; do
+                        apk_count=$((apk_count + 1))
+                        su 1000 -c "cmd package install-write $SESSION_ID split_${apk_count} '$apk' >/dev/null 2>&1"
+                    done
+                    su 1000 -c "cmd package install-commit $SESSION_ID >/dev/null 2>&1"
                 fi
             fi
             FORCE_DATA=1
@@ -468,7 +466,9 @@ do_restore() {
 
     settings put global verifier_verify_adb_installs 0
     settings put global package_verifier_enable 0
-    setprop pm.dexopt.install extract
+    setprop pm.dexopt.install assume-verified
+    setprop pm.dexopt.install-bulk assume-verified
+    setprop pm.dexopt.install-bulk-downgraded skip
 
     while IFS='|' read -r size label type || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
@@ -481,6 +481,8 @@ do_restore() {
     settings put global verifier_verify_adb_installs 1
     settings put global package_verifier_enable 1
     setprop pm.dexopt.install speed-profile
+    setprop pm.dexopt.install-bulk speed-profile
+    setprop pm.dexopt.install-bulk-downgraded verify
 
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
 }
