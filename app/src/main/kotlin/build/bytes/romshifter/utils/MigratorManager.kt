@@ -221,11 +221,11 @@ object MigratorManager {
                     val sysType = if (app.isSystem) "System" else "User"
                     val basePath = "$currentPath/Data-Migrated/$sysType/${app.label}"
                     val parts = mutableListOf<String>()
-                    if (cApp && File("$basePath/App.bundle.pack").exists()) parts.add("App")
-                    if (cData && (File("$basePath/Data.bundle.pack").exists() || File("$basePath/UserDe.bundle.pack").exists())) parts.add("Data")
-                    if (cExt && File("$basePath/ExtData.bundle.pack").exists()) parts.add("ExtData")
-                    if (cMed && File("$basePath/Media.bundle.pack").exists()) parts.add("Media")
-                    if (cObb && File("$basePath/Obb.bundle.pack").exists()) parts.add("Obb")
+                    if (cApp && File("$basePath/App.shift").exists()) parts.add("App")
+                    if (cData && (File("$basePath/Data.shift").exists() || File("$basePath/UserDe.shift").exists())) parts.add("Data")
+                    if (cExt && File("$basePath/ExtData.shift").exists()) parts.add("ExtData")
+                    if (cMed && File("$basePath/Media.shift").exists()) parts.add("Media")
+                    if (cObb && File("$basePath/Obb.shift").exists()) parts.add("Obb")
                     if (cId) {
                         try {
                             val metaFile = File("$basePath/Meta.txt")

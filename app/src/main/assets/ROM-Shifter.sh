@@ -111,7 +111,7 @@ PKG_INSTALLED() {
 }
 BUNDAPP() {
     COOLDOWN "$((JOBS / 2))"
-    tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.bundle.pack" &
+    tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
 }
 
 UNBUNDAPP() {
@@ -154,44 +154,44 @@ DO_BACKUP() {
     fi
 
     if CHK 1; then
-        if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.bundle.pack" ]; }; then
+        if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.shift" ]; }; then
             if [ "$CUR_APP" -gt 0 ]; then
                 apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
-                [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.bundle.pack" &
-            else rm -f "$APP_DIR/App.bundle.pack"; fi
+                [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
+            else rm -f "$APP_DIR/App.shift"; fi
             OLD_APP=$CUR_APP
         fi
     fi
     if CHK 2; then
-        if [ "$CUR_DATA" != "$OLD_DATA" ] || { [ "$CUR_DATA" -gt 0 ] && [ ! -f "$APP_DIR/Data.bundle.pack" ] && [ ! -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
+        if [ "$CUR_DATA" != "$OLD_DATA" ] || { [ "$CUR_DATA" -gt 0 ] && [ ! -f "$APP_DIR/Data.shift" ] && [ ! -f "$APP_DIR/UserDe.shift" ]; }; then
             if [ "$CUR_DATA" -gt 0 ]; then
                 [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
                 [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
-            else rm -f "$APP_DIR/Data.bundle.pack" "$APP_DIR/UserDe.bundle.pack"; fi
+            else rm -f "$APP_DIR/Data.shift" "$APP_DIR/UserDe.shift"; fi
                 OLD_DATA=$CUR_DATA
         fi
     fi
     if CHK 3; then
-        if [ "$CUR_EXT" != "$OLD_EXT" ] || { [ "$CUR_EXT" -gt 0 ] && [ ! -f "$APP_DIR/ExtData.bundle.pack" ]; }; then
+        if [ "$CUR_EXT" != "$OLD_EXT" ] || { [ "$CUR_EXT" -gt 0 ] && [ ! -f "$APP_DIR/ExtData.shift" ]; }; then
             if [ "$CUR_EXT" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/data" "$PKG" "$APP_DIR" "ExtData"
-            else rm -f "$APP_DIR/ExtData.bundle.pack"; fi
+            else rm -f "$APP_DIR/ExtData.shift"; fi
             OLD_EXT=$CUR_EXT
         fi
     fi
     if CHK 4; then
-        if [ "$CUR_MED" != "$OLD_MED" ] || { [ "$CUR_MED" -gt 0 ] && [ ! -f "$APP_DIR/Media.bundle.pack" ]; }; then
+        if [ "$CUR_MED" != "$OLD_MED" ] || { [ "$CUR_MED" -gt 0 ] && [ ! -f "$APP_DIR/Media.shift" ]; }; then
             if [ "$CUR_MED" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/media" "$PKG" "$APP_DIR" "Media"
-            else rm -f "$APP_DIR/Media.bundle.pack"; fi
+            else rm -f "$APP_DIR/Media.shift"; fi
             OLD_MED=$CUR_MED
         fi
     fi
     if CHK 5; then
-        if [ "$CUR_OBB" != "$OLD_OBB" ] || { [ "$CUR_OBB" -gt 0 ] && [ ! -f "$APP_DIR/Obb.bundle.pack" ]; }; then
+        if [ "$CUR_OBB" != "$OLD_OBB" ] || { [ "$CUR_OBB" -gt 0 ] && [ ! -f "$APP_DIR/Obb.shift" ]; }; then
             if [ "$CUR_OBB" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/obb" "$PKG" "$APP_DIR" "Obb"
-            else rm -f "$APP_DIR/Obb.bundle.pack"; fi
+            else rm -f "$APP_DIR/Obb.shift"; fi
             OLD_OBB=$CUR_OBB
         fi
     fi
@@ -263,9 +263,9 @@ DO_RESTORE() {
     OLD_OBB=$(grep "^ObbSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_OBB=${OLD_OBB:-0}
     OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     FORCE_DATA=0
-    if CHK 1 && [ -f "$APP_DIR/App.bundle.pack" ]; then
+    if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
         if ! PKG_INSTALLED "$PKG" "$VER"; then
-            "$ZAPDOS" -d -q -c "$APP_DIR/App.bundle.pack" | tar -xf - -C "$TMP_PKG" 2>/dev/null
+            "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
             chmod 777 "$TMP_PKG"/*.apk 2>/dev/null
             local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
             if [ -n "$apks_to_install" ]; then
@@ -291,34 +291,34 @@ DO_RESTORE() {
 
     if [ "$FORCE_DATA" -eq 0 ]; then
         TMP_SIZES="$AM_TMP/${PKG}_sizes"; mkdir -p "$TMP_SIZES"
-        CHK 2 && { [ -f "$APP_DIR/Data.bundle.pack" ] || [ -f "$APP_DIR/UserDe.bundle.pack" ]; } && ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
-        CHK 3 && [ -f "$APP_DIR/ExtData.bundle.pack" ] && ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
-        CHK 4 && [ -f "$APP_DIR/Media.bundle.pack" ] && ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
-        CHK 5 && [ -f "$APP_DIR/Obb.bundle.pack" ] && ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
+        CHK 2 && { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; } && ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
+        CHK 3 && [ -f "$APP_DIR/ExtData.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
+        CHK 4 && [ -f "$APP_DIR/Media.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
+        CHK 5 && [ -f "$APP_DIR/Obb.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
         wait
         CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); CUR_DATA=${CUR_DATA:-0}; CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}; CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}; CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
         rm -rf "$TMP_SIZES"
     fi
 
-    if CHK 2 && { [ -f "$APP_DIR/Data.bundle.pack" ] || [ -f "$APP_DIR/UserDe.bundle.pack" ]; }; then
+    if CHK 2 && { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; }; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-            [ -f "$APP_DIR/Data.bundle.pack" ] && UNBUNDAPP "$APP_DIR/Data.bundle.pack" "/data/data"
-            [ -f "$APP_DIR/UserDe.bundle.pack" ] && UNBUNDAPP "$APP_DIR/UserDe.bundle.pack" "/data/user_de/0"
+            [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
+            [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
         fi
     fi
-    if CHK 3 && [ -f "$APP_DIR/ExtData.bundle.pack" ]; then
+    if CHK 3 && [ -f "$APP_DIR/ExtData.shift" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
-            UNBUNDAPP "$APP_DIR/ExtData.bundle.pack" "/data/media/0/Android/data"
+            UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
         fi
     fi
-    if CHK 4 && [ -f "$APP_DIR/Media.bundle.pack" ]; then
+    if CHK 4 && [ -f "$APP_DIR/Media.shift" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
-            UNBUNDAPP "$APP_DIR/Media.bundle.pack" "/data/media/0/Android/media"
+            UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
         fi
     fi
-    if CHK 5 && [ -f "$APP_DIR/Obb.bundle.pack" ]; then
+    if CHK 5 && [ -f "$APP_DIR/Obb.shift" ]; then
         if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
-            UNBUNDAPP "$APP_DIR/Obb.bundle.pack" "/data/media/0/Android/obb"
+            UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
         fi
     fi
 

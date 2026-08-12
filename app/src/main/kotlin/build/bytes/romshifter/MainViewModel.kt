@@ -111,6 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val parts = content.split("\n")
             val mainText = parts[0]
             val subText = if (parts.size > 1) parts[1] else null
+
             val displayContent = if (progress in 0..100) "$mainText  •  $progress%" else mainText
 
             val builder = NotificationCompat.Builder(getApplication(), CHANNEL_PROGRESS_ID)
@@ -131,7 +132,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (progress in 0..100) {
                 builder.setProgress(max, progress, false)
             } else {
-
                 builder.setProgress(0, 0, true)
             }
 
@@ -169,6 +169,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun openFlashWizard() {
         _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList())
     }
+
+
     fun flashWizardStepBack() {
         val currentStep = _uiState.value.flashWizardStep
         if (currentStep > 1) {
@@ -353,6 +355,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             progress = -1
         )
         updateProgressNotification(title, "Starting Process...", -1)
+
         val selectedItems = mutableListOf<String>()
         if (doSms) selectedItems.add("SMS")
         if (doCall) selectedItems.add("Call Logs")
@@ -380,7 +383,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.value = _uiState.value.copy(
                         isRunning = false,
                         currentAction = finalMsg,
-                        currentStep = finalDesc, 
+                        currentStep = finalDesc,
                         progress = 100
                     )
                 }
@@ -405,9 +408,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = _savedPath.value
-            if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/'*sms*\"").exec()
-            if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/'*call*\"").exec()
-            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/'*contact*\"").exec()
+
+            if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/Messages.shift'\"").exec()
+            if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/CallLogs.shift'\"").exec()
+            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/Contacts.shift'\"").exec()
 
             withContext(Dispatchers.Main) {
                 Toast.makeText(
@@ -418,7 +422,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-
     suspend fun isMagisk(): Boolean = withContext(Dispatchers.IO) {
         Shell.cmd("su -c '[ -d /data/adb/magisk ] && echo YES'").exec().out.joinToString("")
             .trim() == "YES"
@@ -433,12 +436,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleSystemApps() {
-
         _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
     }
 
     fun toggleShowUserApps(enabled: Boolean) {
-
         _uiState.value = _uiState.value.copy(showUserApps = enabled)
     }
 
@@ -469,7 +470,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(appList = sys, systemAppsFetched = true, actionFilterState = newState, isFetchingApps = false)
             }
         } else {
-
             _uiState.value = _uiState.value.copy(actionFilterState = newState)
         }
     }
@@ -487,14 +487,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showUserApps = true,
             showSystemApps = showSysApps,
             systemAppsFetched = false,
-
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
             globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
         if (mode == MigratorMode.SYSTEMIZE) isPrivilegedSystemize.value = false
 
         when (mode) {
-
             MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
             MigratorMode.RESTORE_APPS -> {
                 MigratorManager.clearCache(); fetchAppsList("AllBackups")
@@ -551,7 +549,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun fetchAppsList(type: String, append: Boolean = false) {
-
         _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -607,6 +604,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val safeAction = action.ifEmpty { "ROM Shifter" }
                 val desc = if (step.isNotEmpty()) "$step\n- $activeComps" else "- $activeComps"
                 updateProgressNotification(safeAction, desc, prog)
+
                 _uiState.value = _uiState.value.copy(
                     currentAction = if (action.isNotEmpty()) action else _uiState.value.currentAction,
                     currentStep = if (step.isNotEmpty()) desc else _uiState.value.currentStep,
@@ -632,7 +630,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 when (state.migratorMode) {
                     MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> {
                         MigratorManager.clearCache()
-                        fetchAppsList("AllInstalled") 
+                        fetchAppsList("AllInstalled")
                     }
 
                     MigratorMode.MANAGE -> {
@@ -703,7 +701,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentMode = _uiState.value.migratorMode
         if (currentMode != MigratorMode.MENU) {
             when (currentMode) {
-                MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled") 
+                MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
                 MigratorMode.RESTORE_APPS -> fetchAppsList("AllBackups")
                 MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
                 MigratorMode.MANAGE -> fetchAppsList("AllBackups")
