@@ -717,7 +717,7 @@ fun OnboardingStepContent(
                     Icon(Icons.Default.Favorite, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.height(24.dp))
-                Text("Made by @ShastikXD", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                Text("Made by @ShivamXD6", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
                 Text("If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(32.dp))
@@ -725,7 +725,7 @@ fun OnboardingStepContent(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FilledTonalButton(onClick = { openUriSafely(context, "https://t.me/buildbytes") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("Telegram") }
                     FilledTonalButton(onClick = { openUriSafely(context, "https://www.youtube.com/@BuildBytesX") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("YouTube") }
-                    FilledTonalButton(onClick = { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("GitHub") }
+                    FilledTonalButton(onClick = { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter/") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("GitHub") }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

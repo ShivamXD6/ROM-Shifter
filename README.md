@@ -3,27 +3,27 @@
   <h1>⚡ROM Shifter App</h1>
   <p><b>A unified, lightweight toolkit for all your ROM shifting and root-related tasks.</b></p>
 
-  [![Downloads](https://img.shields.io/github/downloads/ShivamXD6/ROM-Shifter-App/total?color=green&style=for-the-badge)](../../releases)
-  [![Release](https://img.shields.io/github/v/release/ShivamXD6/ROM-Shifter-App?style=for-the-badge)](../../releases)
-  [![Join Build Bytes](https://img.shields.io/badge/Join-Build%20Bytes-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytes)
-  [![Join Chat](https://img.shields.io/badge/Join%20Chat-Build%20Bytes%20Discussion-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytesDiscussion)
-  ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-  ![Root](https://img.shields.io/badge/Root-ff0000?style=for-the-badge&logo=superuser&logoColor=white)
-  ![Magisk](https://img.shields.io/badge/Magisk-8A2BE2?style=for-the-badge&logo=magisk&logoColor=white)
-  ![KernelSU](https://img.shields.io/badge/KernelSU-000000?style=for-the-badge&logo=linux&logoColor=white)
-  ![APatch](https://img.shields.io/badge/APatch-FF6B00?style=for-the-badge&logo=android&logoColor=white)
+[![Downloads](https://img.shields.io/github/downloads/ShivamXD6/ROM-Shifter/total?color=green&style=for-the-badge)](../../releases)
+[![Release](https://img.shields.io/github/v/release/ShivamXD6/ROM-Shifter?style=for-the-badge)](../../releases)
+[![Join Build Bytes](https://img.shields.io/badge/Join-Build%20Bytes-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytes)
+[![Join Chat](https://img.shields.io/badge/Join%20Chat-Build%20Bytes%20Discussion-2CA5E0?style=for-the-badge&logo=telegram)](https://telegram.me/BuildBytesDiscussion)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Root](https://img.shields.io/badge/Root-ff0000?style=for-the-badge&logo=superuser&logoColor=white)
+![Magisk](https://img.shields.io/badge/Magisk-8A2BE2?style=for-the-badge&logo=magisk&logoColor=white)
+![KernelSU](https://img.shields.io/badge/KernelSU-000000?style=for-the-badge&logo=linux&logoColor=white)
+![APatch](https://img.shields.io/badge/APatch-FF6B00?style=for-the-badge&logo=android&logoColor=white)
 
 </div>
 
 <br>
 
-* **ROM Shifter** is a an Android app built to make flashing, backing up, and migrating between custom ROMs as painless as possible. As well provides tools for some common things we do after switching to another ROM. 
+* **ROM Shifter** is a an Android app built to make flashing, backing up, and migrating between custom ROMs as painless as possible. As well provides tools for some common things we do after switching to another ROM.
 
-* *Note: This app is the native frontend successor to my original [ROM-Shifter Shell Script](https://github.com/ShivamXD6/ROM-Shifter), which is archived now*
+* *Note: This app is the native frontend successor to my original [ROM-Shifter Shell Script](https://github.com/ShivamXD6/ROM-Shifter-Script), which is archived now*
 
 ## 💡 Why ROM Shifter?
 
-* There are plenty of great backup apps out there, and they all do their best, still i felt they are slow in backup restore. But honestly, I just wanted a single, unified, lightweight app that handles *everything* I actually need when hopping between ROMs without the unnecessary bloat. 
+* There are plenty of great backup apps out there, and they all do their best, still i felt they are slow in backup restore. But honestly, I just wanted a single, unified, lightweight app that handles *everything* I actually need when hopping between ROMs without the unnecessary bloat.
 
 * I didn't want three separate apps to back up my data, manage my partitions, and debloat apps etc. ROM Shifter combines a hyper-fast custom Shell backend engine with a clean Kotlin UI to do it all locally and quickly.
 
@@ -61,7 +61,7 @@
 
 ## 💖 Support the Project
 
-ROM Shifter is open-source and entirely free. If this app saves your time, headaches, or saves your phone from a bootloop (jk XD), consider supporting the development! 
+ROM Shifter is open-source and entirely free. If this app saves your time, headaches, or saves your phone from a bootloop (jk XD), consider supporting the development!
 
 * [Sponsor via GitHub](https://github.com/sponsors/ShivamXD6)
 * [Donate via PayPal](https://paypal.me/ShivamXD6)

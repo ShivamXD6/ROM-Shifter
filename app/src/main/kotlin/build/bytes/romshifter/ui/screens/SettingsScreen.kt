@@ -116,7 +116,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter-App/") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter/") }.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Star, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
@@ -128,7 +128,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Made by @ShastikXD | Build Bytes Team", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text("Made by @ShivamXD6 | Build Bytes Team", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterHorizontally))
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
