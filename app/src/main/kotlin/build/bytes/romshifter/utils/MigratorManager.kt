@@ -245,8 +245,25 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
+                val script = java.lang.StringBuilder()
                 selectedApps.forEach { app ->
-                    appPartsMap[app.packageName] = activeComps
+                    val pkg = app.packageName
+                    script.append("res=\"\"\n")
+                    if (cApp) script.append("res=\"\$res|App\"\n")
+                    if (cData) script.append("if [ -d \"/data/data/$pkg\" ] || [ -d \"/data/user_de/0/$pkg\" ]; then res=\"\$res|Data\"; fi\n")
+                    if (cExt) script.append("if [ -d \"/data/media/0/Android/data/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"\$res|ExtData\"; fi\n")
+                    if (cMed) script.append("if [ -d \"/data/media/0/Android/media/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"\$res|Media\"; fi\n")
+                    if (cObb) script.append("if [ -d \"/data/media/0/Android/obb/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/obb/$pkg 2>/dev/null)\" ]; then res=\"\$res|Obb\"; fi\n")
+                    if (cId) script.append("if grep -q \"package=\\\"$pkg\\\"\" /data/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"\$res|Android ID\"; fi\n")
+                    script.append("echo \"$pkg==\$res\"\n")
+                }
+                val out = Shell.cmd("su -mm -c '${script.toString().replace("'", "'\\''")}'").exec().out
+                out.forEach { line ->
+                    val split = line.split("==")
+                    if (split.size == 2) {
+                        val comps = split[1].split("|").filter { it.isNotBlank() }.joinToString(" • ")
+                        appPartsMap[split[0]] = comps
+                    }
                 }
             }
 
