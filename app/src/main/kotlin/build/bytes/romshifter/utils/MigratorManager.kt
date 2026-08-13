@@ -214,6 +214,14 @@ object MigratorManager {
             val cMed = state.globalComponents.contains(4)
             val cObb = state.globalComponents.contains(5)
             val cId = state.globalComponents.contains(6)
+            val activeComps = mutableListOf<String>().apply {
+                if (cApp) add("App")
+                if (cData) add("Data")
+                if (cExt) add("ExtData")
+                if (cMed) add("Media")
+                if (cObb) add("Obb")
+                if (cId) add("Android ID")
+            }.joinToString(" • ")
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
@@ -237,29 +245,8 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
-                val script = java.lang.StringBuilder()
                 selectedApps.forEach { app ->
-                    val pkg = app.packageName
-                    script.append("(\n")
-                    script.append("res=\"\"\n")
-                    if (cApp) script.append("pm path $pkg >/dev/null 2>&1 && res=\"\$res|App\"\n")
-                    if (cData) script.append("([ -d \"/data/data/$pkg\" ] || [ -d \"/data/user_de/0/$pkg\" ]) && res=\"\$res|Data\"\n")
-                    if (cExt) script.append("[ -d \"/data/media/0/Android/data/$pkg\" ] && res=\"\$res|ExtData\"\n")
-                    if (cMed) script.append("[ -d \"/data/media/0/Android/media/$pkg\" ] && res=\"\$res|Media\"\n")
-                    if (cObb) script.append("[ -d \"/data/media/0/Android/obb/$pkg\" ] && res=\"\$res|Obb\"\n")
-
-                    if (cId) script.append("grep -q \"package=\\\"$pkg\\\"\" /data/system/users/0/settings_ssaid.xml 2>/dev/null && res=\"\$res|Android ID\"\n")
-                    script.append("echo \"$pkg==\$res\"\n")
-                    script.append(") &\n")
-                }
-                script.append("wait\n")
-                val out = Shell.cmd("su -mm -c '${script.toString().replace("'", "'\\''")}'").exec().out
-                out.forEach { line ->
-                    val split = line.split("==")
-                    if (split.size == 2) {
-                        val comps = split[1].split("|").filter { it.isNotBlank() }.joinToString(" • ")
-                        appPartsMap[split[0]] = comps
-                    }
+                    appPartsMap[app.packageName] = activeComps
                 }
             }
 

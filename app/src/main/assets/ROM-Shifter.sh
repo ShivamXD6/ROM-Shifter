@@ -382,20 +382,32 @@ do_backup() {
     rm -rf "$AM_TMP/precalc" "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" "$AM_TMP/paths.list" "$AM_TMP/du.out" "$AM_TMP/sizes.map" 2>/dev/null
     mkdir -p "$AM_TMP/precalc"
 
-    > "$AM_TMP/paths.list"
-    while IFS='|' read -r pkg label ver type || [ -n "$pkg" ]; do
-        [ -z "$pkg" ] && continue
-        pkg=$(echo "$pkg" | tr -d '\r')
+    if CHK 1; then
+        pm list packages -f 2>/dev/null > "$AM_TMP/pm_list.txt"
+    else
+        > "$AM_TMP/pm_list.txt"
+    fi
 
-        if CHK 1; then
-            apks=$(pm path "$pkg" 2>/dev/null | sed 's/^package://' | tr -d '\r')
-            for a in $apks; do echo "$a|${pkg}_app" >> "$AM_TMP/paths.list"; done
-        fi
-        CHK 2 && echo "/data/data/$pkg|${pkg}_data" >> "$AM_TMP/paths.list" && echo "/data/user_de/0/$pkg|${pkg}_data" >> "$AM_TMP/paths.list"
-        CHK 3 && echo "/data/media/0/Android/data/$pkg|${pkg}_ext" >> "$AM_TMP/paths.list"
-        CHK 4 && echo "/data/media/0/Android/media/$pkg|${pkg}_med" >> "$AM_TMP/paths.list"
-        CHK 5 && echo "/data/media/0/Android/obb/$pkg|${pkg}_obb" >> "$AM_TMP/paths.list"
-    done < "$TARGETS"
+    awk -v comps=" $APP_COMPS " '
+    NR==FNR {
+        if ($0 == "") next
+        pkg = $0; sub(/.*=/, "", pkg)
+        path = $0; sub(/^package:/, "", path); sub(/=[^=]*$/, "", path)
+        sub(/\/base\.apk$/, "", path)
+        apk_dirs[pkg] = path
+        next
+    }
+    {
+        split($0, a, "|"); pkg = a[1];
+        sub(/\r/, "", pkg)
+        if(pkg == "") next
+
+        if(comps ~ / 1 / && pkg in apk_dirs) print apk_dirs[pkg] "|" pkg "_app"
+        if(comps ~ / 2 /) { print "/data/data/" pkg "|" pkg "_data"; print "/data/user_de/0/" pkg "|" pkg "_data" }
+        if(comps ~ / 3 /) print "/data/media/0/Android/data/" pkg "|" pkg "_ext"
+        if(comps ~ / 4 /) print "/data/media/0/Android/media/" pkg "|" pkg "_med"
+        if(comps ~ / 5 /) print "/data/media/0/Android/obb/" pkg "|" pkg "_obb"
+    }' "$AM_TMP/pm_list.txt" "$TARGETS" > "$AM_TMP/paths.list"
 
     awk -F'|' '{print $1}' "$AM_TMP/paths.list" | tr '\n' '\0' | xargs -0 du -sk 2>/dev/null > "$AM_TMP/du.out"
 
