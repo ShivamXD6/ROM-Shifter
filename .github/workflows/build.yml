@@ -34,16 +34,27 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
 
+      - name: Get Version Info
+        run: |
+          echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "1.0")
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
       - name: Build ROM Shifter
-        run: ./gradlew assembleRelease -PVERSION_CODE=${{ github.run_number }} -x lintVitalRelease --build-cache --parallel --configuration-cache
+        run: ./gradlew assembleRelease -PVERSION_CODE=${{ env.COMMIT_COUNT }} -x lintVitalRelease --build-cache --parallel --configuration-cache
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload Signed APKs (ARM64 & ARMv7)
-        uses: actions/upload-artifact@v7
+      - name: Create Pre-Release
+        uses: softprops/action-gh-release@v3
         with:
-          name: ROM-Shifter
-          path: app/build/outputs/apk/release/*.apk
-          retention-days: 3
+          tag_name: "${{ env.COMMIT_COUNT }}"
+          name: "⚡ ROM Shifter - ${{ env.VERSION_NAME }} - ${{ env.COMMIT_COUNT }}"
+          body: "Automated pre-release build for **${{ env.VERSION_NAME }}** (Build ${{ env.COMMIT_COUNT }}).\n\n### 🔄 Changes in this build:"
+          prerelease: true
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
