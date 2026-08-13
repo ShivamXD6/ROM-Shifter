@@ -557,6 +557,8 @@ do_restore_msgs() {
     if [ -d "$SRC/Telephony" ]; then
         am force-stop com.android.providers.telephony 2>/dev/null
         am force-stop com.google.android.apps.messaging 2>/dev/null
+        rm -f /data/user_de/0/com.android.providers.telephony/databases/mmssms* 2>/dev/null
+        rm -f /data/data/com.google.android.apps.messaging/databases/* 2>/dev/null
 
         cp -a "$SRC/Telephony/"mmssms* /data/user_de/0/com.android.providers.telephony/databases/ 2>/dev/null
         chown -R radio:radio /data/user_de/0/com.android.providers.telephony/databases/ 2>/dev/null
