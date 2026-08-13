@@ -263,7 +263,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(
                 flashWizardStep = 1,
                 flashZips = emptyList(),
-                currentAction = "Operation Completed"
             )
         }
         }
@@ -490,7 +489,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             appList = emptyList(),
             progress = 0,
             searchQuery = "",
-            currentAction = "Operation Completed",
             currentStep = "",
             showUserApps = true,
             showSystemApps = showSysApps,
@@ -550,7 +548,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearLogs() {
         _uiState.value = _uiState.value.copy(
-            currentAction = "Operation Completed",
             currentStep = "",
             progress = 0
         )
@@ -565,7 +562,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     appList = apps,
                     isFetchingApps = false,
-                    currentAction = if (apps.isEmpty()) "No apps found." else "Operation Completed"
                 )
                 if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
                     _uiState.value = _uiState.value.copy(systemAppsFetched = true)

@@ -651,26 +651,15 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 label = "BottomBarTransition"
             ) { isProcessing ->
                 if (isProcessing) {
+                    val isCompleted = !appState.isRunning && appState.progress == 100
 
                     val processingApp = remember(appState.currentAction, appState.currentStep) {
                         appState.appList.firstOrNull { app ->
                             app.isSelected && (
-                                    appState.currentAction.contains(
-                                        app.label,
-                                        ignoreCase = true
-                                    ) ||
-                                            appState.currentStep.contains(
-                                                app.label,
-                                                ignoreCase = true
-                                            ) ||
-                                            appState.currentAction.contains(
-                                                app.packageName,
-                                                ignoreCase = true
-                                            ) ||
-                                            appState.currentStep.contains(
-                                                app.packageName,
-                                                ignoreCase = true
-                                            )
+                                    appState.currentAction.contains(app.label, ignoreCase = true) ||
+                                            appState.currentStep.contains(app.label, ignoreCase = true) ||
+                                            appState.currentAction.contains(app.packageName, ignoreCase = true) ||
+                                            appState.currentStep.contains(app.packageName, ignoreCase = true)
                                     )
                         }
                     }
@@ -686,48 +675,56 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
 
-                            AnimatedVisibility(
-                                visible = processingApp != null,
-                                enter = fadeIn() + scaleIn(),
-                                exit = fadeOut() + scaleOut()
-                            ) {
+                            AnimatedContent(
+                                targetState = isCompleted to (processingApp != null),
+                                transitionSpec = {
+                                    (scaleIn(tween<Float>(400, easing = FastOutSlowInEasing)) + fadeIn(tween<Float>(400))) togetherWith
+                                            (scaleOut(tween<Float>(200)) + fadeOut(tween<Float>(200)))
+                                },
+                                label = "IconTransition"
+                            ) { (completed, hasApp) ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val iconModifier = Modifier
-                                        .size(42.dp)
-                                        .clip(MaterialTheme.shapes.small)
+                                    if (completed) {
+                                        Icon(
+                                            imageVector = Icons.Default.Verified,
+                                            contentDescription = "Success",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(42.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                    } else if (hasApp) {
+                                        val iconModifier = Modifier
+                                            .size(42.dp)
+                                            .clip(RoundedCornerShape(12.dp))
 
-                                    if (processingApp?.iconBitmap != null) {
-                                        Image(
-                                            bitmap = processingApp.iconBitmap.asImageBitmap(),
-                                            contentDescription = null,
-                                            modifier = iconModifier
-                                        )
-                                    } else if (processingApp?.iconPath != null) {
-                                        AsyncImage(
-                                            model = processingApp.iconPath,
-                                            contentDescription = null,
-                                            modifier = iconModifier
-                                        )
-                                    } else if (processingApp != null) {
-                                        val letter =
-                                            processingApp.label.firstOrNull()?.uppercase()
-                                                ?: "?"
-                                        Box(
-                                            modifier = iconModifier.background(
-                                                getAvatarColor(
-                                                    processingApp.label
-                                                )
-                                            ), contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = letter,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 20.sp
+                                        if (processingApp?.iconBitmap != null) {
+                                            Image(
+                                                bitmap = processingApp.iconBitmap.asImageBitmap(),
+                                                contentDescription = null,
+                                                modifier = iconModifier
                                             )
+                                        } else if (processingApp?.iconPath != null) {
+                                            AsyncImage(
+                                                model = processingApp.iconPath,
+                                                contentDescription = null,
+                                                modifier = iconModifier
+                                            )
+                                        } else if (processingApp != null) {
+                                            val letter = processingApp.label.firstOrNull()?.uppercase() ?: "?"
+                                            Box(
+                                                modifier = iconModifier.background(getAvatarColor(processingApp.label)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = letter,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Medium,
+                                                    fontSize = 20.sp
+                                                )
+                                            }
                                         }
+                                        Spacer(modifier = Modifier.width(16.dp))
                                     }
-                                    Spacer(modifier = Modifier.width(16.dp))
                                 }
                             }
 
