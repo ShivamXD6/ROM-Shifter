@@ -588,26 +588,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         viewModelScope.launch {
-
-            val compMap = mapOf(
-                1 to "App",
-                2 to "Data",
-                3 to "ExtData",
-                4 to "Media",
-                5 to "Obb",
-                6 to "Android ID"
-            )
-            val activeComps =
-                state.globalComponents.sorted().mapNotNull { compMap[it] }.joinToString(" • ")
-
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
                 val safeAction = action.ifEmpty { "ROM Shifter" }
-                val desc = if (step.isNotEmpty()) "$step\n- $activeComps" else "- $activeComps"
-                updateProgressNotification(safeAction, desc, prog)
+                updateProgressNotification(safeAction, step, prog)
 
                 _uiState.value = _uiState.value.copy(
                     currentAction = if (action.isNotEmpty()) action else _uiState.value.currentAction,
-                    currentStep = if (step.isNotEmpty()) desc else _uiState.value.currentStep,
+                    currentStep = if (step.isNotEmpty()) step else _uiState.value.currentStep,
                     progress = if (prog >= 0) prog else _uiState.value.progress
                 )
             }

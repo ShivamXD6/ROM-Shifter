@@ -297,7 +297,7 @@ object MigratorManager {
                     is ShifterEvent.BackupProgress -> {
                         val app = selectedApps.find { it.label == event.label }
                         val activeParts = appPartsMap[app?.packageName] ?: ""
-                        val partsString = if (activeParts.isNotEmpty()) "\n- $activeParts" else ""
+                        val partsString = if (activeParts.isNotEmpty()) "\n• $activeParts" else ""
 
                         val rawKb = event.size.replace(Regex("[^0-9]"), "").toLongOrNull() ?: 0L
                         val formattedSize = if (rawKb > 0) formatSize(rawKb.toString()) else ""
