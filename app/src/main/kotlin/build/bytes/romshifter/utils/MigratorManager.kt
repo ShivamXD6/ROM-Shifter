@@ -163,7 +163,7 @@ object MigratorManager {
             else -> {}
         }
 
-        val finalApps = apps.distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
+        val finalApps = apps.filter { it.packageName != context.packageName }.distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
 
         if (!append) {
             when (type) {
