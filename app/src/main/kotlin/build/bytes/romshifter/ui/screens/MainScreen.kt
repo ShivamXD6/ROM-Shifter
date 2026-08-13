@@ -147,7 +147,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     viewModel = viewModel,
                     onTabSelect = {},
                     onSettingsToggle = {},
-                    onBackClick = {}
+                    onBackClick = {},
                 )
             }
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value))))
@@ -531,7 +531,9 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                     onSkip = {},
                     launcher = launcher,
                     permLauncher = permLauncher,
-                    notifPermLauncher = notifPermLauncher
+                    notifPermLauncher = notifPermLauncher,
+                    isBackground = true,
+                    onBack = {}
                 )
             }
             Box(
@@ -579,23 +581,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         onSkip = { step = it },
                         launcher = launcher,
                         permLauncher = permLauncher,
-                        notifPermLauncher = notifPermLauncher
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = step > 1,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 8.dp)
-            ) {
-                IconButton(onClick = { triggerBackNavigation() }) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        modifier = Modifier.size(28.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
+                        notifPermLauncher = notifPermLauncher,
+                        onBack = { triggerBackNavigation() }
                     )
                 }
             }
@@ -612,133 +599,311 @@ fun OnboardingStepContent(
     onSkip: (Int) -> Unit,
     launcher: androidx.activity.compose.ManagedActivityResultLauncher<Uri?, Uri?>,
     permLauncher: androidx.activity.compose.ManagedActivityResultLauncher<Array<String>, Map<String, @JvmSuppressWildcards Boolean>>,
-    notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>
+    notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>,
+    isBackground: Boolean = false,
+    onBack: () -> Unit = {}
 ) {
 
-    val iconScale = remember { Animatable(0.3f) }
+    val iconScale = remember { Animatable(if (isBackground) 1f else 0.3f) }
     LaunchedEffect(step) {
-        iconScale.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
+        if (!isBackground) {
+            iconScale.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
             )
-        )
+        }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        when (step) {
-            1 -> {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(painter = painterResource(id = R.drawable.ic_home), contentDescription = "ROM Shifter", modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            when (step) {
+                1 -> {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_home),
+                            contentDescription = "ROM Shifter",
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.height(32.dp))
+                    Text(
+                        "Get Started with",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "ROM Shifter",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(48.dp))
+                    Button(
+                        onClick = { onNext(2) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = CircleShape
+                    ) { Text("Next", style = MaterialTheme.typography.titleMedium) }
                 }
-                Spacer(Modifier.height(32.dp))
-                Text("Get Started with", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("ROM Shifter", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(16.dp))
-                Text("The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(48.dp))
-                Button(onClick = { onNext(2) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = CircleShape) { Text("Next", style = MaterialTheme.typography.titleMedium) }
-            }
-            2 -> {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.height(32.dp))
-                Text("Shifter Directory", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(16.dp))
-                Text("ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. You can auto-detect an existing one or select manually.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(48.dp))
-                Button(onClick = { viewModel.autoDetectShifterFolder { success -> if (success) onNext(3) } }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = CircleShape) { Text("Auto-Detect #Shifter Folder", style = MaterialTheme.typography.titleMedium) }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = { launcher.launch(null) }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = CircleShape) { Text("Select Folder Manually", style = MaterialTheme.typography.titleMedium) }
-            }
-            3 -> {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                    LaunchedEffect(Unit) {
-                        notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+
+                2 -> {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Folder,
+                            null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.height(32.dp))
+                    Text(
+                        "Shifter Directory",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. You can auto-detect an existing one or select manually.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(48.dp))
+                    Button(
+                        onClick = {
+                            viewModel.autoDetectShifterFolder { success ->
+                                if (success) onNext(
+                                    3
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            "Auto-Detect #Shifter Folder",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { launcher.launch(null) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            "Select Folder Manually",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Security, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                3 -> {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        LaunchedEffect(Unit) {
+                            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Security,
+                            null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.height(32.dp))
+                    Text(
+                        "Permissions",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "To accurately back up native Call Logs, SMS, and Contacts securely via ContentResolver without failing, ROM Shifter requires explicit permissions. Notifications are also needed to track background progress.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(48.dp))
+                    Button(
+                        onClick = {
+                            permLauncher.launch(
+                                arrayOf(
+                                    android.Manifest.permission.READ_SMS,
+                                    android.Manifest.permission.READ_CALL_LOG,
+                                    android.Manifest.permission.WRITE_CALL_LOG,
+                                    android.Manifest.permission.READ_CONTACTS,
+                                    android.Manifest.permission.WRITE_CONTACTS
+                                )
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            "Grant Permissions & Next",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { onSkip(4) }) {
+                        Text(
+                            "Skip for now",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
                 }
-                Spacer(Modifier.height(32.dp))
-                Text("Permissions", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(16.dp))
-                Text("To accurately back up native Call Logs, SMS, and Contacts securely via ContentResolver without failing, ROM Shifter requires explicit permissions. Notifications are also needed to track background progress.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(48.dp))
-                Button(onClick = {
-                    permLauncher.launch(arrayOf(
-                        android.Manifest.permission.READ_SMS,
-                        android.Manifest.permission.READ_CALL_LOG,
-                        android.Manifest.permission.WRITE_CALL_LOG,
-                        android.Manifest.permission.READ_CONTACTS,
-                        android.Manifest.permission.WRITE_CONTACTS
-                    ))
-                }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = CircleShape) { Text("Grant Permissions & Next", style = MaterialTheme.typography.titleMedium) }
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { onSkip(4) }) { Text("Skip for now", style = MaterialTheme.typography.titleMedium) }
+
+                4 -> {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Favorite,
+                            null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        "Made by @ShivamXD6",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(32.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
+                                openUriSafely(
+                                    context,
+                                    "https://t.me/buildbytes"
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = CircleShape
+                        ) { Text("Telegram") }
+                        FilledTonalButton(
+                            onClick = {
+                                openUriSafely(
+                                    context,
+                                    "https://www.youtube.com/@BuildBytesX"
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = CircleShape
+                        ) { Text("YouTube") }
+                        FilledTonalButton(
+                            onClick = {
+                                openUriSafely(
+                                    context,
+                                    "https://github.com/ShivamXD6/ROM-Shifter/"
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = CircleShape
+                        ) { Text("GitHub") }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                openUriSafely(
+                                    context,
+                                    "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR"
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = CircleShape
+                        ) { Text("UPI (Any)") }
+                        Button(
+                            onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = CircleShape
+                        ) { Text("PayPal") }
+                    }
+
+                    Spacer(Modifier.height(32.dp))
+                    Button(
+                        onClick = { viewModel.finishOnboarding() },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = CircleShape
+                    ) { Text("Let's Shift!", style = MaterialTheme.typography.titleMedium) }
+                }
             }
-            4 -> {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value } 
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.height(24.dp))
-                Text("Made by @ShivamXD6", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Text("If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(32.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilledTonalButton(onClick = { openUriSafely(context, "https://t.me/buildbytes") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("Telegram") }
-                    FilledTonalButton(onClick = { openUriSafely(context, "https://www.youtube.com/@BuildBytesX") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("YouTube") }
-                    FilledTonalButton(onClick = { openUriSafely(context, "https://github.com/ShivamXD6/ROM-Shifter/") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("GitHub") }
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { openUriSafely(context, "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("UPI (Any)") }
-                    Button(onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") }, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape) { Text("PayPal") }
-                }
-
-                Spacer(Modifier.height(32.dp))
-                Button(onClick = { viewModel.finishOnboarding() }, modifier = Modifier.fillMaxWidth().height(52.dp), shape = CircleShape) { Text("Let's Shift!", style = MaterialTheme.typography.titleMedium) }
+        }
+        if (step > 1) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 8.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
 }
+
 @Composable
 fun NoRootScreen() {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
