@@ -53,6 +53,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit { putInt("theme_mode", mode) }
     }
 
+    private val _currentTab = MutableStateFlow(prefs.getInt("last_selected_tab", 1))
+    val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
+
+    fun setTab(index: Int) {
+        _currentTab.value = index
+        prefs.edit { putInt("last_selected_tab", index) }
+    }
+
     val isPrivilegedSystemize = MutableStateFlow(false)
 
     private val notificationManager = NotificationManagerCompat.from(application)

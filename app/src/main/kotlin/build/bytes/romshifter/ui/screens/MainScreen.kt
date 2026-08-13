@@ -61,7 +61,7 @@ fun openUriSafely(context: Context, uriString: String) {
 fun MainScreen(viewModel: MainViewModel) {
     val appState by viewModel.uiState.collectAsState()
     val isFirstRun by viewModel.isFirstRun.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(1) }
+    val selectedTab by viewModel.currentTab.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
 
     if (!appState.hasRoot) {
@@ -172,7 +172,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 showSettings = showSettings,
                 selectedTab = selectedTab,
                 viewModel = viewModel,
-                onTabSelect = { selectedTab = it; if (it != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
+                onTabSelect = { viewModel.setTab(it); if (it != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
                 onSettingsToggle = { showSettings = it },
                 onBackClick = { triggerBackNavigation() }
             )
