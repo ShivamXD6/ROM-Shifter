@@ -468,8 +468,8 @@ do_restore() {
     TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores_sorted.txt")
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
 
+    pm disable com.android.vending >/dev/null 2>&1
     settings put global verifier_verify_adb_installs 0
-    settings put global package_verifier_enable 0
     setprop pm.dexopt.install assume-verified
     setprop pm.dexopt.install-bulk assume-verified
     setprop pm.dexopt.install-bulk-downgraded skip
@@ -482,8 +482,8 @@ do_restore() {
         DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$pct" "$size"
     done < "$AM_TMP/selected_restores_sorted.txt"
 
+    pm enable com.android.vending >/dev/null 2>&1
     settings put global verifier_verify_adb_installs 1
-    settings put global package_verifier_enable 1
     setprop pm.dexopt.install speed-profile
     setprop pm.dexopt.install-bulk speed-profile
     setprop pm.dexopt.install-bulk-downgraded verify
