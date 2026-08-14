@@ -1,6 +1,5 @@
 package build.bytes.romshifter
 
-import android.content.Intent
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
@@ -19,12 +18,12 @@ import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
-import build.bytes.romshifter.utils.ToolsManager
 import build.bytes.romshifter.utils.BackendInstaller
 import build.bytes.romshifter.utils.FlashManager
 import build.bytes.romshifter.utils.MigratorManager
 import build.bytes.romshifter.utils.NativeManager
 import build.bytes.romshifter.utils.SettingsManager
+import build.bytes.romshifter.utils.ToolsManager
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -165,7 +164,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         createNotificationChannel()
-        checkForUpdates(isSilent = true)
+        if (!prefs.getBoolean("is_first_run", true)) {
+            checkForUpdates(isSilent = true)
+        }
         viewModelScope.launch(Dispatchers.IO) {
             val isRooted = Shell.getShell().isRoot
             _uiState.value = _uiState.value.copy(hasRoot = isRooted)
