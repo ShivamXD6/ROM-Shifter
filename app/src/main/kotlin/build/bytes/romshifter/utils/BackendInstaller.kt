@@ -10,7 +10,7 @@ import java.io.File
 
 object BackendInstaller {
     suspend fun installEngine(context: Context): Boolean = withContext(Dispatchers.IO) {
-        val targetDir = "/data/adb/#Shifter"
+        val targetDir = "/data/adb/Shifter"
         val scriptName = "ROM-Shifter.sh"
         val cacheDir = context.cacheDir
 

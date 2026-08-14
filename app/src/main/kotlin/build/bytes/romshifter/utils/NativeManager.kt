@@ -32,7 +32,7 @@ object NativeManager {
         val pkg = context.packageName
         val backupDir = "$savedPath/Native"
         val cacheDir = context.cacheDir.absolutePath
-        val zapdosPath = "/data/adb/#Shifter/zapdos"
+        val zapdosPath = "/data/adb/Shifter/zapdos"
 
         Shell.cmd("su -c 'mkdir -p \"$backupDir\"'").exec()
 
@@ -67,7 +67,8 @@ object NativeManager {
                 writer.close()
 
                 updateState("Backing up Advanced MMS & RCS...", 30)
-                Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"'").exec()
+                Shell.cmd("su -mm -c 'sh /data/adb/Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"'")
+                    .exec()
 
                 updateState("Compressing Messages...", 40)
                 Shell.cmd("su -mm -c 'cd \"$cacheDir\" && tar -cf - SMS_DB.json Advanced_Msgs 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"'").exec()
@@ -131,7 +132,8 @@ object NativeManager {
 
                 if (hasRawDbs) {
                     updateState("Injecting Raw MMS & RCS Databases...", 10)
-                    Shell.cmd("su -mm -c 'sh /data/adb/#Shifter/ROM-Shifter.sh --restore-msgs \"$cacheDir\"'").exec()
+                    Shell.cmd("su -mm -c 'sh /data/adb/Shifter/ROM-Shifter.sh --restore-msgs \"$cacheDir\"'")
+                        .exec()
                 } else {
                     updateState("Restoring SMS from JSON...", 10)
                     val currentSmsApp = Shell.cmd("su -c 'cmd role get-role-holders android.app.role.SMS'").exec().out.joinToString("").trim()

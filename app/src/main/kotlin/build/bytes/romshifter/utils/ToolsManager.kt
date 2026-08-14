@@ -22,7 +22,8 @@ object ToolsManager {
             if (isRestore) {
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Restoring Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-                    Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --restore-debloat '${app.packageName}'\"").exec()
+                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --restore-debloat '${app.packageName}'\"")
+                        .exec()
                     updateLog("Restored: ${app.label}")
                 }
                 onComplete("Restore Complete!", "Successfully restored ${selectedApps.size} apps.")
@@ -30,7 +31,9 @@ object ToolsManager {
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
                     val isForce = if (forceRemove) "true" else "false"
-                    val result = Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --remove '${app.packageName}' '$isForce'\"").exec().out.joinToString("").trim()
+                    val result =
+                        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --remove '${app.packageName}' '$isForce'\"")
+                            .exec().out.joinToString("").trim()
 
                     if (result == "FORCE_REMOVED") updateLog("Force Removed (rm -rf): ${app.label}")
                     else updateLog("Uninstalled: ${app.label}")
@@ -57,7 +60,7 @@ object ToolsManager {
                 updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
 
                 val result =
-                    Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}'\"")
+                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}'\"")
                         .exec().out.joinToString("").trim()
 
                 if (result == "SYSTEMIZED") updateLog("Systemized: ${app.label}")

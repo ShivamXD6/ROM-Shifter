@@ -95,19 +95,22 @@ object FlashManager {
     }
 
     fun getBackedUpImages(savedPath: String): List<String> {
-        return Shell.cmd("su -c \"ls -1 '$savedPath/Live-Partition/' | grep '\\.img$'\"").exec().out.filter { it.isNotBlank() }
+        return Shell.cmd("su -c \"ls -1 '$savedPath/Partitions/' | grep '\\.img$'\"")
+            .exec().out.filter { it.isNotBlank() }
     }
 
     fun deleteLivePartitionImage(savedPath: String, imgName: String) {
-        Shell.cmd("su -c \"rm -f '$savedPath/Live-Partition/$imgName'\"").exec()
+        Shell.cmd("su -c \"rm -f '$savedPath/Partitions/$imgName'\"").exec()
     }
 
     fun runLiveOperation(action: String, partition: String, customPath: String?, savedPath: String) {
         if (action == "--live-backup") {
-            Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$partition' '$savedPath'\"").exec()
+            Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$savedPath'\"")
+                .exec()
         } else {
-            val imgPath = customPath ?: "$savedPath/Live-Partition/${partition}_backup.img"
-            Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $action '$partition' '$imgPath'\"").exec()
+            val imgPath = customPath ?: "$savedPath/Partitions/${partition}_backup.img"
+            Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$imgPath'\"")
+                .exec()
         }
     }
 }

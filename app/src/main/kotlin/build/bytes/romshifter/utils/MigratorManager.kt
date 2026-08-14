@@ -63,7 +63,8 @@ object MigratorManager {
                             val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
                             val tinyBitmap = getTinyBitmap(rawIcon)
 
-                            val metaFile = File("$currentPath/Data-Migrated/${if (isSys) "System" else "User"}/$label/Meta.txt")
+                            val metaFile =
+                                File("$currentPath/Apps/${if (isSys) "System" else "User"}/$label/Meta.txt")
                             val bTime = if (metaFile.exists()) {
                                 val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
@@ -102,7 +103,8 @@ object MigratorManager {
                             val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
                             val tinyBitmap = getTinyBitmap(rawIcon)
 
-                            val metaFile = File("$currentPath/Data-Migrated/${if (isSys) "System" else "User"}/$label/Meta.txt")
+                            val metaFile =
+                                File("$currentPath/Apps/${if (isSys) "System" else "User"}/$label/Meta.txt")
                             val bTime = if (metaFile.exists()) {
                                 val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
@@ -118,7 +120,8 @@ object MigratorManager {
             "RestoreUser", "RestoreSystem", "AllBackups" -> {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
-                val command = "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Data-Migrated/$pathType/*/Meta.txt 2>/dev/null'"
+                val command =
+                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -199,9 +202,11 @@ object MigratorManager {
             if (state.migratorMode == MigratorMode.MANAGE) {
                 val baseDir = File(currentPath)
                 if (!baseDir.exists()) {
-                    Shell.cmd("su -c \"mkdir -p '$currentPath/Data-Migrated' '$currentPath/Live-Partition' && touch '$currentPath/.shifter_dir' && touch '$currentPath/.nomedia'\"").exec()
+                    Shell.cmd("su -c \"mkdir -p '$currentPath/Apps' '$currentPath/Partitions' && touch '$currentPath/.shifter_dir'\"")
+                        .exec()
                 }
-                val appPaths = selectedApps.joinToString(" ") { "'$currentPath/Data-Migrated/${if (it.isSystem) "System" else "User"}/${it.label}'" }
+                val appPaths =
+                    selectedApps.joinToString(" ") { "'$currentPath/Apps/${if (it.isSystem) "System" else "User"}/${it.label}'" }
 
                 val sizeCmd = "su -mm -c \"du -sk $appPaths 2>/dev/null\""
                 val sizeOut = Shell.cmd(sizeCmd).exec().out
@@ -229,7 +234,7 @@ object MigratorManager {
             if (isRestore) {
                 selectedApps.forEach { app ->
                     val sysType = if (app.isSystem) "System" else "User"
-                    val basePath = "$currentPath/Data-Migrated/$sysType/${app.label}"
+                    val basePath = "$currentPath/Apps/$sysType/${app.label}"
                     val parts = mutableListOf<String>()
                     if (cApp && File("$basePath/App.shift").exists()) parts.add("App")
                     if (cData && (File("$basePath/Data.shift").exists() || File("$basePath/UserDe.shift").exists())) parts.add("Data")
@@ -284,7 +289,8 @@ object MigratorManager {
             val operation = if (isRestore) "--restore" else "--backup"
             val compsString = state.globalComponents.sorted().joinToString(" ")
 
-            val command = "su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
+            val command =
+                "su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
@@ -297,7 +303,7 @@ object MigratorManager {
                             val tempFile = File(context.cacheDir, "icon_${app.packageName}.png")
                             FileOutputStream(tempFile).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
                             val sysType = if (app.isSystem) "System" else "User"
-                            val destDir = "$currentPath/Data-Migrated/$sysType/${app.label}"
+                            val destDir = "$currentPath/Apps/$sysType/${app.label}"
 
                             iconScript.append("mkdir -p '$destDir'\n")
                             iconScript.append("cp '${tempFile.absolutePath}' '$destDir/Icon.png'\n")

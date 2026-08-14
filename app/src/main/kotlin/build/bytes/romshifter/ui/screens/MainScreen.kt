@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -631,7 +632,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 val basePath = android.os.Environment.getExternalStorageDirectory().absolutePath
                 val path = if ("primary".equals(split[0], true)) "$basePath/${split.getOrNull(1) ?: ""}"
                 else "/storage/${split[0]}/${split.getOrNull(1) ?: ""}"
-                val finalPath = if (path.endsWith("#Shifter")) path else "$path/#Shifter"
+                val finalPath = if (path.endsWith("Shifter")) path else "$path/Shifter"
                 viewModel.migrateFolder(finalPath) { step = 3 }
             }
         }
@@ -750,10 +751,16 @@ fun OnboardingStepContent(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -869,7 +876,7 @@ fun OnboardingStepContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "ROM Shifter needs a dedicated folder to store your backups, partitions and other files safely. Please manually browse or enter the path where your files will be stored.",
+                        "Manually browse or enter the path where you want to store the files.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -884,7 +891,7 @@ fun OnboardingStepContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/#Shifter") },
+                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/Shifter") },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Storage,
@@ -947,7 +954,7 @@ fun OnboardingStepContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations!",
+                        "If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations or sponsors!",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1160,7 +1167,6 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
             }
         }
 
-        // 3. Use the new modern LinkAnnotation system
         val finalStr = toAnnotatedString().text
         val urlRegex = Regex("(https?://\\S+)")
         urlRegex.findAll(finalStr).forEach { match ->

@@ -3,7 +3,7 @@
 # ROM Shifter - APP BACKEND ENGINE
 # ==========================================
 
-BIN_DIR="/data/adb/#Shifter"
+BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
 AM_TMP="/data/local/tmp/appmgr_tmp"
@@ -141,6 +141,7 @@ do_live_restore() {
 DO_BACKUP() {
     PKG="$1"; LABEL="$2"; VER="$3"; TYPE="$4"; CUR_IDX="$5"; TOT_IDX="$6"; PCT="$7"; SIZE="$8"
     CUR_APP="${9}"; CUR_DATA="${10}"; CUR_EXT="${11}"; CUR_MED="${12}"; CUR_OBB="${13}"
+    touch "$BACKUP_BASE/.nomedia"
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"; mkdir -p "$APP_DIR"
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
@@ -581,20 +582,20 @@ do_restore_msgs() {
 
 case "$1" in
     --backup)
-        MAIN_DIR="${3:-/sdcard/#Shifter}"
-        BACKUP_BASE="$MAIN_DIR/Data-Migrated"
+        MAIN_DIR="${3:-/sdcard/Shifter}"
+        BACKUP_BASE="$MAIN_DIR/Apps"
         init_shifter
         do_backup "$2"
         ;;
     --restore)
-        MAIN_DIR="${3:-/sdcard/#Shifter}"
-        BACKUP_BASE="$MAIN_DIR/Data-Migrated"
+        MAIN_DIR="${3:-/sdcard/Shifter}"
+        BACKUP_BASE="$MAIN_DIR/Apps"
         init_shifter
         do_restore "$2"
         ;;
     --live-backup)
-        MAIN_DIR="${3:-/sdcard/#Shifter}"
-        LP_DIR="$MAIN_DIR/Live-Partition"
+        MAIN_DIR="${3:-/sdcard/Shifter}"
+        LP_DIR="$MAIN_DIR/Partitions"
         init_shifter
         do_live_backup "$2"
         ;;

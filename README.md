@@ -57,7 +57,8 @@
 
 1. Your device must be rooted. Supported managers include **Magisk**, **KernelSU**, **APatch** and their forks.
 2. Download the latest APK from the [Releases Tab](../../releases).
-3. Open the app, grant Root permissions, and complete the setup wizard to pick your `#Shifter` storage directory.
+3. Open the app, grant Root permissions, and complete the setup wizard to pick your `Shifter`
+   storage directory.
 
 ## 💖 Support the Project
 

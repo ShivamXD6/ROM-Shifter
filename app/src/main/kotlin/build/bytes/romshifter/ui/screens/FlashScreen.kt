@@ -1,17 +1,34 @@
 package build.bytes.romshifter.ui.screens
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -19,9 +36,49 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.RemoveDone
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdateAlt
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,7 +147,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextField(
@@ -128,9 +187,13 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                     }
 
                     if (allPartitions.isEmpty()) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(24.dp))
+                        CircularProgressIndicator(modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(24.dp))
                     } else if (filteredPartitions.isEmpty()) {
-                        Text("No partitions found.", modifier = Modifier.align(Alignment.CenterHorizontally).padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+                        Text("No partitions found.", modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                     } else {
                         LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                             items(filteredPartitions) { part ->
@@ -142,7 +205,8 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                         .clip(MaterialTheme.shapes.medium)
                                         .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                                         .clickable {
-                                            selectedBackupPartitions = if (isSelected) selectedBackupPartitions - part else selectedBackupPartitions + part
+                                            selectedBackupPartitions =
+                                                if (isSelected) selectedBackupPartitions - part else selectedBackupPartitions + part
                                         }
                                         .padding(horizontal = 16.dp, vertical = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -228,7 +292,11 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
 
                     if (restoreMode == "backup") {
                         if (backedUpImages.isEmpty()) {
-                            Text("No images found in Live-Partition folder.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "No images found in Partitions folder.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         } else {
                             LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                                 items(backedUpImages) { img ->
@@ -240,7 +308,12 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                             .clip(MaterialTheme.shapes.medium)
                                             .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                                             .clickable { selectedPartition = img }
-                                            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                                            .padding(
+                                                start = 12.dp,
+                                                end = 4.dp,
+                                                top = 6.dp,
+                                                bottom = 6.dp
+                                            ),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -266,7 +339,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                         OutlinedButton(
                             onClick = { imgLauncher.launch(arrayOf("application/octet-stream")) },
                             shape = CircleShape,
-                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
                         ) {
                             Text(
                                 text = if (customImgPath.isEmpty()) "Select .img File" else customImgPath.substringAfterLast("/"),
@@ -288,7 +363,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                             ),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
                         )
 
                         val filteredPartitions = allPartitions.filter { it.contains(partitionSearchQuery, ignoreCase = true) }
@@ -324,7 +401,11 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                     onClick = {
                         if (restoreMode == "backup" && selectedPartition.isNotBlank()) {
                             val partName = selectedPartition.substringBefore("_backup.img")
-                            viewModel.runLiveOperation("--live-restore", partName, "${viewModel.savedPath.value}/Live-Partition/$selectedPartition") { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+                            viewModel.runLiveOperation(
+                                "--live-restore",
+                                partName,
+                                "${viewModel.savedPath.value}/Partitions/$selectedPartition"
+                            ) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
                             showRestoreDialog = false
                         } else if (restoreMode == "custom" && customImgPath.isNotBlank() && selectedPartition.isNotBlank()) {
                             viewModel.runLiveOperation("--live-restore", selectedPartition, customImgPath) { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
@@ -356,7 +437,11 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
     ) { step ->
         if (step > 0) {
 
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).navigationBarsPadding().padding(16.dp)) {
+            Column(modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .navigationBarsPadding()
+                .padding(16.dp)) {
                 when (step) {
                     1 -> {
                         ElevatedCard(
@@ -422,12 +507,16 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                         Button(
                             onClick = { isAppending = false; zipLauncher.launch(arrayOf("application/zip")) },
                             shape = CircleShape,
-                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
                         ) { Text("Next: Select ZIP Files", style = MaterialTheme.typography.titleMedium) }
                     }
                     2 -> {
                         if (appState.isProcessingZips) {
-                            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 40.dp))
+                            CircularProgressIndicator(modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 40.dp))
                         } else {
                             val density = LocalDensity.current
                             val swapThreshold = with(density) { 64.dp.toPx() }
@@ -467,7 +556,8 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                                             change.consume()
                                                             dragOffset += dragAmount
 
-                                                            val currentIndex = appState.flashZips.indexOf(zip)
+                                                            val currentIndex =
+                                                                appState.flashZips.indexOf(zip)
 
                                                             if (dragOffset > swapThreshold && currentIndex < appState.flashZips.size - 1) {
                                                                 viewModel.moveZipDown(currentIndex)
@@ -491,11 +581,15 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(modifier = Modifier.fillMaxWidth()) {
-                                OutlinedButton(onClick = { isAppending = true; zipLauncher.launch(arrayOf("application/zip")) }, shape = CircleShape, modifier = Modifier.weight(1f).height(52.dp)) {
+                                OutlinedButton(onClick = { isAppending = true; zipLauncher.launch(arrayOf("application/zip")) }, shape = CircleShape, modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)) {
                                     Text("Add More ZIPs", style = MaterialTheme.typography.titleMedium)
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = CircleShape, modifier = Modifier.weight(1f).height(52.dp)) {
+                                Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = CircleShape, modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)) {
                                     Text("Next", style = MaterialTheme.typography.titleMedium)
                                 }
                             }
@@ -510,7 +604,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                 shape = MaterialTheme.shapes.large,
                                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                             ) {
-                                Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.Lock, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text("Screen Lock Detected!", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onErrorContainer)
@@ -533,7 +629,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                             }
                             Spacer(modifier = Modifier.weight(1f))
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                                Button(onClick = { viewModel.checkLockscreenAndProceed() }, shape = CircleShape, modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)) {
                                     Text("I've Removed It - Verify Again", style = MaterialTheme.typography.titleMedium)
                                 }
 
@@ -542,7 +640,9 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                     OutlinedButton(
                                         onClick = { viewModel.generateOrsAndProceed() },
                                         shape = CircleShape,
-                                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
                                     ) { Text("Skip (Only if Recovery Touch works)", style = MaterialTheme.typography.titleMedium) }
                                 }
                             }
@@ -552,28 +652,38 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                 shape = MaterialTheme.shapes.large,
                                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             ) {
-                                Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text("Storage is Decrypted!", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 }
                             }
                             Spacer(modifier = Modifier.weight(1f))
-                            Button(onClick = { viewModel.generateOrsAndProceed() }, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                            Button(onClick = { viewModel.generateOrsAndProceed() }, shape = CircleShape, modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)) {
                                 Text("Next: Finalize", style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
                     4 -> {
                         if (appState.currentAction == "Rebooting to Recovery...") {
-                            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 40.dp))
+                            CircularProgressIndicator(modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 40.dp))
                         } else {
                             ElevatedCard(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp),
                                 shape = MaterialTheme.shapes.large,
                                 colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
                             ) {
-                                Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column(modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                                         Spacer(modifier = Modifier.width(16.dp))
@@ -587,10 +697,14 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                     onClick = { viewModel.executeFlashNow() },
                                     shape = CircleShape,
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
                                 ) { Text("Reboot to Recovery & Flash Now", style = MaterialTheme.typography.titleMedium) }
                                 Spacer(modifier = Modifier.height(12.dp))
-                                OutlinedButton(onClick = { viewModel.restartFlashWizard() }, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                                OutlinedButton(onClick = { viewModel.restartFlashWizard() }, shape = CircleShape, modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)) {
                                     Text("Restart Wizard", style = MaterialTheme.typography.titleMedium)
                                 }
                             }
@@ -600,8 +714,13 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
             }
         } else {
 
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
-                Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(horizontal = 16.dp)) {
+                Column(modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))
                     MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken recovery touch") { viewModel.openFlashWizard() }
                     MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { showBackupDialog = true }

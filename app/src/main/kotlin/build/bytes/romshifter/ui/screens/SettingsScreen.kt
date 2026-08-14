@@ -87,7 +87,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             val split = docId.split(":")
             val basePath = android.os.Environment.getExternalStorageDirectory().absolutePath
             val path = if ("primary".equals(split[0], true)) "$basePath/${split.getOrNull(1) ?: ""}" else "/storage/${split[0]}/${split.getOrNull(1) ?: ""}"
-            val finalPath = if (path.endsWith("#Shifter")) path else "$path/#Shifter"
+            val finalPath = if (path.endsWith("Shifter")) path else "$path/Shifter"
             inputPath = finalPath
             isMoving = true
             viewModel.migrateFolder(finalPath) { isMoving = false }
@@ -286,7 +286,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/#Shifter") },
+                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/Shifter") },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Storage,

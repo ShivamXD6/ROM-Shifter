@@ -177,7 +177,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Shell.cmd("su -c 'dumpsys deviceidle whitelist +build.bytes.romshifter'").exec()
 
                 val checkScript =
-                    Shell.cmd("su -c '[ -f /data/adb/#Shifter/ROM-Shifter.sh ] && echo YES'")
+                    Shell.cmd("su -c '[ -f /data/adb/Shifter/ROM-Shifter.sh ] && echo YES'")
                         .exec().out.joinToString("")
                 if (checkScript != "YES" || !prefs.getBoolean("is_engine_installed", false)) {
                     val success = BackendInstaller.installEngine(application)
@@ -399,7 +399,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun migrateFolder(newPath: String, onSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             SettingsManager.migrateFolder(_savedPath.value.trimEnd('/'), newPath, prefs)
-            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\" && touch \"$newPath/.nomedia\"'")
+            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'")
                 .exec()
             _savedPath.value = newPath
             withContext(Dispatchers.Main) { onSuccess() }
@@ -436,7 +436,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     Toast.makeText(
                         getApplication(),
-                        "No existing #Shifter folder found. Please select manually.",
+                        "No existing Shifter folder found. Please select manually.",
                         Toast.LENGTH_SHORT
                     ).show()
                     onResult(false)

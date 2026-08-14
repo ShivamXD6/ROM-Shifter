@@ -8,7 +8,7 @@ import com.topjohnwu.superuser.Shell
 object SettingsManager {
 
     fun getDefaultPath(): String {
-        return "${Environment.getExternalStorageDirectory().absolutePath}/#Shifter"
+        return "${Environment.getExternalStorageDirectory().absolutePath}/Shifter"
     }
 
     fun migrateFolder(oldPath: String, newPath: String, prefs: SharedPreferences) {
