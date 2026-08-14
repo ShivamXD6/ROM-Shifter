@@ -1,46 +1,94 @@
 package build.bytes.romshifter.ui.screens
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import kotlin.system.exitProcess
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.*
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,8 +97,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.R
@@ -58,7 +113,7 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.clickable
+import kotlin.system.exitProcess
 
 fun openUriSafely(context: Context, uriString: String) {
     try {
@@ -205,7 +260,9 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
     }
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.scrim)) {
 
         if (backProgress.value > 0f) {
             Box(
@@ -228,7 +285,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     onBackClick = {},
                 )
             }
-            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value))))
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value))))
         }
 
         Box(
@@ -373,7 +432,9 @@ fun AppScaffold(
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(top = innerPadding.calculateTopPadding()).fillMaxSize()) {
+        Box(modifier = Modifier
+            .padding(top = innerPadding.calculateTopPadding())
+            .fillMaxSize()) {
 
             AnimatedContent(
                 targetState = showSettings to selectedTab,
@@ -528,6 +589,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
     val scope = rememberCoroutineScope()
     var isPopping by remember { mutableStateOf(false) }
 
+    var hasAttemptedAutoDetect by remember { mutableStateOf(false) }
+
     val triggerBackNavigation = {
         if (!isPopping) {
             isPopping = true
@@ -582,13 +645,12 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             }
         }
 
-    val permLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            step = 4
-        }
     val notifPermLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim)) {
+
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.scrim)) {
 
         if (backProgress.value > 0f) {
             Box(
@@ -606,16 +668,17 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                     context = context,
                     viewModel = viewModel,
                     onNext = {},
-                    onSkip = {},
                     launcher = launcher,
-                    permLauncher = permLauncher,
                     notifPermLauncher = notifPermLauncher,
                     isBackground = true,
+                    hasAttemptedAutoDetect = hasAttemptedAutoDetect,
+                    onSetAttemptedAutoDetect = {},
                     onBack = {}
                 )
             }
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
                     .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value)))
             )
         }
@@ -648,7 +711,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 modifier = Modifier.fillMaxSize()
             ) { currentStep ->
                 Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                 ) {
                     OnboardingStepContent(
@@ -656,10 +720,10 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         context = context,
                         viewModel = viewModel,
                         onNext = { step = it },
-                        onSkip = { step = it },
                         launcher = launcher,
-                        permLauncher = permLauncher,
                         notifPermLauncher = notifPermLauncher,
+                        hasAttemptedAutoDetect = hasAttemptedAutoDetect,
+                        onSetAttemptedAutoDetect = { hasAttemptedAutoDetect = true },
                         onBack = { triggerBackNavigation() }
                     )
                 }
@@ -674,11 +738,11 @@ fun OnboardingStepContent(
     context: Context,
     viewModel: MainViewModel,
     onNext: (Int) -> Unit,
-    onSkip: (Int) -> Unit,
     launcher: androidx.activity.compose.ManagedActivityResultLauncher<Uri?, Uri?>,
-    permLauncher: androidx.activity.compose.ManagedActivityResultLauncher<Array<String>, Map<String, @JvmSuppressWildcards Boolean>>,
     notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>,
     isBackground: Boolean = false,
+    hasAttemptedAutoDetect: Boolean = false,
+    onSetAttemptedAutoDetect: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
 
@@ -697,12 +761,22 @@ fun OnboardingStepContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             when (step) {
                 1 -> {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        LaunchedEffect(Unit) {
+                            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
+                    var isDetecting by remember { mutableStateOf(false) }
+
                     Box(
                         modifier = Modifier
                             .size(100.dp)
@@ -737,14 +811,50 @@ fun OnboardingStepContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(48.dp))
+
                     Button(
-                        onClick = { onNext(2) },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = CircleShape
-                    ) { Text("Next", style = MaterialTheme.typography.titleMedium) }
+                        onClick = {
+                            if (!hasAttemptedAutoDetect) {
+                                isDetecting = true
+                                viewModel.autoDetectShifterFolder { success ->
+                                    isDetecting = false
+                                    onSetAttemptedAutoDetect()
+                                    if (success) {
+                                        onNext(3)
+                                    } else {
+                                        onNext(2)
+                                    }
+                                }
+                            } else {
+                                onNext(2)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = CircleShape,
+                        enabled = !isDetecting
+                    ) {
+                        if (isDetecting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Searching...", style = MaterialTheme.typography.titleMedium)
+                        } else {
+                            Text("Next", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
                 }
 
                 2 -> {
+                    val savedPath by viewModel.savedPath.collectAsState()
+                    var inputPath by remember { mutableStateOf(savedPath) }
+
+                    LaunchedEffect(savedPath) { inputPath = savedPath }
+
                     Box(
                         modifier = Modifier
                             .size(100.dp)
@@ -768,107 +878,60 @@ fun OnboardingStepContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. You can auto-detect an existing one or select manually.",
+                        "ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. Please manually browse or enter the path where your backups will be stored.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(48.dp))
+
+                    OutlinedTextField(
+                        value = inputPath,
+                        onValueChange = { inputPath = it },
+                        singleLine = true,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        placeholder = { Text("/sdcard/#Shifter") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Storage,
+                                null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+                    Spacer(Modifier.height(16.dp))
+
                     Button(
-                        onClick = {
-                            viewModel.autoDetectShifterFolder { success ->
-                                if (success) onNext(
-                                    3
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        onClick = { viewModel.migrateFolder(inputPath) { onNext(3) } },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
                         shape = CircleShape
                     ) {
                         Text(
-                            "Auto-Detect #Shifter Folder",
+                            "Confirm & Next",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = { launcher.launch(null) },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
                         shape = CircleShape
                     ) {
                         Text(
-                            "Select Folder Manually",
+                            "Browse Storage",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
 
                 3 -> {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                        LaunchedEffect(Unit) {
-                            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Security,
-                            null,
-                            modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                    Spacer(Modifier.height(32.dp))
-                    Text(
-                        "Permissions",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "To accurately back up native Call Logs, SMS, and Contacts securely via ContentResolver without failing, ROM Shifter requires explicit permissions. Notifications are also needed to track background progress.",
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(48.dp))
-                    Button(
-                        onClick = {
-                            permLauncher.launch(
-                                arrayOf(
-                                    android.Manifest.permission.READ_SMS,
-                                    android.Manifest.permission.READ_CALL_LOG,
-                                    android.Manifest.permission.WRITE_CALL_LOG,
-                                    android.Manifest.permission.READ_CONTACTS,
-                                    android.Manifest.permission.WRITE_CONTACTS
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = CircleShape
-                    ) {
-                        Text(
-                            "Grant Permissions & Next",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { onSkip(4) }) {
-                        Text(
-                            "Skip for now",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-
-                4 -> {
                     Box(
                         modifier = Modifier
                             .size(100.dp)
@@ -911,7 +974,9 @@ fun OnboardingStepContent(
                                     "https://t.me/buildbytes"
                                 )
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
                             shape = CircleShape
                         ) { Text("Telegram") }
                         FilledTonalButton(
@@ -921,7 +986,9 @@ fun OnboardingStepContent(
                                     "https://www.youtube.com/@BuildBytesX"
                                 )
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
                             shape = CircleShape
                         ) { Text("YouTube") }
                         FilledTonalButton(
@@ -931,7 +998,9 @@ fun OnboardingStepContent(
                                     "https://github.com/ShivamXD6/ROM-Shifter/"
                                 )
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
                             shape = CircleShape
                         ) { Text("GitHub") }
                     }
@@ -947,12 +1016,16 @@ fun OnboardingStepContent(
                                     "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR"
                                 )
                             },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
                             shape = CircleShape
                         ) { Text("UPI (Any)") }
                         Button(
                             onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") },
-                            modifier = Modifier.weight(1f).height(48.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
                             shape = CircleShape
                         ) { Text("PayPal") }
                     }
@@ -960,7 +1033,9 @@ fun OnboardingStepContent(
                     Spacer(Modifier.height(32.dp))
                     Button(
                         onClick = { viewModel.finishOnboarding() },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
                         shape = CircleShape
                     ) { Text("Let's Shift!", style = MaterialTheme.typography.titleMedium) }
                 }
@@ -969,7 +1044,9 @@ fun OnboardingStepContent(
         if (step > 1) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 8.dp)
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 24.dp, start = 8.dp)
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
@@ -1004,7 +1081,10 @@ fun NoRootScreen() {
         label = "pulseAlpha"
     )
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.surfaceContainer)
+        .padding(24.dp), contentAlignment = Alignment.Center) {
         ElevatedCard(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
@@ -1031,7 +1111,9 @@ fun NoRootScreen() {
                 Button(
                     onClick = { exitProcess(0) },
                     shape = CircleShape,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
