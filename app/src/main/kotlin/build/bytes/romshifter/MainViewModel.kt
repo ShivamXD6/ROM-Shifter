@@ -1,5 +1,6 @@
 package build.bytes.romshifter
 
+import android.content.Intent
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
@@ -63,6 +64,100 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val isPrivilegedSystemize = MutableStateFlow(false)
 
+    private val _updateChannel = MutableStateFlow(prefs.getInt("update_channel", 1))
+    val updateChannel: StateFlow<Int> = _updateChannel.asStateFlow()
+
+    private val _updateStatus = MutableStateFlow<String>("")
+    val updateStatus: StateFlow<String> = _updateStatus.asStateFlow()
+
+    data class UpdateInfo(val version: String, val changelog: String, val downloadUrl: String)
+
+    val showUpdateDialog = MutableStateFlow(false)
+    val updateInfo = MutableStateFlow<UpdateInfo?>(null)
+
+    fun setUpdateChannel(channel: Int) {
+        _updateChannel.value = channel
+        prefs.edit { putInt("update_channel", channel) }
+    }
+
+    fun checkForUpdates(isSilent: Boolean = false) {
+        if (!isSilent) _updateStatus.value = "Checking for updates..."
+        val context = getApplication<Application>()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val url = java.net.URL("https://api.github.com/repos/ShivamXD6/ROM-Shifter/releases")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+
+                if (connection.responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    val releases = org.json.JSONArray(response)
+                    var targetRelease: org.json.JSONObject? = null
+
+                    for (i in 0 until releases.length()) {
+                        val release = releases.getJSONObject(i)
+                        val isPreRelease = release.getBoolean("prerelease")
+
+                        if (_updateChannel.value == 0 && isPreRelease) continue
+
+                        targetRelease = release
+                        break
+                    }
+
+                    if (targetRelease != null) {
+                        val tagName = targetRelease.getString("tag_name")
+                        val htmlUrl = targetRelease.getString("html_url")
+
+                        val body = targetRelease.optString("body", "No release notes provided.")
+
+                        val assets = targetRelease.optJSONArray("assets")
+                        val downloadUrl = if (assets != null && assets.length() > 0) {
+                            assets.getJSONObject(0).getString("browser_download_url")
+                        } else {
+                            htmlUrl
+                        }
+
+                        val currentVersion = try {
+                            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+                        } catch (e: Exception) { "" }
+
+                        val cleanLatest = tagName.replace("v", "").trim()
+                        val cleanCurrent = currentVersion.replace("v", "").trim()
+
+                        withContext(Dispatchers.Main) {
+                            if (cleanLatest != cleanCurrent && cleanCurrent.isNotEmpty()) {
+                                _updateStatus.value = "New version available: $tagName"
+
+                                updateInfo.value = UpdateInfo(tagName, body, downloadUrl)
+                                showUpdateDialog.value = true
+
+                            } else {
+                                _updateStatus.value = "App is up to date!"
+                                if (!isSilent) {
+                                    Toast.makeText(context, "You are on the latest version.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            if (!isSilent) _updateStatus.value = "No releases found on GitHub."
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        if (!isSilent) _updateStatus.value = "Update check failed (${connection.responseCode})"
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    if (!isSilent) _updateStatus.value = "Network error while checking updates"
+                }
+            }
+        }
+    }
+
     private val notificationManager = NotificationManagerCompat.from(application)
     private val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
     private val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
@@ -70,6 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         createNotificationChannel()
+        checkForUpdates(isSilent = true)
         viewModelScope.launch(Dispatchers.IO) {
             val isRooted = Shell.getShell().isRoot
             _uiState.value = _uiState.value.copy(hasRoot = isRooted)
