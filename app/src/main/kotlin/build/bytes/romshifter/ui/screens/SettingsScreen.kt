@@ -3,6 +3,7 @@ package build.bytes.romshifter.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -34,6 +35,8 @@ import build.bytes.romshifter.MainViewModel
 fun SettingsTab(context: Context, viewModel: MainViewModel) {
     val savedPath by viewModel.savedPath.collectAsState()
     val currentTheme by viewModel.themeMode.collectAsState()
+    val updateChannel by viewModel.updateChannel.collectAsState()
+    val updateStatus by viewModel.updateStatus.collectAsState()
 
     var inputPath by remember { mutableStateOf(savedPath) }
     var isMoving by remember { mutableStateOf(false) }
@@ -43,6 +46,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
 
     var showAboutSheet by remember { mutableStateOf(false) }
     var showThemeSheet by remember { mutableStateOf(false) }
+    var showUpdateSheet by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -54,6 +58,52 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             inputPath = finalPath
             isMoving = true
             viewModel.migrateFolder(finalPath) { isMoving = false }
+        }
+    }
+
+    if (showUpdateSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showUpdateSheet = false },
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                Text("App Updates", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                Text("Select release channel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val channels = listOf(0 to "Stable Release", 1 to "Early Access (Pre-releases)")
+                channels.forEach { (value, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { viewModel.setUpdateChannel(value) }
+                            .padding(vertical = 14.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label, style = MaterialTheme.typography.titleMedium, color = if (updateChannel == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        if (updateChannel == value) Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.checkForUpdates(isSilent = false)
+                        showUpdateSheet = false
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.Sync, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Check for Updates Now", style = MaterialTheme.typography.titleMedium)
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 
@@ -190,6 +240,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { showThemeSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -207,6 +258,26 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showUpdateSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.SystemUpdate, contentDescription = "Updates", tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("App Updates", style = MaterialTheme.typography.titleLarge)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        val channelText = if (updateChannel == 0) "Stable" else "Early Access"
+                        val displayText = updateStatus.ifEmpty { "Channel: $channelText" }
+                        Text(displayText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
                 Row(
                     modifier = Modifier.fillMaxWidth().clickable { showAboutSheet = true }.padding(horizontal = 24.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
