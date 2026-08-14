@@ -16,7 +16,6 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -42,7 +41,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -105,7 +103,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import build.bytes.romshifter.MainViewModel
@@ -404,6 +401,7 @@ fun AppScaffold(
                         Text(
                             text = dynamicTitle,
                             style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -509,10 +507,10 @@ fun AppScaffold(
                 Surface(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(80.dp)
+                        .padding(horizontal = 24.dp, vertical = 14.dp)
+                        .height(64.dp)
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.large),
+                        .clip(CircleShape),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 0.dp
                 ) {
@@ -524,16 +522,8 @@ fun AppScaffold(
                         tabs.forEachIndexed { index, tab ->
                             val isSelected = selectedTab == index
 
-                            val yOffset by animateDpAsState(
-                                targetValue = if (isSelected) (-6).dp else 0.dp,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                ),
-                                label = "tabYOffset"
-                            )
                             val iconScale by animateFloatAsState(
-                                targetValue = if (isSelected) 1.12f else 1f,
+                                targetValue = if (isSelected) 1.1f else 1f,
                                 animationSpec = spring(
                                     dampingRatio = Spring.DampingRatioMediumBouncy,
                                     stiffness = Spring.StiffnessLow
@@ -552,39 +542,40 @@ fun AppScaffold(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.offset { IntOffset(0, yOffset.roundToPx()) }
+                                Box(
+                                    modifier = Modifier
+                                        .graphicsLayer {
+                                            scaleX = iconScale; scaleY = iconScale
+                                        }
+                                        .height(42.dp)
+                                        .fillMaxWidth(0.8f)
+                                        .background(
+                                            color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
                                 ) {
-
-                                    Box(
-                                        modifier = Modifier
-                                            .graphicsLayer {
-                                                scaleX = iconScale; scaleY = iconScale
-                                            }
-                                            .size(width = 56.dp, height = 32.dp)
-                                            .background(
-                                                color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                                                shape = CircleShape
-                                            ),
-                                        contentAlignment = Alignment.Center
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
                                         Icon(
                                             imageVector = tab.second,
                                             contentDescription = tab.first,
                                             tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(22.dp)
                                         )
+                                        if (isSelected) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = tab.third,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                maxLines = 1
+                                            )
+                                        }
                                     }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Text(
-                                        text = tab.third,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
                             }
                         }
