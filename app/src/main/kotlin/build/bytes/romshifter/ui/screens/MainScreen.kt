@@ -1,5 +1,16 @@
 package build.bytes.romshifter.ui.screens
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -63,6 +74,73 @@ fun MainScreen(viewModel: MainViewModel) {
     val isFirstRun by viewModel.isFirstRun.collectAsState()
     val selectedTab by viewModel.currentTab.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+    val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
+    val context = LocalContext.current
+
+    if (showUpdateDialog && updateInfo != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.showUpdateDialog.value = false },
+            icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) },
+            title = { Text("Update Available: ${updateInfo!!.version}") },
+            text = {
+                val uriHandler = LocalUriHandler.current
+                val parsedChangelog = formatChangelog(
+                    text = updateInfo!!.changelog,
+                    linkColor = MaterialTheme.colorScheme.primary
+                )
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Release Notes",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(16.dp)
+                    ) {
+                        ClickableText(
+                            text = parsedChangelog,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier.verticalScroll(rememberScrollState()),
+                            onClick = { offset ->
+                                parsedChangelog.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                                    .firstOrNull()?.let { stringAnnotation ->
+                                        uriHandler.openUri(stringAnnotation.item)
+                                    }
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.showUpdateDialog.value = false
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.downloadUrl))
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("Download Update")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.showUpdateDialog.value = false }) {
+                    Text("Later")
+                }
+            }
+        )
+    }
 
     if (!appState.hasRoot) {
         NoRootScreen()
@@ -392,7 +470,7 @@ fun AppScaffold(
                                     .fillMaxHeight()
                                     .clickable(
                                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                        indication = null 
+                                        indication = null
                                     ) {
                                         onTabSelect(index)
                                     },
@@ -951,7 +1029,7 @@ fun NoRootScreen() {
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = { exitProcess(0) }, 
+                    onClick = { exitProcess(0) },
                     shape = CircleShape,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -962,6 +1040,70 @@ fun NoRootScreen() {
                     Text("Restart App", style = MaterialTheme.typography.titleMedium)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
+    val titleLargeStyle = MaterialTheme.typography.titleLarge.toSpanStyle().copy(fontWeight = FontWeight.Bold)
+    val titleMediumStyle = MaterialTheme.typography.titleMedium.toSpanStyle().copy(fontWeight = FontWeight.Bold)
+
+    return buildAnnotatedString {
+        val lines = text.split("\n")
+
+        for ((lineIndex, line) in lines.withIndex()) {
+            var currentLine = line
+            var headingStyle: SpanStyle? = null
+
+            if (currentLine.startsWith("### ")) {
+                currentLine = currentLine.removePrefix("### ")
+                headingStyle = titleMediumStyle
+            } else if (currentLine.startsWith("## ")) {
+                currentLine = currentLine.removePrefix("## ")
+                headingStyle = titleLargeStyle
+            } else if (currentLine.startsWith("# ")) {
+                currentLine = currentLine.removePrefix("# ")
+                headingStyle = titleLargeStyle
+            }
+
+            val lineStart = length
+
+            val parts = currentLine.split("**")
+            for ((index, part) in parts.withIndex()) {
+                if (index % 2 == 1) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
+                } else {
+                    append(part)
+                }
+            }
+
+            if (headingStyle != null) {
+                addStyle(headingStyle, lineStart, length)
+            }
+
+            if (lineIndex < lines.size - 1) {
+                append("\n")
+            }
+        }
+
+        val finalStr = toAnnotatedString().text
+        val urlRegex = Regex("(https?://[^\\s]+)")
+        urlRegex.findAll(finalStr).forEach { match ->
+            addStringAnnotation(
+                tag = "URL",
+                annotation = match.value,
+                start = match.range.first,
+                end = match.range.last + 1
+            )
+            addStyle(
+                style = SpanStyle(
+                    color = linkColor,
+                    textDecoration = TextDecoration.Underline
+                ),
+                start = match.range.first,
+                end = match.range.last + 1
+            )
         }
     }
 }
