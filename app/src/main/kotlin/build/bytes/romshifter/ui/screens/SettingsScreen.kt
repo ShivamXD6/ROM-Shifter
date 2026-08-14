@@ -286,7 +286,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        placeholder = { Text("/sdcard/#Shifter") },
+                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/#Shifter") },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Storage,

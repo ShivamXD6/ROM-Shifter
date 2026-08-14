@@ -43,7 +43,8 @@ object ToolsManager {
     }
 
     suspend fun runSystemizeOperation(
-        context: Context, selectedApps: List<AppInfo>, isPrivileged: Boolean,
+        context: Context,
+        selectedApps: List<AppInfo>,
         updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
         var wakeLock: PowerManager.WakeLock? = null
@@ -55,8 +56,9 @@ object ToolsManager {
             selectedApps.forEachIndexed { index, app ->
                 updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
 
-                val isPriv = if (isPrivileged) "true" else "false"
-                val result = Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}' '$isPriv'\"").exec().out.joinToString("").trim()
+                val result =
+                    Shell.cmd("su -mm -c \"sh /data/adb/#Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}'\"")
+                        .exec().out.joinToString("").trim()
 
                 if (result == "SYSTEMIZED") updateLog("Systemized: ${app.label}")
                 else updateLog("Failed to locate APK path for: ${app.label}")

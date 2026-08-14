@@ -61,12 +61,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit { putInt("last_selected_tab", index) }
     }
 
-    val isPrivilegedSystemize = MutableStateFlow(false)
-
     private val _updateChannel = MutableStateFlow(prefs.getInt("update_channel", 1))
     val updateChannel: StateFlow<Int> = _updateChannel.asStateFlow()
 
-    private val _updateStatus = MutableStateFlow<String>("")
+    private val _updateStatus = MutableStateFlow("")
     val updateStatus: StateFlow<String> = _updateStatus.asStateFlow()
 
     data class UpdateInfo(val version: String, val changelog: String, val downloadUrl: String)
@@ -81,7 +79,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkForUpdates(isSilent: Boolean = false) {
         if (!isSilent) _updateStatus.value = "Checking for updates..."
-        val context = getApplication<Application>()
+        val context: Application = getApplication()
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -120,7 +118,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                         val currentVersion = try {
                             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
-                        } catch (e: Exception) { "" }
+                        } catch (_: Exception) {
+                            ""
+                        }
 
                         val cleanLatest = tagName.replace("v", "").trim()
                         val cleanCurrent = currentVersion.replace("v", "").trim()
@@ -149,7 +149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         if (!isSilent) _updateStatus.value = "Update check failed (${connection.responseCode})"
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 withContext(Dispatchers.Main) {
                     if (!isSilent) _updateStatus.value = "Network error while checking updates"
                 }
@@ -158,9 +158,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val notificationManager = NotificationManagerCompat.from(application)
-    private val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
-    private val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
-    private val NOTIFICATION_ID = 1001
+
+    companion object {
+        private const val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
+        private const val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
+        private const val NOTIFICATION_ID = 1001
+    }
 
     init {
         createNotificationChannel()
@@ -185,20 +188,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val progressChannel = NotificationChannel(
-                CHANNEL_PROGRESS_ID,
-                "Task Progress",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val alertChannel = NotificationChannel(
-                CHANNEL_ALERT_ID,
-                "Task Completed",
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            notificationManager.createNotificationChannel(progressChannel)
-            notificationManager.createNotificationChannel(alertChannel)
-        }
+        val progressChannel = NotificationChannel(
+            CHANNEL_PROGRESS_ID,
+            "Task Progress",
+            NotificationManager.IMPORTANCE_LOW
+        )
+        val alertChannel = NotificationChannel(
+            CHANNEL_ALERT_ID,
+            "Task Completed",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        notificationManager.createNotificationChannel(progressChannel)
+        notificationManager.createNotificationChannel(alertChannel)
     }
 
     private fun updateProgressNotification(
@@ -481,13 +482,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 withContext(Dispatchers.Main) {
                     val finalMsg = if (isBackup) "Backup Complete!" else "Restore Complete!"
-                    val finalDesc = "$itemsProcessed"
 
-                    showCompletionNotification(finalMsg, finalDesc)
+                    showCompletionNotification(finalMsg, itemsProcessed)
                     _uiState.value = _uiState.value.copy(
                         isRunning = false,
                         currentAction = finalMsg,
-                        currentStep = finalDesc,
+                        currentStep = itemsProcessed,
                         progress = 100
                     )
                 }
@@ -547,10 +547,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(showUserApps = enabled)
     }
 
-    fun setPrivilegedSystemize(enabled: Boolean) {
-        isPrivilegedSystemize.value = enabled
-    }
-
     fun toggleActionFilter() {
         val mode = _uiState.value.migratorMode
         val currentState = _uiState.value.actionFilterState
@@ -561,20 +557,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (currentState == 1) 2 else 1
         }
 
-        if (mode == MigratorMode.DEBLOAT && newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
-            _uiState.value = _uiState.value.copy(isFetchingApps = true)
-            viewModelScope.launch {
-                val uninstalled = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "Uninstalled", true, _uiState.value.appList)
-                _uiState.value = _uiState.value.copy(appList = uninstalled, actionFilterState = newState, isFetchingApps = false)
+        when (mode) {
+            MigratorMode.DEBLOAT -> {
+                if (newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
+                    _uiState.value = _uiState.value.copy(isFetchingApps = true)
+                    viewModelScope.launch {
+                        val uninstalled = MigratorManager.fetchAppsList(
+                            getApplication(),
+                            _savedPath.value,
+                            "Uninstalled",
+                            true,
+                            _uiState.value.appList
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            appList = uninstalled,
+                            actionFilterState = newState,
+                            isFetchingApps = false
+                        )
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(actionFilterState = newState)
+                }
             }
-        } else if (mode == MigratorMode.SYSTEMIZE && !_uiState.value.systemAppsFetched && newState == 2) {
-            _uiState.value = _uiState.value.copy(isFetchingApps = true)
-            viewModelScope.launch {
-                val sys = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, "System", true, _uiState.value.appList)
-                _uiState.value = _uiState.value.copy(appList = sys, systemAppsFetched = true, actionFilterState = newState, isFetchingApps = false)
+
+            MigratorMode.SYSTEMIZE -> {
+                if (!_uiState.value.systemAppsFetched && newState == 2) {
+                    _uiState.value = _uiState.value.copy(isFetchingApps = true)
+                    viewModelScope.launch {
+                        val sys = MigratorManager.fetchAppsList(
+                            getApplication(),
+                            _savedPath.value,
+                            "System",
+                            true,
+                            _uiState.value.appList
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            appList = sys,
+                            systemAppsFetched = true,
+                            actionFilterState = newState,
+                            isFetchingApps = false
+                        )
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(actionFilterState = newState)
+                }
             }
-        } else {
-            _uiState.value = _uiState.value.copy(actionFilterState = newState)
+
+            else -> {
+                _uiState.value = _uiState.value.copy(actionFilterState = newState)
+            }
         }
     }
 
@@ -593,7 +624,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
             globalComponents = setOf(1, 2, 3, 4, 5, 6)
         )
-        if (mode == MigratorMode.SYSTEMIZE) isPrivilegedSystemize.value = false
 
         when (mode) {
             MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
@@ -694,8 +724,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 updateProgressNotification(safeAction, step, prog)
 
                 _uiState.value = _uiState.value.copy(
-                    currentAction = if (action.isNotEmpty()) action else _uiState.value.currentAction,
-                    currentStep = if (step.isNotEmpty()) step else _uiState.value.currentStep,
+                    currentAction = action.ifEmpty { _uiState.value.currentAction },
+                    currentStep = step.ifEmpty { _uiState.value.currentStep },
                     progress = if (prog >= 0) prog else _uiState.value.progress
                 )
             }
@@ -753,7 +783,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (state.actionFilterState == 2) {
                         val appPaths = selectedApps.joinToString(" ") {
                             val safeLabel = it.label.replace(Regex("[^a-zA-Z0-9_]"), "")
-                            "'/data/adb/modules/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules/ROM-Shifter/system/product/priv-app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/priv-app/$safeLabel'"
+                            "'/data/adb/modules/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/app/$safeLabel'"
                         }
                         Shell.cmd("su -c \"rm -rf $appPaths\"").exec()
                         updateProgress("De-Systemizing", "Removed from module folder", 100)
@@ -762,7 +792,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         ToolsManager.runSystemizeOperation(
                             context = getApplication(),
                             selectedApps = selectedApps,
-                            isPrivileged = isPrivilegedSystemize.value,
                             updateLog = {},
                             updateProgress = updateProgress,
                             onComplete = onComplete

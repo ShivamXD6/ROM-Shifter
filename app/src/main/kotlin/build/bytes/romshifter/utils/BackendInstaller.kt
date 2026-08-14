@@ -1,6 +1,7 @@
 package build.bytes.romshifter.utils
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
@@ -52,14 +53,13 @@ object BackendInstaller {
             val result = Shell.cmd(*commands).exec()
 
             if (result.isSuccess) {
-                prefs.edit().putLong("installed_version", currentVersionCode).apply()
+                prefs.edit { putLong("installed_version", currentVersionCode) }
                 return@withContext true
             } else {
                 return@withContext false
             }
 
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (_: Exception) {
             return@withContext false
         } finally {
             File(cacheDir, scriptName).delete()

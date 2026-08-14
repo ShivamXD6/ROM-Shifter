@@ -1,18 +1,36 @@
 package build.bytes.romshifter.ui.screens
 
+import android.content.pm.PackageManager
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import build.bytes.romshifter.utils.getAvatarColor
-import coil.compose.AsyncImage
-import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,24 +39,75 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AllInclusive
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.PermMedia
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RemoveDone
+import androidx.compose.material.icons.filled.RestorePage
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SettingsPhone
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.AppListItem
 import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.ShimmerAppListItem
-import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
+import build.bytes.romshifter.utils.getAvatarColor
+import coil.compose.AsyncImage
 
 @Composable
 fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
@@ -56,7 +125,7 @@ fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
         label = "MigratorTransition"
     ) { isMenu ->
         if (isMenu) {
-            MigratorMenu(appState, viewModel)
+            MigratorMenu(viewModel)
         } else {
             MigratorActionScreen(appState, viewModel)
         }
@@ -64,7 +133,7 @@ fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
 }
 
 @Composable
-fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
+fun MigratorMenu(viewModel: MainViewModel) {
     val context = LocalContext.current
     var showNativeBackupDialog by remember { mutableStateOf(false) }
     var showNativeRestoreDialog by remember { mutableStateOf(false) }
@@ -102,7 +171,11 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .clip(MaterialTheme.shapes.medium)
-                                .background(if (state) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+                                .background(
+                                    if (state) MaterialTheme.colorScheme.secondaryContainer.copy(
+                                        alpha = 0.5f
+                                    ) else Color.Transparent
+                                )
                                 .clickable {
                                     when (label) {
                                         "SMS Messages" -> doSms = !doSms
@@ -150,8 +223,13 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
             dismissButton = { TextButton(onClick = { showNativeBackupDialog = false; showNativeRestoreDialog = false }) { Text("Cancel") } }
         )
     }
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp)) {
-        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.surfaceContainer)
+        .padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier
+            .weight(1f)
+            .verticalScroll(rememberScrollState())) {
             Spacer(modifier = Modifier.height(12.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
@@ -167,8 +245,7 @@ fun MigratorMenu(appState: AppState, viewModel: MainViewModel) {
 @Composable
 fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
     val context = LocalContext.current
-    val isPrivileged by viewModel.isPrivilegedSystemize.collectAsState()
-    var showFilters by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+
 
     val filteredApps by remember(
         appState.appList,
@@ -207,7 +284,6 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
 
     var showForceRemoveWarning by remember { mutableStateOf(false) }
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
-    var showPrivilegedInfo by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
@@ -326,42 +402,16 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         )
     }
 
-    if (showPrivilegedInfo) {
-        AlertDialog(
-            shape = MaterialTheme.shapes.large,
-            onDismissRequest = { showPrivilegedInfo = false },
-            icon = {
-                Icon(
-                    Icons.Default.SecurityUpdateGood,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            },
-            title = { Text("Enable Privileged Mode?") },
-            text = {
-                Text(
-                    "This grants the application access to restricted, system-level permissions (e.g., secure settings, deep telephony routing, or recent apps integration).\n\nRecommended for: Custom Launchers, Google Dialer/Phone ports, Camera ports, or System UI plugins.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.setPrivilegedSystemize(true)
-                    showPrivilegedInfo = false
-                }) { Text("Enable") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPrivilegedInfo = false }) { Text("Cancel") }
-            }
-        )
-    }
-
     Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -388,7 +438,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                modifier = Modifier.weight(1f).height(52.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
             val allSelected = filteredApps.isNotEmpty() && filteredApps.all { it.isSelected }
@@ -408,7 +460,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         Column {
             if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -440,7 +494,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
 
             LazyRow(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -593,7 +649,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             isRefreshing = appState.isFetchingApps,
             onRefresh = { viewModel.refreshCurrentList() },
             modifier = Modifier
-                .weight(1f) 
+                .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .clip(MaterialTheme.shapes.large)
@@ -603,7 +659,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
             } else if (filteredApps.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -640,7 +698,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
             shadowElevation = 4.dp
         ) {
             AnimatedContent(
@@ -678,8 +738,10 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             AnimatedContent(
                                 targetState = isCompleted to (processingApp != null),
                                 transitionSpec = {
-                                    (scaleIn(tween<Float>(400, easing = FastOutSlowInEasing)) + fadeIn(tween<Float>(400))) togetherWith
-                                            (scaleOut(tween<Float>(200)) + fadeOut(tween<Float>(200)))
+                                    (scaleIn(tween(400, easing = FastOutSlowInEasing)) + fadeIn(
+                                        tween(400)
+                                    )) togetherWith
+                                            (scaleOut(tween(200)) + fadeOut(tween(200)))
                                 },
                                 label = "IconTransition"
                             ) { (completed, hasApp) ->
@@ -777,14 +839,18 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         if (appState.progress in 0..100) {
                             LinearProgressIndicator(
                                 progress = { appState.progress / 100f },
-                                modifier = Modifier.fillMaxWidth().height(6.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
                                     .clip(CircleShape),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             )
                         } else {
                             LinearProgressIndicator(
-                                modifier = Modifier.fillMaxWidth().height(6.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
                                     .clip(CircleShape),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -831,7 +897,9 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2) || (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 2)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                             ),
-                            modifier = Modifier.height(52.dp).widthIn(min = 120.dp)
+                            modifier = Modifier
+                                .height(52.dp)
+                                .widthIn(min = 120.dp)
                         ) {
                             val act = when (appState.migratorMode) {
                                 MigratorMode.MANAGE -> "Delete Apps"

@@ -29,15 +29,8 @@ fun ROMShifterTheme(
     val systemDark = isSystemInDarkTheme()
     val context = LocalContext.current
 
-    val isDark = when (themeMode) {
-        1 -> false
-        2, 3, 4 -> true
-        else -> systemDark
-    }
-
-    val colorScheme = when {
-
-        themeMode == 0 -> {
+    val colorScheme = when (themeMode) {
+        0 -> {
             if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             } else {
@@ -45,13 +38,13 @@ fun ROMShifterTheme(
             }
         }
 
-        themeMode == 1 -> LightColorScheme
+        1 -> LightColorScheme
 
-        themeMode == 2 -> DarkColorScheme
+        2 -> DarkColorScheme
 
-        themeMode == 3 -> AmoledAccentColorScheme
+        3 -> AmoledAccentColorScheme
 
-        themeMode == 4 -> {
+        4 -> {
             if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 dynamicDarkColorScheme(context).copy(
                     background = Color(0xFF000000),

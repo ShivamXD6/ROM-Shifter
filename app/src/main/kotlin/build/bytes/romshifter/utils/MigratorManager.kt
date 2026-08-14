@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.PowerManager
+import androidx.core.graphics.createBitmap
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
@@ -46,7 +47,8 @@ object MigratorManager {
 
         when (type) {
             "User", "System", "AllInstalled" -> {
-                val sysModCmd = "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules/ROM-Shifter/system/product/priv-app /data/adb/modules_update/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/priv-app 2>/dev/null"
+                val sysModCmd =
+                    "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/app 2>/dev/null"
                 val systemizedLabels = Shell.cmd(sysModCmd).exec().out.toSet()
 
                 val installedApps = pm.getInstalledApplications(0)
@@ -86,7 +88,9 @@ object MigratorManager {
                         if (!activeApps.contains(app.packageName)) {
                             val apkExists = try {
                                 app.sourceDir != null && File(app.sourceDir).exists()
-                            } catch (e: Exception) { false }
+                            } catch (_: Exception) {
+                                false
+                            }
 
                             if (!apkExists) {
                                 return@async null
@@ -153,7 +157,11 @@ object MigratorManager {
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
-                            val isInst = try { pm.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
+                            val isInst = try {
+                                pm.getPackageInfo(pkg, 0); true
+                            } catch (_: Exception) {
+                                false
+                            }
 
                             AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconPath = iconPath, backupTime = bTime, isInstalled = isInst)                        } else null
                     }
@@ -195,9 +203,11 @@ object MigratorManager {
                 }
                 val appPaths = selectedApps.joinToString(" ") { "'$currentPath/Data-Migrated/${if (it.isSystem) "System" else "User"}/${it.label}'" }
 
-                val sizeCmd = "su -mm -c \"du -sk $appPaths 2>/dev/null | awk '{s+=\\\$1} END {print s}'\""
-                val sizeStr = Shell.cmd(sizeCmd).exec().out.joinToString("").trim()
-                val totalFreedKb = sizeStr.toLongOrNull() ?: 0L
+                val sizeCmd = "su -mm -c \"du -sk $appPaths 2>/dev/null\""
+                val sizeOut = Shell.cmd(sizeCmd).exec().out
+                val totalFreedKb = sizeOut.sumOf {
+                    it.trim().split("\\s+".toRegex()).firstOrNull()?.toLongOrNull() ?: 0L
+                }
 
                 Shell.cmd("su -mm -c \"rm -rf $appPaths\"").exec()
 
@@ -214,14 +224,6 @@ object MigratorManager {
             val cMed = state.globalComponents.contains(4)
             val cObb = state.globalComponents.contains(5)
             val cId = state.globalComponents.contains(6)
-            val activeComps = mutableListOf<String>().apply {
-                if (cApp) add("App")
-                if (cData) add("Data")
-                if (cExt) add("ExtData")
-                if (cMed) add("Media")
-                if (cObb) add("Obb")
-                if (cId) add("Android ID")
-            }.joinToString(" • ")
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
@@ -245,19 +247,22 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
-                val script = java.lang.StringBuilder()
-                selectedApps.forEach { app ->
-                    val pkg = app.packageName
-                    script.append("res=\"\"\n")
-                    if (cApp) script.append("res=\"\$res|App\"\n")
-                    if (cData) script.append("if [ -d \"/data/data/$pkg\" ] || [ -d \"/data/user_de/0/$pkg\" ]; then res=\"\$res|Data\"; fi\n")
-                    if (cExt) script.append("if [ -d \"/data/media/0/Android/data/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"\$res|ExtData\"; fi\n")
-                    if (cMed) script.append("if [ -d \"/data/media/0/Android/media/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"\$res|Media\"; fi\n")
-                    if (cObb) script.append("if [ -d \"/data/media/0/Android/obb/$pkg\" ] && [ \"\$(ls -A /data/media/0/Android/obb/$pkg 2>/dev/null)\" ]; then res=\"\$res|Obb\"; fi\n")
-                    if (cId) script.append("if grep -q \"package=\\\"$pkg\\\"\" /data/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"\$res|Android ID\"; fi\n")
-                    script.append("echo \"$pkg==\$res\"\n")
+                val d = "/data"
+                val dlr = "$"
+                val script = buildString {
+                    selectedApps.forEach { app ->
+                        val pkg = app.packageName
+                        appendLine("res=\"\"")
+                        if (cApp) appendLine("res=\"${dlr}res|App\"")
+                        if (cData) appendLine("if [ -d \"$d/data/$pkg\" ] || [ -d \"$d/user_de/0/$pkg\" ]; then res=\"${dlr}res|Data\"; fi")
+                        if (cExt) appendLine("if [ -d \"$d/media/0/Android/data/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|ExtData\"; fi")
+                        if (cMed) appendLine("if [ -d \"$d/media/0/Android/media/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Media\"; fi")
+                        if (cObb) appendLine("if [ -d \"$d/media/0/Android/obb/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/obb/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Obb\"; fi")
+                        if (cId) appendLine("if grep -q 'package=\"$pkg\"' $d/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"${dlr}res|Android ID\"; fi")
+                        appendLine("echo \"$pkg==${dlr}res\"")
+                    }
                 }
-                val out = Shell.cmd("su -mm -c '${script.toString().replace("'", "'\\''")}'").exec().out
+                val out = Shell.cmd("su -mm -c '${script.replace("'", "'\\''")}'").exec().out
                 out.forEach { line ->
                     val split = line.split("==")
                     if (split.size == 2) {
@@ -343,12 +348,12 @@ object MigratorManager {
         if (drawable == null) return null
         return try {
             val size = 120
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(bitmap)
             drawable.setBounds(0, 0, canvas.width, canvas.height)
             drawable.draw(canvas)
             bitmap
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

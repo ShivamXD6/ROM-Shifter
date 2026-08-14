@@ -529,11 +529,10 @@ do_restore_debloat() {
 do_systemize() {
     local PKG="$1"
     local LABEL="$2"
-    local IS_PRIV="$3"
 
     local MOD_DIR="/data/adb/modules/ROM-Shifter"
     local UP_DIR="/data/adb/modules_update/ROM-Shifter"
-    local PROP="id=ROM-Shifter\nname=ROM Shifter Systemized Apps\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Systemlessly makes selected user apps system apps."
+    local PROP="id=ROM-Shifter\nname=ROM Shifter Module\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Used for some system dependent features such as Systemizer"
 
     mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
     mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
@@ -542,12 +541,7 @@ do_systemize() {
 
     if [ -n "$APK_PATH" ]; then
         local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
-        local TARGET_DIR=""
-        if [ "$IS_PRIV" == "true" ]; then
-            TARGET_DIR="$UP_DIR/system/product/priv-app/$SAFE_LABEL"
-        else
-            TARGET_DIR="$UP_DIR/system/product/app/$SAFE_LABEL"
-        fi
+        TARGET_DIR="$UP_DIR/system/product/app/$SAFE_LABEL"
         local SOURCE_DIR=$(dirname "$APK_PATH")
 
         mkdir -p "$TARGET_DIR"
@@ -610,7 +604,7 @@ case "$1" in
         ;;
     --remove) init_shifter; do_remove "$2" "$3" ;;
     --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
-    --systemize) init_shifter; do_systemize "$2" "$3" "$4" ;;
+    --systemize) init_shifter; do_systemize "$2" "$3" ;;
     --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
     --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
 esac

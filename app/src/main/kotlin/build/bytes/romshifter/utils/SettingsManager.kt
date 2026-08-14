@@ -1,11 +1,9 @@
 package build.bytes.romshifter.utils
 
-import android.content.Context
 import android.content.SharedPreferences
 import android.os.Environment
 import androidx.core.content.edit
 import com.topjohnwu.superuser.Shell
-import java.io.File
 
 object SettingsManager {
 

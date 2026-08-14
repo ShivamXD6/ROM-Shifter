@@ -48,7 +48,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -94,19 +93,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.R
 import build.bytes.romshifter.models.AppState
@@ -114,11 +114,12 @@ import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 fun openUriSafely(context: Context, uriString: String) {
     try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriString)))
-    } catch (e: Exception) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uriString.toUri()))
+    } catch (_: Exception) {
         Toast.makeText(context, "No app available to open this link.", Toast.LENGTH_SHORT).show()
     }
 }
@@ -139,7 +140,6 @@ fun MainScreen(viewModel: MainViewModel) {
             icon = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) },
             title = { Text("Update Available: ${updateInfo!!.version}") },
             text = {
-                val uriHandler = LocalUriHandler.current
                 val parsedChangelog = formatChangelog(
                     text = updateInfo!!.changelog,
                     linkColor = MaterialTheme.colorScheme.primary
@@ -161,18 +161,11 @@ fun MainScreen(viewModel: MainViewModel) {
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .padding(16.dp)
                     ) {
-                        ClickableText(
+                        Text(
                             text = parsedChangelog,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier.verticalScroll(rememberScrollState()),
-                            onClick = { offset ->
-                                parsedChangelog.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                                    .firstOrNull()?.let { stringAnnotation ->
-                                        uriHandler.openUri(stringAnnotation.item)
-                                    }
-                            }
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.verticalScroll(rememberScrollState())
                         )
                     }
                 }
@@ -181,7 +174,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 Button(
                     onClick = {
                         viewModel.showUpdateDialog.value = false
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo!!.downloadUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, updateInfo!!.downloadUrl.toUri())
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         context.startActivity(intent)
                     }
@@ -223,7 +216,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 else if (appState.flashWizardStep > 0) viewModel.flashWizardStepBack()
                 else viewModel.setMigratorMode(MigratorMode.MENU)
 
-                kotlinx.coroutines.delay(50)
+                kotlinx.coroutines.delay(50.milliseconds)
                 backProgress.snapTo(0f)
                 isPopping = false
             }
@@ -236,14 +229,13 @@ fun MainScreen(viewModel: MainViewModel) {
                 backProgress.snapTo(backEvent.progress)
             }
             triggerBackNavigation()
-        } catch (e: CancellationException) {
+        } catch (_: CancellationException) {
             scope.launch { backProgress.animateTo(0f, animationSpec = tween(350, easing = FastOutSlowInEasing)) }
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenWidthPx =
+        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.width.toFloat()
 
     var frozenPreviousAppState by remember {
         mutableStateOf(appState.copy(
@@ -540,7 +532,7 @@ fun AppScaffold(
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.offset(y = yOffset)
+                                    modifier = Modifier.offset { IntOffset(0, yOffset.roundToPx()) }
                                 ) {
 
                                     Box(
@@ -597,7 +589,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
             scope.launch {
                 backProgress.animateTo(1f, animationSpec = tween(350, easing = FastOutSlowInEasing))
                 step -= 1
-                kotlinx.coroutines.delay(50)
+                kotlinx.coroutines.delay(50.milliseconds)
                 backProgress.snapTo(0f)
                 isPopping = false
             }
@@ -610,7 +602,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                 backProgress.snapTo(backEvent.progress)
             }
             triggerBackNavigation()
-        } catch (e: CancellationException) {
+        } catch (_: CancellationException) {
             scope.launch {
                 backProgress.animateTo(
                     0f,
@@ -620,9 +612,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenWidthPx =
+        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.width.toFloat()
 
     var frozenBgStep by remember { mutableIntStateOf(if (step > 1) step - 1 else 1) }
 
@@ -805,7 +796,7 @@ fun OnboardingStepContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "The ultimate root-powered tool for migrating apps, backing up telephony data, auto-flashing ZIPs directly in recovery, and modifying your ROM securely.",
+                        "The Ultimate Android app built to make flashing, backing up, and migrating between custom ROMs as painless as possible. As well provides tools for some common things we do after switching to another ROM.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -878,7 +869,7 @@ fun OnboardingStepContent(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "ROM Shifter needs a dedicated folder to store your backups, images, and logs safely. Please manually browse or enter the path where your backups will be stored.",
+                        "ROM Shifter needs a dedicated folder to store your backups, partitions and other files safely. Please manually browse or enter the path where your files will be stored.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -893,7 +884,7 @@ fun OnboardingStepContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
-                        placeholder = { Text("/sdcard/#Shifter") },
+                        placeholder = { Text("${android.os.Environment.getExternalStorageDirectory().absolutePath}/#Shifter") },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.Storage,
@@ -1169,22 +1160,22 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
             }
         }
 
+        // 3. Use the new modern LinkAnnotation system
         val finalStr = toAnnotatedString().text
-        val urlRegex = Regex("(https?://[^\\s]+)")
+        val urlRegex = Regex("(https?://\\S+)")
         urlRegex.findAll(finalStr).forEach { match ->
-            addStringAnnotation(
-                tag = "URL",
-                annotation = match.value,
-                start = match.range.first,
-                end = match.range.last + 1
-            )
-            addStyle(
-                style = SpanStyle(
-                    color = linkColor,
-                    textDecoration = TextDecoration.Underline
+            addLink(
+                LinkAnnotation.Url(
+                    url = match.value,
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline
+                        )
+                    )
                 ),
-                start = match.range.first,
-                end = match.range.last + 1
+                match.range.first,
+                match.range.last + 1
             )
         }
     }
