@@ -146,7 +146,10 @@ fun MainScreen(viewModel: MainViewModel) {
                     linkColor = MaterialTheme.colorScheme.primary
                 )
 
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
                         text = "Release Notes",
                         style = MaterialTheme.typography.titleMedium,
@@ -160,7 +163,8 @@ fun MainScreen(viewModel: MainViewModel) {
                             .weight(1f, fill = false)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .padding(16.dp)
+                            .padding(16.dp),
+                        contentAlignment = Alignment.TopStart
                     ) {
                         Text(
                             text = parsedChangelog,
