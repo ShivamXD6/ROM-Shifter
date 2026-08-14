@@ -53,8 +53,8 @@ fun ROMShifterTheme(
                     surfaceContainerLowest = Color(0xFF000000),
                     surfaceContainerLow = Color(0xFF000000),
                     surfaceContainer = Color(0xFF000000),
-                    surfaceContainerHigh = Color(0xFF070707),
-                    surfaceContainerHighest = Color(0xFF0F0F0F)
+                    surfaceContainerHigh = Color(0xFF000000),
+                    surfaceContainerHighest = Color(0xFF000000)
                 )
             } else {
                 AmoledAccentColorScheme

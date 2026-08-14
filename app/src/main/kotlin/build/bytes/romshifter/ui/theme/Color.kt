@@ -55,11 +55,11 @@ val AmoledAccentColorScheme = darkColorScheme(
 
     background = Color(0xFF000000),
     surface = Color(0xFF000000),
-    surfaceVariant = Color(0xFF111111),
+    surfaceVariant = Color(0xFF000000),
 
-    surfaceContainerLowest = Color(0xFF050505),
-    surfaceContainerLow = Color(0xFF0A0A0A),
-    surfaceContainer = Color(0xFF101010),
-    surfaceContainerHigh = Color(0xFF161616),
-    surfaceContainerHighest = Color(0xFF1C1C1C)
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF000000),
+    surfaceContainer = Color(0xFF000000),
+    surfaceContainerHigh = Color(0xFF000000),
+    surfaceContainerHighest = Color(0xFF000000)
 )

@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.RestorePage
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsPhone
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sms
@@ -63,14 +64,10 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -103,6 +100,7 @@ import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
+import build.bytes.romshifter.ui.components.AnimatedFilterChip
 import build.bytes.romshifter.ui.components.AppListItem
 import build.bytes.romshifter.ui.components.ExpressiveRefreshIndicator
 import build.bytes.romshifter.ui.components.MenuCard
@@ -226,7 +224,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
     }
     Column(modifier = Modifier
         .fillMaxSize()
-        .background(MaterialTheme.colorScheme.surfaceContainer)
+        .background(MaterialTheme.colorScheme.surfaceContainerLow)
         .padding(horizontal = 16.dp)) {
         Column(modifier = Modifier
             .weight(1f)
@@ -406,8 +404,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
+        Spacer(modifier = Modifier.height(14.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -458,57 +457,18 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             }
         }
 
-        Column {
-            if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(compNames.entries.toList()) { entry ->
-                        val isSelected = appState.globalComponents.contains(entry.key)
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.toggleGlobalComponent(entry.key) },
-                            label = {
-                                Text(
-                                    entry.value,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                compIcons[entry.key]?.let {
-                                    Icon(
-                                        it,
-                                        null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            },
-                            shape = CircleShape,
-                            modifier = Modifier.height(36.dp)
-                        )
-                    }
-                }
-            }
-
+        Column(modifier = Modifier.padding(bottom = 8.dp)) {
             LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val chipModifier = Modifier.height(36.dp)
-
                 val actionChipLabel = when (appState.migratorMode) {
                     MigratorMode.DEBLOAT -> if (appState.actionFilterState == 1) "Debloat" else "Restore"
                     MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
                     else -> ""
                 }
-
                 val actionIcon = when (appState.actionFilterState) {
                     0 -> Icons.Default.AllInclusive
                     1 -> Icons.Default.FilterList
@@ -517,129 +477,71 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
                 if (actionChipLabel.isNotEmpty()) {
                     item {
-                        FilterChip(
+                        AnimatedFilterChip(
                             selected = appState.actionFilterState != 0,
                             onClick = { viewModel.toggleActionFilter() },
-                            label = {
-                                Text(
-                                    actionChipLabel,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    actionIcon,
-                                    null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            shape = CircleShape,
-                            modifier = chipModifier
+                            label = actionChipLabel,
+                            leadingIcon = actionIcon
                         )
                     }
                 }
 
                 if (appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)) {
                     item {
-                        FilterChip(
+                        AnimatedFilterChip(
                             selected = appState.showUserApps,
                             onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) },
-                            label = {
-                                Text(
-                                    "User Apps",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Person,
-                                    null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            shape = CircleShape,
-                            modifier = chipModifier
+                            label = "User Apps",
+                            leadingIcon = Icons.Default.Person
                         )
                     }
                     item {
-                        FilterChip(
+                        AnimatedFilterChip(
                             selected = appState.showSystemApps,
                             onClick = { viewModel.toggleSystemApps() },
-                            label = {
-                                Text(
-                                    "System Apps",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Android,
-                                    null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            shape = CircleShape,
-                            modifier = chipModifier
+                            label = "System Apps",
+                            leadingIcon = Icons.Default.Settings
+                        )
+                    }
+                }
+
+                if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
+                    items(compNames.entries.toList()) { entry ->
+                        AnimatedFilterChip(
+                            selected = appState.globalComponents.contains(entry.key),
+                            onClick = { viewModel.toggleGlobalComponent(entry.key) },
+                            label = entry.value,
+                            leadingIcon = compIcons[entry.key] ?: Icons.Default.Android
                         )
                     }
                 }
 
                 if (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1) {
                     item {
-                        FilterChip(
+                        AnimatedFilterChip(
                             selected = appState.forceRemoveEnabled,
                             onClick = {
-                                if (appState.forceRemoveEnabled) viewModel.setForceRemove(false) else showForceRemoveWarning =
-                                    true
+                                if (appState.forceRemoveEnabled) viewModel.setForceRemove(
+                                    false
+                                ) else showForceRemoveWarning = true
                             },
-                            label = {
-                                Text(
-                                    "Force Deletion",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.DeleteForever,
-                                    null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            shape = CircleShape,
-                            modifier = chipModifier,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            label = "Force Deletion",
+                            leadingIcon = Icons.Default.DeleteForever,
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
 
                 if (appState.migratorMode == MigratorMode.MANAGE) {
                     item {
-                        AssistChip(
+                        AnimatedFilterChip(
+                            selected = false,
                             onClick = { showNativeDeleteDialog = true },
-                            label = {
-                                Text(
-                                    "Erase Native",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.SettingsPhone,
-                                    null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            shape = CircleShape,
-                            modifier = chipModifier,
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                labelColor = MaterialTheme.colorScheme.onErrorContainer,
-                                leadingIconContentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            label = "Erase Native",
+                            leadingIcon = Icons.Default.SettingsPhone,
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
@@ -729,18 +631,27 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         appList.firstOrNull { app ->
                             app.isSelected && (
                                     appState.currentAction.contains(app.label, ignoreCase = true) ||
-                                            appState.currentStep.contains(app.label, ignoreCase = true) ||
-                                            appState.currentAction.contains(app.packageName, ignoreCase = true) ||
-                                            appState.currentStep.contains(app.packageName, ignoreCase = true)
+                                            appState.currentStep.contains(
+                                                app.label,
+                                                ignoreCase = true
+                                            ) ||
+                                            appState.currentAction.contains(
+                                                app.packageName,
+                                                ignoreCase = true
+                                            ) ||
+                                            appState.currentStep.contains(
+                                                app.packageName,
+                                                ignoreCase = true
+                                            )
                                     )
                         }
-                    }
+                        }
 
                     Column(
                         modifier = Modifier
                             .navigationBarsPadding()
                             .padding(horizontal = 24.dp, vertical = 16.dp)
-                    ) {
+                        ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -764,7 +675,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                             contentDescription = "Success",
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(42.dp)
-                                        )
+                                            )
                                         Spacer(modifier = Modifier.width(16.dp))
                                     } else if (hasApp) {
                                         val iconModifier = Modifier
@@ -776,11 +687,17 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                                 model = processingApp.iconPath,
                                                 contentDescription = null,
                                                 modifier = iconModifier
-                                            )
+                                                )
                                         } else if (processingApp != null) {
-                                            val letter = processingApp.label.firstOrNull()?.uppercase() ?: "?"
+                                            val letter =
+                                                processingApp.label.firstOrNull()?.uppercase()
+                                                    ?: "?"
                                             Box(
-                                                modifier = iconModifier.background(getAvatarColor(processingApp.label)),
+                                                modifier = iconModifier.background(
+                                                    getAvatarColor(
+                                                        processingApp.label
+                                                    )
+                                                ),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
@@ -790,20 +707,20 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                                     fontSize = 20.sp
                                                 )
                                             }
-                                        }
+                                            }
                                         Spacer(modifier = Modifier.width(16.dp))
+                                        }
                                     }
                                 }
-                            }
 
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = appState.currentAction,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                    Text(
+                                        text = appState.currentAction,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 if (appState.currentStep.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
@@ -814,7 +731,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
-                            }
+                                }
 
                             if (!appState.isRunning) {
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -836,9 +753,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     text = "${appState.progress}%",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary
-                                )
+                                    )
+                                }
                             }
-                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -862,7 +779,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             )
                         }
-                    }
+                        }
                 } else {
                     val selectedCount = appList.count { it.isSelected }
                     Row(
@@ -885,7 +802,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 }
                             },
                             label = "CountAnimation",
-                            modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f)
                         ) { count ->
                             Text(
                                 text = "$count Selected",
@@ -915,10 +832,10 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 else -> "Backup Apps"
                             }
                             Text(act, style = MaterialTheme.typography.titleMedium)
+                            }
                         }
                     }
                 }
             }
         }
     }
-}

@@ -11,6 +11,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -104,6 +105,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.R
@@ -273,12 +275,12 @@ fun MainScreen(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
             AppScaffold(
                 appState = frozenPreviousAppState,
-                appList = emptyList<AppInfo>(),
-                flashZips = emptyList<FlashZip>(),
+                appList = emptyList(),
+                flashZips = emptyList(),
                 showSettings = false,
                 selectedTab = selectedTab,
                 viewModel = viewModel,
@@ -306,7 +308,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
         ) {
             AppScaffold(
                 appState = appState,
@@ -380,69 +382,83 @@ fun AppScaffold(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
+                shadowElevation = 8.dp,
+                modifier = Modifier.zIndex(1f)
+            ) {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isHome) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_home),
+                                    contentDescription = "Logo",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .graphicsLayer {
+                                            alpha = if (appState.isRunning) logoAlpha else 1f
+                                        }
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                            }
+                            Text(
+                                text = dynamicTitle,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        if (isBackEnabled) {
+                            IconButton(
+                                onClick = onBackClick,
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    "Back",
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
+                    },
+                    actions = {
                         if (isHome) {
+                            IconButton(
+                                onClick = { onSettingsToggle(true) },
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        } else {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_home),
                                 contentDescription = "Logo",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .padding(end = 16.dp)
+                                    .size(32.dp)
                                     .graphicsLayer {
                                         alpha = if (appState.isRunning) logoAlpha else 1f
                                     }
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
                         }
-                        Text(
-                            text = dynamicTitle,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                navigationIcon = {
-                    if (isBackEnabled) {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                "Back",
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    if (isHome) {
-
-                        IconButton(onClick = { onSettingsToggle(true) }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    } else {
-
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_home),
-                            contentDescription = "Logo",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .padding(end = 12.dp)
-                                .size(30.dp)
-                                .graphicsLayer { alpha = if (appState.isRunning) logoAlpha else 1f }
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
+                )
+            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier
@@ -507,7 +523,7 @@ fun AppScaffold(
                 Surface(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 14.dp)
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
                         .height(64.dp)
                         .fillMaxWidth()
                         .clip(CircleShape),
@@ -515,7 +531,9 @@ fun AppScaffold(
                     tonalElevation = 0.dp
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -548,31 +566,34 @@ fun AppScaffold(
                                             scaleX = iconScale; scaleY = iconScale
                                         }
                                         .height(42.dp)
-                                        .fillMaxWidth(0.8f)
+                                        .fillMaxWidth(if (isSelected) 0.95f else 0.5f)
                                         .background(
                                             color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
                                             shape = CircleShape
-                                        ),
+                                        )
+                                        .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessLow)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(horizontal = if (isSelected) 8.dp else 0.dp)
                                     ) {
                                         Icon(
                                             imageVector = tab.second,
                                             contentDescription = tab.first,
                                             tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(22.dp)
+                                            modifier = Modifier.size(24.dp)
                                         )
                                         if (isSelected) {
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
                                                 text = tab.third,
                                                 style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                maxLines = 1
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Visible
                                             )
                                         }
                                     }
@@ -666,7 +687,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
                 OnboardingStepContent(
                     step = frozenBgStep,
@@ -700,7 +721,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
         ) {
             AnimatedContent(
                 targetState = step,
@@ -958,14 +979,14 @@ fun OnboardingStepContent(
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         "Made by @ShivamXD6",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "If ROM Shifter helped you, please consider starring the repository on GitHub or supporting the project via donations or sponsors!",
                         textAlign = TextAlign.Center,
@@ -1015,7 +1036,7 @@ fun OnboardingStepContent(
                             shape = CircleShape
                         ) { Text("Source") }
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
