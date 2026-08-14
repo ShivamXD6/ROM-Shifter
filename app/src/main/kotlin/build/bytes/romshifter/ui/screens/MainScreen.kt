@@ -166,7 +166,9 @@ fun MainScreen(viewModel: MainViewModel) {
                             text = parsedChangelog,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.verticalScroll(rememberScrollState())
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
                         )
                     }
                 }
@@ -1000,13 +1002,31 @@ fun OnboardingStepContent(
                                 .weight(1f)
                                 .height(48.dp),
                             shape = CircleShape
-                        ) { Text("GitHub") }
+                        ) { Text("Source") }
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Button(
+                            onClick = {
+                                openUriSafely(
+                                    context,
+                                    "https://github.com/sponsors/ShivamXD6"
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp),
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                "Sponsor",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
                         Button(
                             onClick = {
                                 openUriSafely(
@@ -1018,14 +1038,27 @@ fun OnboardingStepContent(
                                 .weight(1f)
                                 .height(48.dp),
                             shape = CircleShape
-                        ) { Text("UPI (Any)") }
+                        ) {
+                            Text(
+                                "UPI",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+
                         Button(
                             onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
                             shape = CircleShape
-                        ) { Text("PayPal") }
+                        ) {
+                            Text(
+                                "PayPal",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     Spacer(Modifier.height(32.dp))
