@@ -17,6 +17,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
+import build.bytes.romshifter.models.FlashZip
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.utils.BackendInstaller
 import build.bytes.romshifter.utils.FlashManager
@@ -26,6 +27,7 @@ import build.bytes.romshifter.utils.SettingsManager
 import build.bytes.romshifter.utils.ToolsManager
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +38,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AppState())
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
+
+    private val _appList = MutableStateFlow<List<AppInfo>>(emptyList())
+    val appList: StateFlow<List<AppInfo>> = _appList.asStateFlow()
+
+    private val _flashZips = MutableStateFlow<List<FlashZip>>(emptyList())
+    val flashZips: StateFlow<List<FlashZip>> = _flashZips.asStateFlow()
+
     private val prefs = application.getSharedPreferences("shifter_prefs", Context.MODE_PRIVATE)
 
     private val _savedPath = MutableStateFlow(
@@ -167,22 +176,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         createNotificationChannel()
-        if (!prefs.getBoolean("is_first_run", true)) {
-            checkForUpdates(isSilent = true)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!prefs.getBoolean("is_first_run", true)) {
+                checkForUpdates(isSilent = true)
+            }
         }
+
         viewModelScope.launch(Dispatchers.IO) {
             val isRooted = Shell.getShell().isRoot
             _uiState.value = _uiState.value.copy(hasRoot = isRooted)
-            if (isRooted) {
-                Shell.cmd("su -c 'dumpsys deviceidle whitelist +build.bytes.romshifter'").exec()
 
-                val checkScript =
-                    Shell.cmd("su -c '[ -f /data/adb/Shifter/ROM-Shifter.sh ] && echo YES'")
-                        .exec().out.joinToString("")
-                if (checkScript != "YES" || !prefs.getBoolean("is_engine_installed", false)) {
-                    val success = BackendInstaller.installEngine(application)
-                    if (success) prefs.edit { putBoolean("is_engine_installed", true) }
+            if (isRooted) {
+                val whitelistJob = async {
+                    Shell.cmd("su -c 'dumpsys deviceidle whitelist +build.bytes.romshifter'").exec()
                 }
+
+                val engineJob = async {
+                    val checkScript =
+                        Shell.cmd("su -c '[ -f /data/adb/Shifter/ROM-Shifter.sh ] && echo YES'")
+                        .exec().out.joinToString("")
+                    if (checkScript != "YES" || !prefs.getBoolean("is_engine_installed", false)) {
+                        val success = BackendInstaller.installEngine(application)
+                        if (success) prefs.edit { putBoolean("is_engine_installed", true) }
+                    }
+                }
+
+                whitelistJob.await()
+                engineJob.await()
             }
         }
     }
@@ -273,9 +294,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openFlashWizard() {
-        _uiState.value = _uiState.value.copy(flashWizardStep = 1, flashZips = emptyList())
+        _flashZips.value = emptyList()
+        _uiState.value = _uiState.value.copy(flashWizardStep = 1)
     }
-
 
     fun flashWizardStepBack() {
         val currentStep = _uiState.value.flashWizardStep
@@ -291,31 +312,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun removeZip(index: Int) {
-        val l =
-            _uiState.value.flashZips.toMutableList(); if (index in l.indices) l.removeAt(index); _uiState.value =
-            _uiState.value.copy(flashZips = l)
+        val l = _flashZips.value.toMutableList()
+        if (index in l.indices) l.removeAt(index)
+        _flashZips.value = l
     }
 
     fun moveZipUp(index: Int) {
-        val l = _uiState.value.flashZips.toMutableList(); if (index > 0) {
-            val i = l.removeAt(index); l.add(index - 1, i)
-        }; _uiState.value = _uiState.value.copy(flashZips = l)
+        val l = _flashZips.value.toMutableList()
+        if (index > 0) {
+            val i = l.removeAt(index)
+            l.add(index - 1, i)
+        }
+        _flashZips.value = l
     }
 
     fun moveZipDown(index: Int) {
-        val l = _uiState.value.flashZips.toMutableList(); if (index < l.size - 1) {
-            val i = l.removeAt(index); l.add(index + 1, i)
-        }; _uiState.value = _uiState.value.copy(flashZips = l)
+        val l = _flashZips.value.toMutableList()
+        if (index < l.size - 1) {
+            val i = l.removeAt(index)
+            l.add(index + 1, i)
+        }
+        _flashZips.value = l
     }
 
     fun processSelectedZips(uris: List<Uri>, append: Boolean = false) {
         _uiState.value = _uiState.value.copy(isProcessingZips = true)
         viewModelScope.launch(Dispatchers.IO) {
-            val zips =
-                FlashManager.processZips(uris, _uiState.value.flashZips, append, getApplication())
+            val zips = FlashManager.processZips(uris, _flashZips.value, append, getApplication())
             withContext(Dispatchers.Main) {
+                _flashZips.value = zips
                 _uiState.value = _uiState.value.copy(
-                    flashZips = zips,
                     isProcessingZips = false,
                     flashWizardStep = 2
                 )
@@ -347,7 +373,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             FlashManager.generateOrsAndProceed(
                 _uiState.value.flashWipePartitions,
                 _uiState.value.flashFormatData,
-                _uiState.value.flashZips
+                _flashZips.value
             )
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(flashWizardStep = 4)
@@ -358,9 +384,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun restartFlashWizard() {
         viewModelScope.launch(Dispatchers.IO) {
             FlashManager.restartFlashWizard(); withContext(Dispatchers.Main) {
+            _flashZips.value = emptyList()
             _uiState.value = _uiState.value.copy(
                 flashWizardStep = 1,
-                flashZips = emptyList(),
             )
         }
         }
@@ -559,7 +585,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         when (mode) {
             MigratorMode.DEBLOAT -> {
-                if (newState == 2 && _uiState.value.appList.none { !it.isInstalled }) {
+                if (newState == 2 && _appList.value.none { !it.isInstalled }) {
                     _uiState.value = _uiState.value.copy(isFetchingApps = true)
                     viewModelScope.launch {
                         val uninstalled = MigratorManager.fetchAppsList(
@@ -567,10 +593,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "Uninstalled",
                             true,
-                            _uiState.value.appList
+                            _appList.value
                         )
+                        _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
-                            appList = uninstalled,
                             actionFilterState = newState,
                             isFetchingApps = false
                         )
@@ -589,10 +615,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "System",
                             true,
-                            _uiState.value.appList
+                            _appList.value
                         )
+                        _appList.value = sys
                         _uiState.value = _uiState.value.copy(
-                            appList = sys,
                             systemAppsFetched = true,
                             actionFilterState = newState,
                             isFetchingApps = false
@@ -612,9 +638,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setMigratorMode(mode: MigratorMode) {
         val showSysApps =
             (mode == MigratorMode.DEBLOAT || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE || mode == MigratorMode.SYSTEMIZE)
+
+        _appList.value = emptyList()
         _uiState.value = _uiState.value.copy(
             migratorMode = mode,
-            appList = emptyList(),
             progress = 0,
             searchQuery = "",
             currentStep = "",
@@ -656,21 +683,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleAppSelection(packageName: String) {
-        val currentList = _uiState.value.appList.toMutableList()
+        val currentList = _appList.value.toMutableList()
         val index = currentList.indexOfFirst { it.packageName == packageName }
         if (index != -1) {
             currentList[index] =
                 currentList[index].copy(isSelected = !currentList[index].isSelected)
-            _uiState.value = _uiState.value.copy(appList = currentList)
+            _appList.value = currentList
         }
     }
 
     fun selectAllVisibleApps(select: Boolean, visibleApps: List<AppInfo>) {
         val visiblePackageNames = visibleApps.map { it.packageName }.toSet()
-        val updatedList = _uiState.value.appList.map {
+        val updatedList = _appList.value.map {
             if (visiblePackageNames.contains(it.packageName)) it.copy(isSelected = select) else it
         }
-        _uiState.value = _uiState.value.copy(appList = updatedList)
+        _appList.value = updatedList
     }
 
     fun clearLogs() {
@@ -684,10 +711,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
         viewModelScope.launch(Dispatchers.IO) {
-            val apps = MigratorManager.fetchAppsList(getApplication(), _savedPath.value, type, append, _uiState.value.appList)
+            val apps = MigratorManager.fetchAppsList(
+                getApplication(),
+                _savedPath.value,
+                type,
+                append,
+                _appList.value
+            )
             withContext(Dispatchers.Main) {
+                _appList.value = apps
                 _uiState.value = _uiState.value.copy(
-                    appList = apps,
                     isFetchingApps = false,
                 )
                 if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
@@ -699,8 +732,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun runDynamicOperation() {
         val state = _uiState.value
+        val apps = _appList.value
         val selectedApps =
-            state.appList.filter { it.isSelected && (it.isSystem && state.showSystemApps || !it.isSystem && state.showUserApps || state.actionFilterState == 2) }
+            apps.filter { it.isSelected && (it.isSystem && state.showSystemApps || !it.isSystem && state.showUserApps || state.actionFilterState == 2) }
         if (selectedApps.isEmpty()) return
 
         val initText = when (state.migratorMode) {

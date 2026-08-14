@@ -38,13 +38,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import build.bytes.romshifter.MainViewModel
+import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.MenuCard
 import kotlinx.coroutines.launch
 
 @Composable
-fun ToolsTab(appState: AppState, viewModel: MainViewModel) {
+fun ToolsTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
     val context = LocalContext.current
     var showMetaWarningDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -87,7 +88,7 @@ fun ToolsTab(appState: AppState, viewModel: MainViewModel) {
         label = "ToolsTransition"
     ) { isMenu ->
         if (!isMenu) {
-            MigratorActionScreen(appState, viewModel)
+            MigratorActionScreen(appState, appList, viewModel)
         } else {
 
             Column(modifier = Modifier

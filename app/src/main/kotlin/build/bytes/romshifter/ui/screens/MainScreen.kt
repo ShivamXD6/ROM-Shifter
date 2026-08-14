@@ -110,7 +110,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.R
+import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
+import build.bytes.romshifter.models.FlashZip
 import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -128,6 +130,8 @@ fun openUriSafely(context: Context, uriString: String) {
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val appState by viewModel.uiState.collectAsState()
+    val appList by viewModel.appList.collectAsState()
+    val flashZips by viewModel.flashZips.collectAsState()
     val isFirstRun by viewModel.isFirstRun.collectAsState()
     val selectedTab by viewModel.currentTab.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
@@ -274,19 +278,23 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                     .background(MaterialTheme.colorScheme.surfaceContainer)
             ) {
-                AppScaffold(
-                    appState = frozenPreviousAppState,
-                    showSettings = false,
-                    selectedTab = selectedTab,
-                    viewModel = viewModel,
-                    onTabSelect = {},
-                    onSettingsToggle = {},
-                    onBackClick = {},
-                )
-            }
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value))))
+            AppScaffold(
+                appState = frozenPreviousAppState,
+                appList = emptyList<AppInfo>(),
+                flashZips = emptyList<FlashZip>(),
+                showSettings = false,
+                selectedTab = selectedTab,
+                viewModel = viewModel,
+                onTabSelect = {},
+                onSettingsToggle = {},
+                onBackClick = {},
+            )
+        }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f * (1f - backProgress.value)))
+            )
         }
 
         Box(
@@ -305,10 +313,16 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             AppScaffold(
                 appState = appState,
+                appList = appList,
+                flashZips = flashZips,
                 showSettings = showSettings,
                 selectedTab = selectedTab,
                 viewModel = viewModel,
-                onTabSelect = { viewModel.setTab(it); if (it != 1) viewModel.setMigratorMode(MigratorMode.MENU) },
+                onTabSelect = {
+                    viewModel.setTab(it); if (it != 1) viewModel.setMigratorMode(
+                    MigratorMode.MENU
+                )
+                },
                 onSettingsToggle = { showSettings = it },
                 onBackClick = { triggerBackNavigation() }
             )
@@ -320,6 +334,8 @@ fun MainScreen(viewModel: MainViewModel) {
 @Composable
 fun AppScaffold(
     appState: AppState,
+    appList: List<AppInfo>,
+    flashZips: List<FlashZip>,
     showSettings: Boolean,
     selectedTab: Int,
     viewModel: MainViewModel,
@@ -473,9 +489,9 @@ fun AppScaffold(
                     SettingsTab(LocalContext.current, viewModel)
                 } else {
                     when (currentTab) {
-                        0 -> FlashTab(appState, LocalContext.current, viewModel)
-                        1 -> MigratorTab(appState, viewModel)
-                        2 -> ToolsTab(appState, viewModel)
+                        0 -> FlashTab(appState, flashZips, LocalContext.current, viewModel)
+                        1 -> MigratorTab(appState, appList, viewModel)
+                        2 -> ToolsTab(appState, appList, viewModel)
                     }
                 }
             }

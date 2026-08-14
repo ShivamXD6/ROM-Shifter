@@ -41,7 +41,8 @@ object NativeManager {
         if (doCall) permsToGrant.addAll(listOf("READ_CALL_LOG", "WRITE_CALL_LOG"))
         if (doContacts) permsToGrant.addAll(listOf("READ_CONTACTS", "WRITE_CONTACTS"))
 
-        permsToGrant.forEach { Shell.cmd("su -c 'pm grant $pkg android.permission.$it'").exec() }
+        val grantCmds = permsToGrant.map { "pm grant $pkg android.permission.$it" }.toTypedArray()
+        if (grantCmds.isNotEmpty()) Shell.cmd(*grantCmds).exec()
 
         if (isBackup) {
             if (doSms) {

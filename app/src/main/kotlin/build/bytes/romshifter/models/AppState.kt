@@ -1,7 +1,6 @@
 package build.bytes.romshifter.models
 
 import androidx.compose.runtime.Stable
-import android.graphics.Bitmap
 
 enum class MigratorMode { MENU, BACKUP_APPS, RESTORE_APPS, MANAGE, DEBLOAT, SYSTEMIZE }
 
@@ -12,7 +11,6 @@ data class AppInfo(
     val version: String = "",
     val isSystem: Boolean = false,
     val isSelected: Boolean = false,
-    val iconBitmap: Bitmap? = null,
     val iconPath: String? = null,
     val backupTime: String = "",
     val isInstalled: Boolean = true,
@@ -27,8 +25,6 @@ data class AppState(
     val currentAction: String = "Ready to Shift",
     val currentStep: String = "",
     val progress: Int = 0,
-    val logs: List<String> = emptyList(),
-    val appList: List<AppInfo> = emptyList(),
     val isFetchingApps: Boolean = false,
     val systemAppsFetched: Boolean = false,
     val searchQuery: String = "",
@@ -41,7 +37,6 @@ data class AppState(
     val flashWizardStep: Int = 0,
     val flashWipePartitions: Set<String> = setOf("dalvik", "cache"),
     val flashFormatData: Boolean = false,
-    val flashZips: List<FlashZip> = emptyList(),
     val isProcessingZips: Boolean = false,
     val hasLockscreen: Boolean = false
 )

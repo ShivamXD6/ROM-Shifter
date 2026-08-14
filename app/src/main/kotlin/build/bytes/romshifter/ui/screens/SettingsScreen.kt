@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
@@ -37,7 +38,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -98,6 +99,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     if (showUpdateSheet) {
         ModalBottomSheet(
             onDismissRequest = { showUpdateSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {
@@ -109,7 +111,8 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 Text("Select release channel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val channels = listOf(0 to "Stable Release", 1 to "Early Access (Pre-releases)")
+                val channels =
+                    remember { listOf(0 to "Stable Release", 1 to "Early Access (Pre-releases)") }
                 channels.forEach { (value, label) ->
                     Row(
                         modifier = Modifier
@@ -137,7 +140,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         .height(52.dp),
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.Sync, contentDescription = null)
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Check for Updates Now", style = MaterialTheme.typography.titleMedium)
                 }
@@ -149,6 +152,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     if (showThemeSheet) {
         ModalBottomSheet(
             onDismissRequest = { showThemeSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {
@@ -159,7 +163,15 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 Text("Choose Theme", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val options = listOf(0 to "System Default", 1 to "Light", 2 to "Dark", 3 to "Amoled (Accent)", 4 to "Amoled (Dynamic)")
+                val options = remember {
+                    listOf(
+                        0 to "System Default",
+                        1 to "Light",
+                        2 to "Dark",
+                        3 to "Amoled (Accent)",
+                        4 to "Amoled (Dynamic)"
+                    )
+                }
                 options.forEach { (value, label) ->
                     Row(
                         modifier = Modifier
@@ -182,6 +194,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     if (showAboutSheet) {
         ModalBottomSheet(
             onDismissRequest = { showAboutSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ) {

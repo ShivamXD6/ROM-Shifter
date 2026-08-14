@@ -78,6 +78,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,6 +92,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
+import build.bytes.romshifter.models.FlashZip
 import build.bytes.romshifter.ui.components.MenuCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -98,7 +100,15 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
+fun FlashTab(
+    appState: AppState,
+    flashZips: List<FlashZip>,
+    context: Context,
+    viewModel: MainViewModel
+) {
+    val currentFlashZips by rememberUpdatedState(flashZips)
+    val currentViewModel by rememberUpdatedState(viewModel)
+
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
 
@@ -519,11 +529,15 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                 .padding(top = 40.dp))
                         } else {
                             val density = LocalDensity.current
-                            val swapThreshold = with(density) { 64.dp.toPx() }
+                            val swapThreshold =
+                                with(density) { 56.dp.toPx() }
 
                             LazyColumn(modifier = Modifier.weight(1f)) {
-                                itemsIndexed(items = appState.flashZips, key = { _, zip -> zip.path }) { index, zip ->
+                                itemsIndexed(
+                                    items = flashZips,
+                                    key = { _, zip -> zip.path }) { index, zip ->
                                     var dragOffset by remember(zip.path) { mutableFloatStateOf(0f) }
+                                    val currentIndexState by rememberUpdatedState(index)
 
                                     ElevatedCard(
                                         modifier = Modifier
@@ -556,15 +570,22 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                                             change.consume()
                                                             dragOffset += dragAmount
 
+                                                            val list = currentFlashZips
                                                             val currentIndex =
-                                                                appState.flashZips.indexOf(zip)
+                                                                list.indexOfFirst { it.path == zip.path }
 
-                                                            if (dragOffset > swapThreshold && currentIndex < appState.flashZips.size - 1) {
-                                                                viewModel.moveZipDown(currentIndex)
-                                                                dragOffset -= swapThreshold
-                                                            } else if (dragOffset < -swapThreshold && currentIndex > 0) {
-                                                                viewModel.moveZipUp(currentIndex)
-                                                                dragOffset += swapThreshold
+                                                            if (currentIndex != -1) {
+                                                                if (dragOffset > swapThreshold && currentIndex < list.size - 1) {
+                                                                    currentViewModel.moveZipDown(
+                                                                        currentIndex
+                                                                    )
+                                                                    dragOffset -= swapThreshold
+                                                                } else if (dragOffset < -swapThreshold && currentIndex > 0) {
+                                                                    currentViewModel.moveZipUp(
+                                                                        currentIndex
+                                                                    )
+                                                                    dragOffset += swapThreshold
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -572,7 +593,11 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
 
-                                            IconButton(onClick = { viewModel.removeZip(index) }, modifier = Modifier.size(40.dp)) {
+                                            IconButton(onClick = {
+                                                currentViewModel.removeZip(
+                                                    currentIndexState
+                                                )
+                                            }, modifier = Modifier.size(40.dp)) {
                                                 Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
                                             }
                                         }
@@ -596,7 +621,12 @@ fun FlashTab(appState: AppState, context: Context, viewModel: MainViewModel) {
                         }
                     }
                     3 -> {
-                        val hasRomZip = appState.flashZips.any { it.category.contains("ROM", ignoreCase = true) || it.name.contains("ROM", ignoreCase = true) }
+                        val hasRomZip = flashZips.any {
+                            it.category.contains(
+                                "ROM",
+                                ignoreCase = true
+                            ) || it.name.contains("ROM", ignoreCase = true)
+                        }
 
                         if (appState.hasLockscreen) {
                             ElevatedCard(

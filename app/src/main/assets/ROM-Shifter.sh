@@ -22,15 +22,7 @@ SANITIZE() { echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'; }
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
 
 RAW_SIZE() {
-    local sum=0
-    for p in "$@"; do
-        p=$(echo "$p" | tr -d '\r')
-        if [ -n "$p" ] && [ -e "$p" ]; then
-            local base=$(du -sk "$p" 2>/dev/null | awk '{print $1}')
-            sum=$(( sum + ${base:-0} ))
-        fi
-    done
-    echo "$sum"
+    du -sk "$@" 2>/dev/null | awk '{sum+=$1} END{print sum+0}'
 }
 
 FORMAT_SIZE() {
@@ -219,7 +211,7 @@ DO_BACKUP() {
         [ "$global_pct" -gt 100 ] && global_pct=100
 
         echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
-        sleep 0.5
+        sleep 0.8
     done
 
     wait
@@ -343,7 +335,7 @@ DO_RESTORE() {
         local global_pct=$(( BASE_PCT + (app_pct / TOT_IDX) ))
         [ "$global_pct" -gt 100 ] && global_pct=100
         echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
-        sleep 0.5
+        sleep 0.8
     done
 
     wait

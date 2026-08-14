@@ -6,6 +6,10 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import build.bytes.romshifter.models.FlashZip
 import com.topjohnwu.superuser.Shell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.util.Locale
 
 object FlashManager {
@@ -19,36 +23,59 @@ object FlashManager {
         return null
     }
 
-    fun processZips(uris: List<Uri>, currentZips: List<FlashZip>, append: Boolean, context: Context): List<FlashZip> {
+    suspend fun processZips(
+        uris: List<Uri>,
+        currentZips: List<FlashZip>,
+        append: Boolean,
+        context: Context
+    ): List<FlashZip> = coroutineScope {
         val zips = if (append) currentZips.toMutableList() else mutableListOf()
-        for (uri in uris) {
-            val path = getPathFromUri(context, uri) ?: continue
-            if (zips.any { it.path == path }) continue
-            val name = path.substringAfterLast("/")
-            val nameLower = name.lowercase(Locale.ROOT)
-            val contents = Shell.cmd("su -mm -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
 
-            val hasModuleProp = contents.contains("module.prop", ignoreCase = true)
-            val hasUpdateBinary = contents.contains(Regex("META-INF/.*update-binary", RegexOption.IGNORE_CASE))
-            var isGapps = false; var isAddon = false
+        val deferredZips = uris.map { uri ->
+            async(Dispatchers.IO) {
+                val path = getPathFromUri(context, uri) ?: return@async null
+                if (zips.any { it.path == path }) return@async null
 
-            if (nameLower.contains(Regex("gapps|nikgapps|bitgapps|mindthegapps"))) { isGapps = true; if (nameLower.contains("addon")) isAddon = true }
-            else if (contents.contains(Regex("bitgapps|nikgapps|mindthegapps|busybox-arm|util_functions\\.sh"))) { isGapps = true; isAddon = true }
+                val name = path.substringAfterLast("/")
+                val nameLower = name.lowercase(Locale.ROOT)
+                val contents =
+                    Shell.cmd("su -mm -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
 
-            val category: String? = when {
-                isGapps -> if (isAddon) "Addon" else "GApps"
-                hasModuleProp -> null
-                contents.contains(Regex("firmware-update/|abl\\.elf|xbl\\.elf|tz\\.mbn")) -> "Firmware"
-                contents.contains(Regex("payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list")) -> "ROM"
-                contents.contains(Regex("anykernel|zimage|image\\.gz")) || nameLower.contains(Regex("kernel|perf|stormbreaker|eas")) -> "Kernel"
-                hasUpdateBinary -> "Other"
-                else -> null
+                val hasModuleProp = contents.contains("module.prop", ignoreCase = true)
+                val hasUpdateBinary =
+                    contents.contains(Regex("META-INF/.*update-binary", RegexOption.IGNORE_CASE))
+                var isGapps = false
+                var isAddon = false
+
+                if (nameLower.contains(Regex("gapps|nikgapps|bitgapps|mindthegapps"))) {
+                    isGapps = true; if (nameLower.contains("addon")) isAddon = true
+                } else if (contents.contains(Regex("bitgapps|nikgapps|mindthegapps|busybox-arm|util_functions\\.sh"))) {
+                    isGapps = true; isAddon = true
+                }
+
+                val category: String? = when {
+                    isGapps -> if (isAddon) "Addon" else "GApps"
+                    hasModuleProp -> null
+                    contents.contains(Regex("firmware-update/|abl\\.elf|xbl\\.elf|tz\\.mbn")) -> "Firmware"
+                    contents.contains(Regex("payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list")) -> "ROM"
+                    contents.contains(Regex("anykernel|zimage|image\\.gz")) || nameLower.contains(
+                        Regex("kernel|perf|stormbreaker|eas")
+                    ) -> "Kernel"
+
+                    hasUpdateBinary -> "Other"
+                    else -> null
+                }
+
+                if (category != null) FlashZip(name, path, category) else null
             }
-
-            if (category != null) zips.add(FlashZip(name, path, category))
         }
+
+        zips.addAll(deferredZips.awaitAll().filterNotNull())
+        
         val order = listOf("Firmware", "ROM", "GApps", "Addon", "Kernel", "Other")
-        return zips.sortedWith(compareBy<FlashZip> { val index = order.indexOf(it.category); if (index == -1) 99 else index }.thenBy { it.name })
+        zips.sortedWith(compareBy<FlashZip> {
+            val index = order.indexOf(it.category); if (index == -1) 99 else index
+        }.thenBy { it.name })
     }
 
     fun checkLockscreen(): Boolean = !Shell.cmd("su -mm -c 'locksettings verify'").exec().isSuccess

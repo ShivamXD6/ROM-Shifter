@@ -30,34 +30,45 @@ object ShellEngine {
     }
 
     private fun parseLine(line: String): ShifterEvent {
-        if (!line.contains("|")) return ShifterEvent.RawLog(line)
+        if (!line.startsWith("ACTION:") && !line.contains("|INFO:STEP|")) return ShifterEvent.RawLog(
+            line
+        )
 
-        val parts = line.split("|").associate { segment ->
-            val kv = segment.split(":", limit = 2)
-            if (kv.size == 2) kv[0] to kv[1] else segment to ""
+        val partsMap = mutableMapOf<String, String>()
+        var start = 0
+        while (start < line.length) {
+            val end = line.indexOf('|', start).let { if (it == -1) line.length else it }
+            val segment = line.substring(start, end)
+            val colonIdx = segment.indexOf(':')
+            if (colonIdx != -1) {
+                val key = segment.substring(0, colonIdx)
+                val value = segment.substring(colonIdx + 1)
+                partsMap[key] = value
+            }
+            start = end + 1
         }
 
-        val action = parts["ACTION"]
-        val info = parts["INFO"]
+        val action = partsMap["ACTION"]
+        val info = partsMap["INFO"]
 
         return when {
             action == "BACKUP_START" || action == "RESTORE_START" -> ShifterEvent.BackupProgress(
-                pkg = parts["PKG"] ?: "",
-                label = parts["LABEL"] ?: "",
-                current = parts["CUR"]?.toIntOrNull() ?: 0,
-                total = parts["TOT"]?.toIntOrNull() ?: 0,
-                percent = parts["PCT"]?.toIntOrNull() ?: 0,
-                size = parts["SIZE"] ?: "",
+                pkg = partsMap["PKG"] ?: "",
+                label = partsMap["LABEL"] ?: "",
+                current = partsMap["CUR"]?.toIntOrNull() ?: 0,
+                total = partsMap["TOT"]?.toIntOrNull() ?: 0,
+                percent = partsMap["PCT"]?.toIntOrNull() ?: 0,
+                size = partsMap["SIZE"] ?: "",
             )
             info == "STEP" -> ShifterEvent.InfoStep(
-                msg = parts["MSG"] ?: ""
+                msg = partsMap["MSG"] ?: ""
             )
             action == "GLOBAL_DONE" -> ShifterEvent.GlobalDone(
-                totalKb = parts["TOTAL"] ?: "0",
-                timeSec = parts["TIME"] ?: "0"
+                totalKb = partsMap["TOTAL"] ?: "0",
+                timeSec = partsMap["TIME"] ?: "0"
             )
             action == "FETCH_DONE" -> ShifterEvent.FetchDone(
-                file = parts["FILE"] ?: ""
+                file = partsMap["FILE"] ?: ""
             )
             else -> ShifterEvent.RawLog(line)
         }

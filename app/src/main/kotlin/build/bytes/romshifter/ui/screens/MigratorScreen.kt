@@ -14,7 +14,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,6 +82,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -93,7 +93,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -101,16 +100,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import build.bytes.romshifter.MainViewModel
+import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.AppListItem
+import build.bytes.romshifter.ui.components.ExpressiveRefreshIndicator
 import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.ShimmerAppListItem
 import build.bytes.romshifter.utils.getAvatarColor
 import coil.compose.AsyncImage
 
 @Composable
-fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
+fun MigratorTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
     AnimatedContent(
         targetState = appState.migratorMode == MigratorMode.MENU,
         transitionSpec = {
@@ -127,7 +128,7 @@ fun MigratorTab(appState: AppState, viewModel: MainViewModel) {
         if (isMenu) {
             MigratorMenu(viewModel)
         } else {
-            MigratorActionScreen(appState, viewModel)
+            MigratorActionScreen(appState, appList, viewModel)
         }
     }
 }
@@ -243,19 +244,19 @@ fun MigratorMenu(viewModel: MainViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
+fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
     val context = LocalContext.current
 
 
     val filteredApps by remember(
-        appState.appList,
+        appList,
         appState.searchQuery,
         appState.showSystemApps,
         appState.showUserApps,
         appState.actionFilterState
     ) {
         derivedStateOf {
-            appState.appList.filter { app ->
+            appList.filter { app ->
                 val matchesSearch = app.label.contains(
                     appState.searchQuery,
                     ignoreCase = true
@@ -645,9 +646,20 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
             }
         }
 
+        val pullRefreshState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = appState.isFetchingApps,
             onRefresh = { viewModel.refreshCurrentList() },
+            state = pullRefreshState,
+            indicator = {
+                ExpressiveRefreshIndicator(
+                    state = pullRefreshState,
+                    isRefreshing = appState.isFetchingApps,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                )
+            },
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -714,7 +726,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                     val isCompleted = !appState.isRunning && appState.progress == 100
 
                     val processingApp = remember(appState.currentAction, appState.currentStep) {
-                        appState.appList.firstOrNull { app ->
+                        appList.firstOrNull { app ->
                             app.isSelected && (
                                     appState.currentAction.contains(app.label, ignoreCase = true) ||
                                             appState.currentStep.contains(app.label, ignoreCase = true) ||
@@ -759,13 +771,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                                             .size(42.dp)
                                             .clip(RoundedCornerShape(12.dp))
 
-                                        if (processingApp?.iconBitmap != null) {
-                                            Image(
-                                                bitmap = processingApp.iconBitmap.asImageBitmap(),
-                                                contentDescription = null,
-                                                modifier = iconModifier
-                                            )
-                                        } else if (processingApp?.iconPath != null) {
+                                        if (processingApp?.iconPath != null) {
                                             AsyncImage(
                                                 model = processingApp.iconPath,
                                                 contentDescription = null,
@@ -858,7 +864,7 @@ fun MigratorActionScreen(appState: AppState, viewModel: MainViewModel) {
                         }
                     }
                 } else {
-                    val selectedCount = appState.appList.count { it.isSelected }
+                    val selectedCount = appList.count { it.isSelected }
                     Row(
                         modifier = Modifier
                             .navigationBarsPadding()

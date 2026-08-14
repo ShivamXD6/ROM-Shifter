@@ -44,12 +44,15 @@ object MigratorManager {
 
         val pm = context.packageManager
         val apps = if (append) currentList.toMutableList() else mutableListOf()
+        val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
 
         when (type) {
             "User", "System", "AllInstalled" -> {
                 val sysModCmd =
                     "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/app 2>/dev/null"
                 val systemizedLabels = Shell.cmd(sysModCmd).exec().out.toSet()
+
+                val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
                 val installedApps = pm.getInstalledApplications(0)
                 val fetchedApps = installedApps.map { app ->
@@ -60,19 +63,38 @@ object MigratorManager {
                             val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
                             val version = try { pm.getPackageInfo(app.packageName, 0).versionName?.replace("|", "")?.replace("\n", "")?.trim() ?: "" } catch(_: Exception) { "" }
 
-                            val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
-                            val tinyBitmap = getTinyBitmap(rawIcon)
+                            val iconFile = File(iconCacheDir, "${pkg}_icon.png")
+                            if (!iconFile.exists()) {
+                                try {
+                                    val rawIcon = app.loadIcon(pm)
+                                    val bitmap = getTinyBitmap(rawIcon)
+                                    if (bitmap != null) {
+                                        FileOutputStream(iconFile).use { out ->
+                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                        }
+                                    }
+                                } catch (_: Exception) {
+                                }
+                            }
+                            val iconPath = if (iconFile.exists()) iconFile.absolutePath else null
 
                             val metaFile =
                                 File("$currentPath/Apps/${if (isSys) "System" else "User"}/$label/Meta.txt")
                             val bTime = if (metaFile.exists()) {
-                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
 
-                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconBitmap = tinyBitmap, backupTime = bTime, isSystemized = isSystemizedApp)
+                            AppInfo(
+                                label = label,
+                                packageName = pkg,
+                                version = version,
+                                isSystem = isSys,
+                                iconPath = iconPath,
+                                backupTime = bTime,
+                                isSystemized = isSystemizedApp
+                            )
                         } else {
                             null
                         }
@@ -83,6 +105,7 @@ object MigratorManager {
             "Uninstalled" -> {
                 val allApps = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
                 val activeApps = pm.getInstalledApplications(0).map { it.packageName }.toSet()
+                val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
                 val fetchedApps = allApps.map { app ->
                     async(Dispatchers.IO) {
@@ -99,18 +122,38 @@ object MigratorManager {
 
                             val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
+                            val pkg = app.packageName
 
-                            val rawIcon = try { app.loadIcon(pm) } catch(_: Exception) { null }
-                            val tinyBitmap = getTinyBitmap(rawIcon)
+                            val iconFile = File(iconCacheDir, "${pkg}_icon.png")
+                            if (!iconFile.exists()) {
+                                try {
+                                    val rawIcon = app.loadIcon(pm)
+                                    val bitmap = getTinyBitmap(rawIcon)
+                                    if (bitmap != null) {
+                                        FileOutputStream(iconFile).use { out ->
+                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                        }
+                                    }
+                                } catch (_: Exception) {
+                                }
+                            }
+                            val iconPath = if (iconFile.exists()) iconFile.absolutePath else null
 
                             val metaFile =
                                 File("$currentPath/Apps/${if (isSys) "System" else "User"}/$label/Meta.txt")
                             val bTime = if (metaFile.exists()) {
-                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
-                            AppInfo(label = label, packageName = app.packageName, isSystem = isSys, iconBitmap = tinyBitmap, backupTime = bTime, isInstalled = false)                        } else {
+                            AppInfo(
+                                label = label,
+                                packageName = pkg,
+                                isSystem = isSys,
+                                iconPath = iconPath,
+                                backupTime = bTime,
+                                isInstalled = false
+                            )
+                        } else {
                             null
                         }
                     }
@@ -138,6 +181,18 @@ object MigratorManager {
                     }
                 }
 
+                val iconScript = StringBuilder()
+                appMap.forEach { (basePath, data) ->
+                    val pkg = data["Package"] ?: return@forEach
+                    val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
+                    if (!cacheFile.exists()) {
+                        iconScript.append("cp '$basePath/Icon.png' '${cacheFile.absolutePath}' && chmod 644 '${cacheFile.absolutePath}'\n")
+                    }
+                }
+                if (iconScript.isNotEmpty()) {
+                    Shell.cmd("su -c \"$iconScript\"").exec()
+                }
+
                 val deferredBackups = appMap.map { (basePath, data) ->
                     async(Dispatchers.IO) {
                         val sysType = basePath.split("/").lastOrNull { it == "System" || it == "User" } ?: "User"
@@ -147,16 +202,12 @@ object MigratorManager {
                         val version = data["Version"] ?: ""
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
-                            var iconPath: String? = null
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
-                            if (!cacheFile.exists()) {
-                                Shell.cmd("su -c \"cp '$basePath/Icon.png' '${cacheFile.absolutePath}' && chmod 644 '${cacheFile.absolutePath}'\"").exec()
-                            }
-                            if (cacheFile.exists() && cacheFile.length() > 0) iconPath = cacheFile.absolutePath
+                            val iconPath =
+                                if (cacheFile.exists() && cacheFile.length() > 0) cacheFile.absolutePath else null
 
                             val metaFile = File("$basePath/Meta.txt")
                             val bTime = if (metaFile.exists()) {
-                                val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
