@@ -265,6 +265,36 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            openUriSafely(
+                                context,
+                                "upi://pay?pa=shivamashokdhage6@oksbi&pn=Build%20Bytes&cu=INR"
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = CircleShape
+                    ) { Text("UPI (Any)") }
+
+                    Button(
+                        onClick = { openUriSafely(context, "https://paypal.me/ShivamXD6") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
+                        shape = CircleShape
+                    ) { Text("PayPal") }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(16.dp))
