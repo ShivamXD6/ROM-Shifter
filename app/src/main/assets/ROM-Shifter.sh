@@ -465,8 +465,13 @@ do_restore() {
 
         APP_PATH="$BACKUP_BASE/$type/$label/Meta.txt"
         if [ -f "$APP_PATH" ]; then
-            size=$(grep "^TotalSize=" "$APP_PATH" | cut -d= -f2)
-            echo "${size:-0}|${label}|${type}" >> "$AM_TMP/selected_restores.txt"
+            local s=0
+            CHK 1 && { val=$(grep "^AppSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            CHK 2 && { val=$(grep "^DataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            CHK 3 && { val=$(grep "^ExtDataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            CHK 4 && { val=$(grep "^MediaSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            CHK 5 && { val=$(grep "^ObbSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            echo "${s:-0}|${label}|${type}" >> "$AM_TMP/selected_restores.txt"
         fi
     done < "$TARGETS"
 
