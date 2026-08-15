@@ -11,7 +11,14 @@ android {
         applicationId = "build.bytes.romshifter"
         minSdk = 26
         targetSdk = 37
-        versionCode = (project.findProperty("VERSION_CODE") ?: "10").toString().toInt()
+        versionCode = project.findProperty("VERSION_CODE")?.toString()?.toIntOrNull() ?: try {
+            project.providers.exec {
+                commandLine("git", "rev-list", "--count", "HEAD")
+                isIgnoreExitValue = true
+            }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 10 }.getOrElse(86)
+        } catch (_: Exception) {
+            10
+        }
         versionName = "Eevee (v1)"
     }
 
