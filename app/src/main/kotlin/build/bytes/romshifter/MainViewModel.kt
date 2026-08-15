@@ -195,17 +195,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val engineJob = async {
-                    val checkScript =
-                        Shell.cmd("su -c '[ -f /data/adb/Shifter/ROM-Shifter.sh ] && echo YES'")
-                        .exec().out.joinToString("")
-                    if (checkScript != "YES" || !prefs.getBoolean("is_engine_installed", false)) {
-                        val success = BackendInstaller.installEngine(application)
-                        if (success) prefs.edit { putBoolean("is_engine_installed", true) }
-                    }
+                    val success = BackendInstaller.installEngine(application)
+                    if (success) prefs.edit { putBoolean("is_engine_installed", true) }
+                }
+
+                val cleanupJob = async {
+                    val commands = arrayOf(
+                        "mkdir -p /data/local/tmp",
+                        "chmod 1777 /data/local/tmp",
+                        "chown shell:shell /data/local/tmp",
+                        "rm -rf /data/local/tmp/appmgr_tmp /data/local/tmp/shifter_targets.txt",
+                        "mkdir -p /data/local/tmp/appmgr_tmp",
+                        "chmod 777 /data/local/tmp/appmgr_tmp",
+                        "chown shell:shell /data/local/tmp/appmgr_tmp"
+                    )
+                    Shell.cmd(*commands).exec()
                 }
 
                 whitelistJob.await()
                 engineJob.await()
+                cleanupJob.await()
             }
         }
     }
