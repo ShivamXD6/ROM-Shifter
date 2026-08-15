@@ -92,6 +92,13 @@ SETPERM() {
 
 DELGMS() { rm -f "/data/data/$1/databases/com.google.android.datatransport.events" "/data/data/$1/databases/com.google.android.datatransport.events-journal" "/data/data/$1/no_backup/com.google.android.gms.appid-no-backup" "/data/data/$1/shared_prefs/com.google.android.gms.appid.xml" "/data/data/$1/shared_prefs/com.google.android.gms.measurement.prefs.xml" 2>/dev/null; }
 
+FIND_BLOCK() {
+    for p in "/dev/block/mapper/$1" "/dev/block/by-name/$1" "/dev/block/bootdevice/by-name/$1"; do
+        [ -e "$p" ] && echo "$p" && return 0
+    done
+    return 1
+}
+
 PKG_INSTALLED() {
     pm list packages | grep -q "^package:$1$" || return 1
     [ -z "$2" ] && return 0
@@ -113,21 +120,15 @@ UNBUNDAPP() {
 
 do_live_backup() {
     local part="$1"
-    local BLOCK_PATH="/dev/block/by-name/$part"
-    [ ! -e "$BLOCK_PATH" ] && BLOCK_PATH="/dev/block/bootdevice/by-name/$part"
-    if [ -e "$BLOCK_PATH" ]; then
-        dd if="$BLOCK_PATH" of="$LP_DIR/${part}_backup.img" bs=4M
+    local BLOCK_PATH=$(FIND_BLOCK "$part")
+    if [ -n "$BLOCK_PATH" ]; then
+      dd if="$BLOCK_PATH" of="$LP_DIR/${part}_backup.img" bs=4M
     fi
 }
 
 do_live_restore() {
-    local part="$1"
-    local IMG_PATH="$2"
-    local BLOCK_PATH="/dev/block/by-name/$part"
-    [ ! -e "$BLOCK_PATH" ] && BLOCK_PATH="/dev/block/bootdevice/by-name/$part"
-    if [ -e "$BLOCK_PATH" ] && [ -f "$IMG_PATH" ]; then
-        dd if="$IMG_PATH" of="$BLOCK_PATH" bs=4M
-    fi
+    local BLOCK_PATH=$(FIND_BLOCK "$1")
+    [ -n "$BLOCK_PATH" ] && [ -f "$2" ] && [ "${2##*.}" = "img" ] && dd if="$2" of="$BLOCK_PATH" bs=4M && sync
 }
 
 DO_BACKUP() {

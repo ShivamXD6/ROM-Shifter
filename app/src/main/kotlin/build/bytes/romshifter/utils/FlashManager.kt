@@ -104,26 +104,34 @@ object FlashManager {
     fun executeFlashNow() { Shell.cmd("su -mm -c \"sync; reboot recovery\"").exec() }
 
     fun getAllPartitions(): List<String> {
-        val paths = listOf("/dev/block/by-name", "/dev/block/bootdevice/by-name")
-        val blockedPartitions = listOf("system", "system_ext", "vendor", "product", "odm", "super", "userdata", "metadata", "persist")
+        val paths =
+            listOf("/dev/block/by-name", "/dev/block/bootdevice/by-name", "/dev/block/mapper")
+        val blocked = listOf(
+            "system",
+            "system_ext",
+            "super",
+            "vendor",
+            "product",
+            "odm",
+            "userdata",
+            "metadata",
+            "persist",
+            "control"
+        )
+        val allFound = mutableListOf<String>()
         for (path in paths) {
-            val out = Shell.cmd("su -c ls -1 $path").exec().out
-            if (out.isNotEmpty() && !out[0].contains("No such file")) {
-                return out.asSequence()
-                    .filter { it.isNotBlank() }
-                    .map { it.trim().replace(Regex("_[ab]$"), "") }
-                    .filterNot { blockedPartitions.contains(it) }
-                    .distinct()
-                    .sorted()
-                    .toList()
-            }
+            val out = Shell.cmd("su -c \"ls -1p $path 2>/dev/null | grep -v /\"").exec().out
+            allFound.addAll(out.map { it.trim() }
+                .filter { it.isNotBlank() && !blocked.any { b -> it == b || it.startsWith("${b}_") } })
         }
-        return emptyList()
+        return allFound.distinct().sorted()
     }
 
     fun getBackedUpImages(savedPath: String): List<String> {
-        return Shell.cmd("su -c \"ls -1 '$savedPath/Partitions/' | grep '\\.img$'\"")
-            .exec().out.filter { it.isNotBlank() }
+        return Shell.cmd("su -c \"ls -1p '$savedPath/Partitions/' 2>/dev/null | grep -v / | grep '\\.img$'\"")
+            .exec().out
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
     }
 
     fun deleteLivePartitionImage(savedPath: String, imgName: String) {
