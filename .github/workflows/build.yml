@@ -34,17 +34,15 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
 
-      - name: Get Version Info & Changelog
+      - name: Get Version Info & Changelogs
         run: |
-          echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          echo "COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_ENV
           VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts || echo "1.0")
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           
-          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || [ -z "${{ github.event.before }}" ]; then
-            CHANGES=$(git log -5 --pretty=format:"- %s")
-          else
-            CHANGES=$(git log ${{ github.event.before }}..${{ github.sha }} --pretty=format:"- %s")
-          fi
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CHANGES=$(git log $PREV_TAG..HEAD --pretty=format:"- **%s** by @%an%n%w(0,2,2)%b")
           
           echo "CHANGELOG<<EOF" >> $GITHUB_ENV
           echo "$CHANGES" >> $GITHUB_ENV

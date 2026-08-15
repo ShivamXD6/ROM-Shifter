@@ -164,6 +164,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = false)
+                            .animateContentSize()
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .padding(16.dp),
@@ -1191,50 +1192,85 @@ fun NoRootScreen() {
 
 @Composable
 fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
-    val titleLargeStyle = MaterialTheme.typography.titleLarge.toSpanStyle().copy(fontWeight = FontWeight.Bold)
-    val titleMediumStyle = MaterialTheme.typography.titleMedium.toSpanStyle().copy(fontWeight = FontWeight.Bold)
+    val titleLargeStyle = MaterialTheme.typography.titleLarge.toSpanStyle().copy(
+        fontWeight = FontWeight.ExtraBold,
+        color = MaterialTheme.colorScheme.primary
+    )
+    val titleMediumStyle = MaterialTheme.typography.titleMedium.toSpanStyle().copy(
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary
+    )
+    val codeStyle = SpanStyle(
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        background = MaterialTheme.colorScheme.surfaceVariant,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    val quoteStyle = SpanStyle(
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+    )
 
     return buildAnnotatedString {
         val lines = text.split("\n")
 
-        for ((lineIndex, line) in lines.withIndex()) {
+        lines.forEachIndexed { index, line ->
             var currentLine = line
-            var headingStyle: SpanStyle? = null
+            var lineStyle: SpanStyle? = null
+            var prefix = ""
 
-            if (currentLine.startsWith("### ")) {
-                currentLine = currentLine.removePrefix("### ")
-                headingStyle = titleMediumStyle
-            } else if (currentLine.startsWith("## ")) {
-                currentLine = currentLine.removePrefix("## ")
-                headingStyle = titleLargeStyle
-            } else if (currentLine.startsWith("# ")) {
-                currentLine = currentLine.removePrefix("# ")
-                headingStyle = titleLargeStyle
-            }
+            if (currentLine.matches(Regex("^-{3,}$|^\\*{3,}$|^_{3,}$"))) {
+                withStyle(SpanStyle(color = MaterialTheme.colorScheme.outlineVariant)) {
+                    append("────────────────────────────────")
+                }
+            } else {
+                if (currentLine.startsWith("### ")) {
+                    currentLine = currentLine.removePrefix("### ")
+                    lineStyle = titleMediumStyle
+                } else if (currentLine.startsWith("## ")) {
+                    currentLine = currentLine.removePrefix("## ")
+                    lineStyle = titleLargeStyle
+                } else if (currentLine.startsWith("# ")) {
+                    currentLine = currentLine.removePrefix("# ")
+                    lineStyle = titleLargeStyle
+                }
 
-            val lineStart = length
+                if (currentLine.startsWith("> ")) {
+                    currentLine = currentLine.removePrefix("> ")
+                    lineStyle = quoteStyle
+                    prefix = "┃ "
+                }
 
-            val parts = currentLine.split("**")
-            for ((index, part) in parts.withIndex()) {
-                if (index % 2 == 1) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
-                } else {
-                    append(part)
+                if (currentLine.trimStart().startsWith("- ") || currentLine.trimStart()
+                        .startsWith("* ")
+                ) {
+                    val indent = currentLine.takeWhile { it.isWhitespace() }
+                    currentLine = currentLine.trimStart().substring(2)
+                    prefix = "$indent• "
+                }
+
+                val lineStart = length
+                append(prefix)
+
+                parseInlineStyles(currentLine, codeStyle).forEach { part ->
+                    val partStart = length
+                    append(part.text)
+                    part.styles.forEach { (style, range) ->
+                        addStyle(style, partStart + range.first, partStart + range.last)
+                    }
+                }
+
+                if (lineStyle != null) {
+                    addStyle(lineStyle, lineStart, length)
                 }
             }
 
-            if (headingStyle != null) {
-                addStyle(headingStyle, lineStart, length)
-            }
-
-            if (lineIndex < lines.size - 1) {
+            if (index < lines.size - 1) {
                 append("\n")
             }
         }
 
-        val finalStr = toAnnotatedString().text
         val urlRegex = Regex("(https?://\\S+)")
-        urlRegex.findAll(finalStr).forEach { match ->
+        urlRegex.findAll(this.toAnnotatedString().text).forEach { match ->
             addLink(
                 LinkAnnotation.Url(
                     url = match.value,
@@ -1250,4 +1286,95 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
             )
         }
     }
+}
+
+private data class StyledPart(val text: String, val styles: List<Pair<SpanStyle, IntRange>>)
+
+private fun parseInlineStyles(text: String, codeStyle: SpanStyle): List<StyledPart> {
+    val result = mutableListOf<StyledPart>()
+
+    val codeRegex = Regex("`([^`]+)`")
+    var lastMatchEnd = 0
+
+    codeRegex.findAll(text).forEach { match ->
+        if (match.range.first > lastMatchEnd) {
+            result.add(parseBoldItalic(text.substring(lastMatchEnd, match.range.first)))
+        }
+        result.add(
+            StyledPart(
+                match.groupValues[1],
+                listOf(codeStyle to 0.rangeTo(match.groupValues[1].length))
+            )
+        )
+        lastMatchEnd = match.range.last + 1
+    }
+
+    if (lastMatchEnd < text.length) {
+        result.add(parseBoldItalic(text.substring(lastMatchEnd)))
+    }
+
+    return if (result.isEmpty()) listOf(parseBoldItalic(text)) else result
+}
+
+private fun parseBoldItalic(text: String): StyledPart {
+    val styles = mutableListOf<Pair<SpanStyle, IntRange>>()
+
+    val boldRegex = Regex("(\\*\\*|__)(.*?)\\1")
+    boldRegex.findAll(text).forEach { match ->
+        styles.add(SpanStyle(fontWeight = FontWeight.Bold) to match.range.first.rangeTo(match.range.last + 1))
+    }
+
+    val italicRegex =
+        Regex("(?<!\\*)\\*(?!\\*)(.*?)(?<!\\*)\\*(?!\\*)|(?<!_)_(?!_)(.*?)(?<!_)_(?!_)")
+    italicRegex.findAll(text).forEach { match ->
+        styles.add(
+            SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) to match.range.first.rangeTo(
+                match.range.last + 1
+            )
+        )
+    }
+
+
+    val finalBuilder = AnnotatedString.Builder()
+    var i = 0
+    while (i < text.length) {
+        when {
+            text.startsWith("**", i) || text.startsWith("__", i) -> {
+                val marker = text.substring(i, i + 2)
+                val end = text.indexOf(marker, i + 2)
+                if (end != -1) {
+                    finalBuilder.withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(text.substring(i + 2, end))
+                    }
+                    i = end + 2
+                } else {
+                    finalBuilder.append(text[i])
+                    i++
+                }
+            }
+
+            text.startsWith("*", i) || text.startsWith("_", i) -> {
+                val marker = text[i].toString()
+                val end = text.indexOf(marker, i + 1)
+                if (end != -1 && (end + 1 == text.length || text[end + 1] != text[end])) {
+                    finalBuilder.withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) {
+                        append(text.substring(i + 1, end))
+                    }
+                    i = end + 1
+                } else {
+                    finalBuilder.append(text[i])
+                    i++
+                }
+            }
+
+            else -> {
+                finalBuilder.append(text[i])
+                i++
+            }
+        }
+    }
+
+    return StyledPart(
+        finalBuilder.toAnnotatedString().text,
+        finalBuilder.toAnnotatedString().spanStyles.map { it.item to it.start.rangeTo(it.end) })
 }
