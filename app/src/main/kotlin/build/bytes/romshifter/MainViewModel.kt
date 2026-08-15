@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
@@ -125,17 +126,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             htmlUrl
                         }
 
-                        val currentVersion = try {
-                            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
+                        val currentVersionCode = try {
+                            val packageInfo =
+                                context.packageManager.getPackageInfo(context.packageName, 0)
+                            PackageInfoCompat.getLongVersionCode(packageInfo)
                         } catch (_: Exception) {
-                            ""
+                            -1L
                         }
 
-                        val cleanLatest = tagName.replace("v", "").trim()
-                        val cleanCurrent = currentVersion.replace("v", "").trim()
+                        val cleanLatest = tagName.replace(Regex("[^0-9]"), "").toLongOrNull() ?: 0L
 
                         withContext(Dispatchers.Main) {
-                            if (cleanLatest != cleanCurrent && cleanCurrent.isNotEmpty()) {
+                            if (cleanLatest > currentVersionCode && currentVersionCode != -1L) {
                                 _updateStatus.value = "New version available: $tagName"
 
                                 updateInfo.value = UpdateInfo(tagName, body, downloadUrl)
