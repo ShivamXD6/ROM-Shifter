@@ -579,32 +579,84 @@ do_restore_msgs() {
     fi
 }
 
-case "$1" in
-    --backup)
-        MAIN_DIR="${3:-/sdcard/Shifter}"
-        BACKUP_BASE="$MAIN_DIR/Apps"
-        init_shifter
-        do_backup "$2"
-        ;;
-    --restore)
-        MAIN_DIR="${3:-/sdcard/Shifter}"
-        BACKUP_BASE="$MAIN_DIR/Apps"
-        init_shifter
-        do_restore "$2"
-        ;;
-    --live-backup)
-        MAIN_DIR="${3:-/sdcard/Shifter}"
-        LP_DIR="$MAIN_DIR/Partitions"
-        init_shifter
-        do_live_backup "$2"
-        ;;
-    --live-restore)
-        init_shifter
-        do_live_restore "$2" "$3"
-        ;;
-    --remove) init_shifter; do_remove "$2" "$3" ;;
-    --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
-    --systemize) init_shifter; do_systemize "$2" "$3" ;;
-    --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
-    --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
-esac
+do_ors() {
+    local SCRIPT_CONTENT="$1"
+    local REBOOT_OPT="$2"
+    local LOCS="/cache/recovery /data/cache/recovery /metadata/recovery"
+    mount -o rw,remount /cache 2>/dev/null
+    mount -o rw,remount /metadata 2>/dev/null
+
+    for loc in $LOCS; do
+        mkdir -p "$loc" 2>/dev/null
+        echo "$SCRIPT_CONTENT" > "$loc/openrecoveryscript"
+        [ -n "$REBOOT_OPT" ] && [ "$REBOOT_OPT" != "none" ] && echo "reboot $REBOOT_OPT" >> "$loc/openrecoveryscript"
+        chmod 666 "$loc/openrecoveryscript" 2>/dev/null
+    done
+}
+
+get_partitions() {
+    local paths="/dev/block/by-name /dev/block/bootdevice/by-name /dev/block/mapper"
+    local blocked="system system_ext super vendor product odm userdata metadata persist control"
+    local all_found=""
+    for p in $paths; do
+        if [ -d "$p" ]; then
+            local list=$(ls -1p "$p" 2>/dev/null | grep -v /)
+            for item in $list; do
+                local skip=0
+                for b in $blocked; do
+                    if [ "$item" = "$b" ] || [ "${item#${b}_}" != "$item" ]; then
+                        skip=1; break
+                    fi
+                done
+                [ $skip -eq 0 ] && all_found="$all_found $item"
+            done
+        fi
+    done
+    echo "$all_found" | tr ' ' '\n' | sort -u
+}
+
+get_images() {
+    ls -1p "$1/Partitions/" 2>/dev/null | grep -v / | grep '\.img$'
+}
+
+delete_image() {
+    rm -f "$1/Partitions/$2"
+}
+
+shifter_main() {
+    case "$1" in
+        --backup)
+            MAIN_DIR="${3:-/sdcard/Shifter}"
+            BACKUP_BASE="$MAIN_DIR/Apps"
+            init_shifter
+            do_backup "$2"
+            ;;
+        --restore)
+            MAIN_DIR="${3:-/sdcard/Shifter}"
+            BACKUP_BASE="$MAIN_DIR/Apps"
+            init_shifter
+            do_restore "$2"
+            ;;
+        --live-backup)
+            MAIN_DIR="${3:-/sdcard/Shifter}"
+            LP_DIR="$MAIN_DIR/Partitions"
+            init_shifter
+            do_live_backup "$2"
+            ;;
+        --live-restore)
+            init_shifter
+            do_live_restore "$2" "$3"
+            ;;
+        --remove) init_shifter; do_remove "$2" "$3" ;;
+        --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
+        --systemize) init_shifter; do_systemize "$2" "$3" ;;
+        --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
+        --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
+        --ors) do_ors "$2" "$3" ;;
+        --get-partitions) get_partitions ;;
+        --get-images) get_images "$2" ;;
+        --delete-image) delete_image "$2" "$3" ;;
+    esac
+}
+
+shifter_main "$@"

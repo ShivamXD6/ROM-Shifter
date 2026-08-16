@@ -858,7 +858,7 @@ fun FlashTab(
                                     .fillMaxWidth()
                                     .height(52.dp)) {
                                     Text(
-                                        "Restart Wizard & Clear Script",
+                                        "Restart Wizard & Clear ORS",
                                         style = MaterialTheme.typography.titleMedium
                                     )
                                 }

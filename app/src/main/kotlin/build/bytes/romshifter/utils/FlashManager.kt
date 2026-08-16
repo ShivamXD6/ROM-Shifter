@@ -79,8 +79,10 @@ object FlashManager {
                 val category: String? = when {
                     isGapps -> if (isAddon) "Addon" else "GApps"
                     hasModuleProp -> null
-                    contents.contains(Regex("firmware-update/|abl\\.elf|xbl\\.elf|tz\\.mbn")) -> "Firmware"
-                    contents.contains(Regex("payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list")) -> "ROM"
+                    contents.contains(Regex("firmware-update", RegexOption.IGNORE_CASE)) ||
+                            contents.contains(Regex("abl\\.elf|xbl\\.elf|tz\\.mbn|devcfg\\.mbn")) -> "Firmware"
+
+                    contents.contains(Regex("payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list|apex_info\\.pb|care_map\\.pb")) -> "ROM"
                     contents.contains(
                         Regex(
                             "anykernel|zimage|image\\.gz",
@@ -114,7 +116,7 @@ object FlashManager {
     fun checkLockscreen(): Boolean = !Shell.cmd("su -mm -c 'locksettings verify'").exec().isSuccess
 
     fun generateOrsAndProceed(actions: List<FlashAction>, rebootOption: String) {
-        val script = java.lang.StringBuilder()
+        val script = StringBuilder()
 
         actions.forEach { action ->
             when (action) {
@@ -127,7 +129,7 @@ object FlashManager {
                     if (path.startsWith("/storage/emulated/0")) {
                         path = path.replace("/storage/emulated/0", "/sdcard")
                     }
-                    script.append("install \"$path\"\n")
+                    script.append("install $path\n")
                 }
 
                 is FlashAction.FormatData -> {
@@ -136,67 +138,42 @@ object FlashManager {
             }
         }
 
-        if (rebootOption != "none") {
-            script.append("reboot $rebootOption\n")
-        }
-
-        val safeScript = script.toString().replace("'", "'\\''")
-
-        val locations = listOf("/cache/recovery", "/data/cache/recovery", "/metadata/recovery")
-        val shellCommand = buildString {
-            append("su -mm -c \"")
-            locations.forEach { loc ->
-                append("mkdir -p $loc 2>/dev/null; ")
-                append("echo '$safeScript' > $loc/openrecoveryscript 2>/dev/null; ")
-                append("chmod 666 $loc/openrecoveryscript 2>/dev/null; ")
-            }
-            append("\"")
-        }
-        Shell.cmd(shellCommand).exec()
+        val scriptContent = script.toString().replace("'", "'\\''")
+        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --ors '$scriptContent' '$rebootOption'\"")
+            .exec()
     }
 
     fun restartFlashWizard() {
         val locations = listOf("/cache/recovery", "/data/cache/recovery", "/metadata/recovery")
         val shellCommand =
-            "su -mm -c \"rm -f ${locations.joinToString(" ") { "$it/openrecoveryscript" }} 2>/dev/null\""
+            "su -mm -c \"mount -o rw,remount /cache 2>/dev/null; mount -o rw,remount /metadata 2>/dev/null; rm -f ${
+                locations.joinToString(
+                    " "
+                ) { "$it/openrecoveryscript" }
+            } 2>/dev/null\""
         Shell.cmd(shellCommand).exec()
     }
 
     fun executeFlashNow() { Shell.cmd("su -mm -c \"sync; reboot recovery\"").exec() }
 
     fun getAllPartitions(): List<String> {
-        val paths =
-            listOf("/dev/block/by-name", "/dev/block/bootdevice/by-name", "/dev/block/mapper")
-        val blocked = listOf(
-            "system",
-            "system_ext",
-            "super",
-            "vendor",
-            "product",
-            "odm",
-            "userdata",
-            "metadata",
-            "persist",
-            "control"
-        )
-        val allFound = mutableListOf<String>()
-        for (path in paths) {
-            val out = Shell.cmd("su -c \"ls -1p $path 2>/dev/null | grep -v /\"").exec().out
-            allFound.addAll(out.map { it.trim() }
-                .filter { it.isNotBlank() && !blocked.any { b -> it == b || it.startsWith("${b}_") } })
-        }
-        return allFound.distinct().sorted()
+        return Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --get-partitions\"")
+            .exec().out
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .sorted()
     }
 
     fun getBackedUpImages(savedPath: String): List<String> {
-        return Shell.cmd("su -c \"ls -1p '$savedPath/Partitions/' 2>/dev/null | grep -v / | grep '\\.img$'\"")
+        return Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --get-images '$savedPath'\"")
             .exec().out
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }
 
     fun deleteLivePartitionImage(savedPath: String, imgName: String) {
-        Shell.cmd("su -c \"rm -f '$savedPath/Partitions/$imgName'\"").exec()
+        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --delete-image '$savedPath' '$imgName'\"")
+            .exec()
     }
 
     fun runLiveOperation(action: String, partition: String, customPath: String?, savedPath: String) {
