@@ -45,10 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,12 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import build.bytes.romshifter.models.AppInfo
 import coil.compose.AsyncImage
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,13 +72,11 @@ fun AnimatedFilterChip(
     onClick: () -> Unit,
     label: String,
     leadingIcon: ImageVector,
+    showLabel: Boolean,
+    onExpand: () -> Unit,
     selectedContainerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     selectedContentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer
 ) {
-    var showLabel by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    var timerJob by remember { mutableStateOf<Job?>(null) }
-
     val containerColor =
         if (selected) selectedContainerColor else MaterialTheme.colorScheme.surfaceContainerHigh
     val contentColor =
@@ -95,12 +86,7 @@ fun AnimatedFilterChip(
         selected = selected,
         onClick = {
             onClick()
-            showLabel = true
-            timerJob?.cancel()
-            timerJob = scope.launch {
-                delay(3000.milliseconds)
-                showLabel = false
-            }
+            onExpand()
         },
         shape = CircleShape,
         color = containerColor,

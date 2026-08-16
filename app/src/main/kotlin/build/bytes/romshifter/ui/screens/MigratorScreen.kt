@@ -86,6 +86,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +109,10 @@ import build.bytes.romshifter.ui.components.MenuCard
 import build.bytes.romshifter.ui.components.ShimmerAppListItem
 import build.bytes.romshifter.utils.getAvatarColor
 import coil.compose.AsyncImage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun MigratorTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
@@ -279,6 +284,19 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
                 matchesSearch && matchesType && matchesAction
             }
+        }
+    }
+
+    var expandedChipLabel by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var timerJob by remember { mutableStateOf<Job?>(null) }
+
+    fun expandChip(label: String) {
+        expandedChipLabel = label
+        timerJob?.cancel()
+        timerJob = scope.launch {
+            delay(3000.milliseconds)
+            expandedChipLabel = null
         }
     }
 
@@ -490,6 +508,8 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             onClick = { showNativeDeleteDialog = true },
                             label = "Erase Native",
                             leadingIcon = Icons.Default.SettingsPhone,
+                            showLabel = expandedChipLabel == "Erase Native",
+                            onExpand = { expandChip("Erase Native") },
                             selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
                             selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -526,7 +546,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             selected = appState.actionFilterState != 0,
                             onClick = { viewModel.toggleActionFilter() },
                             label = actionChipLabel,
-                            leadingIcon = actionIcon
+                            leadingIcon = actionIcon,
+                            showLabel = expandedChipLabel == actionChipLabel,
+                            onExpand = { expandChip(actionChipLabel) }
                         )
                     }
                 }
@@ -541,6 +563,8 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             },
                             label = "Force Deletion",
                             leadingIcon = Icons.Default.DeleteForever,
+                            showLabel = expandedChipLabel == "Force Deletion",
+                            onExpand = { expandChip("Force Deletion") },
                             selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
                             selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -565,7 +589,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             selected = appState.globalComponents.contains(entry.key),
                             onClick = { viewModel.toggleGlobalComponent(entry.key) },
                             label = entry.value,
-                            leadingIcon = compIcons[entry.key] ?: Icons.Default.Android
+                            leadingIcon = compIcons[entry.key] ?: Icons.Default.Android,
+                            showLabel = expandedChipLabel == entry.value,
+                            onExpand = { expandChip(entry.value) }
                         )
                     }
                 }
@@ -588,7 +614,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             selected = appState.showUserApps,
                             onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) },
                             label = "User Apps",
-                            leadingIcon = Icons.Default.Person
+                            leadingIcon = Icons.Default.Person,
+                            showLabel = expandedChipLabel == "User Apps",
+                            onExpand = { expandChip("User Apps") }
                         )
                     }
                     item {
@@ -596,7 +624,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             selected = appState.showSystemApps,
                             onClick = { viewModel.toggleSystemApps() },
                             label = "System Apps",
-                            leadingIcon = Icons.Default.Settings
+                            leadingIcon = Icons.Default.Settings,
+                            showLabel = expandedChipLabel == "System Apps",
+                            onExpand = { expandChip("System Apps") }
                         )
                     }
                 }
