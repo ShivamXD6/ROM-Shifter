@@ -40,6 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -501,10 +502,24 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
                         else -> ""
                     }
-                    val actionIcon = when (appState.actionFilterState) {
-                        0 -> Icons.Default.AllInclusive
-                        1 -> Icons.Default.FilterList
-                        else -> Icons.Default.CheckCircle
+                    val actionIcon = when (appState.migratorMode) {
+                        MigratorMode.DEBLOAT -> {
+                            if (appState.actionFilterState == 1) Icons.Default.Delete
+                            else Icons.Default.RestorePage
+                        }
+
+                        MigratorMode.SYSTEMIZE -> {
+                            if (appState.actionFilterState == 1) Icons.Default.Settings
+                            else Icons.Default.Build
+                        }
+
+                        else -> {
+                            when (appState.actionFilterState) {
+                                0 -> Icons.Default.AllInclusive
+                                1 -> Icons.Default.FilterList
+                                else -> Icons.Default.CheckCircle
+                            }
+                        }
                     }
                     item {
                         AnimatedFilterChip(
