@@ -458,24 +458,55 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         }
 
         Column(modifier = Modifier.padding(bottom = 8.dp)) {
+            val showActionChip = when (appState.migratorMode) {
+                MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> true
+                else -> false
+            }
+
+            val showEraseNative = appState.migratorMode == MigratorMode.MANAGE
+            val showForceDeletion =
+                appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1
+            val hasButtons = showActionChip || showEraseNative
+
+            val hasComponents =
+                appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS
+
+            val showAppFilters =
+                appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)
+            val hasFilters = showAppFilters
+
+            val activeGroups = listOf(hasButtons, hasComponents, hasFilters).count { it }
+
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val actionChipLabel = when (appState.migratorMode) {
-                    MigratorMode.DEBLOAT -> if (appState.actionFilterState == 1) "Debloat" else "Restore"
-                    MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
-                    else -> ""
-                }
-                val actionIcon = when (appState.actionFilterState) {
-                    0 -> Icons.Default.AllInclusive
-                    1 -> Icons.Default.FilterList
-                    else -> Icons.Default.CheckCircle
+                if (showEraseNative) {
+                    item {
+                        AnimatedFilterChip(
+                            selected = false,
+                            onClick = { showNativeDeleteDialog = true },
+                            label = "Erase Native",
+                            leadingIcon = Icons.Default.SettingsPhone,
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
 
-                if (actionChipLabel.isNotEmpty()) {
+                if (showActionChip) {
+                    val actionChipLabel = when (appState.migratorMode) {
+                        MigratorMode.DEBLOAT -> if (appState.actionFilterState == 1) "Debloat" else "Restore"
+                        MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
+                        else -> ""
+                    }
+                    val actionIcon = when (appState.actionFilterState) {
+                        0 -> Icons.Default.AllInclusive
+                        1 -> Icons.Default.FilterList
+                        else -> Icons.Default.CheckCircle
+                    }
                     item {
                         AnimatedFilterChip(
                             selected = appState.actionFilterState != 0,
@@ -486,7 +517,58 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)) {
+                if (showForceDeletion) {
+                    item {
+                        AnimatedFilterChip(
+                            selected = appState.forceRemoveEnabled,
+                            onClick = {
+                                if (appState.forceRemoveEnabled) viewModel.setForceRemove(false)
+                                else showForceRemoveWarning = true
+                            },
+                            label = "Force Deletion",
+                            leadingIcon = Icons.Default.DeleteForever,
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                if (activeGroups > 1 && hasButtons && (hasFilters)) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                }
+
+                if (hasComponents) {
+                    items(compNames.entries.toList()) { entry ->
+                        AnimatedFilterChip(
+                            selected = appState.globalComponents.contains(entry.key),
+                            onClick = { viewModel.toggleGlobalComponent(entry.key) },
+                            label = entry.value,
+                            leadingIcon = compIcons[entry.key] ?: Icons.Default.Android
+                        )
+                    }
+                }
+
+                if (activeGroups > 1 && hasComponents) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                }
+
+                if (hasFilters) {
                     item {
                         AnimatedFilterChip(
                             selected = appState.showUserApps,
@@ -501,47 +583,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             onClick = { viewModel.toggleSystemApps() },
                             label = "System Apps",
                             leadingIcon = Icons.Default.Settings
-                        )
-                    }
-                }
-
-                if (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS) {
-                    items(compNames.entries.toList()) { entry ->
-                        AnimatedFilterChip(
-                            selected = appState.globalComponents.contains(entry.key),
-                            onClick = { viewModel.toggleGlobalComponent(entry.key) },
-                            label = entry.value,
-                            leadingIcon = compIcons[entry.key] ?: Icons.Default.Android
-                        )
-                    }
-                }
-
-                if (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1) {
-                    item {
-                        AnimatedFilterChip(
-                            selected = appState.forceRemoveEnabled,
-                            onClick = {
-                                if (appState.forceRemoveEnabled) viewModel.setForceRemove(
-                                    false
-                                ) else showForceRemoveWarning = true
-                            },
-                            label = "Force Deletion",
-                            leadingIcon = Icons.Default.DeleteForever,
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-
-                if (appState.migratorMode == MigratorMode.MANAGE) {
-                    item {
-                        AnimatedFilterChip(
-                            selected = false,
-                            onClick = { showNativeDeleteDialog = true },
-                            label = "Erase Native",
-                            leadingIcon = Icons.Default.SettingsPhone,
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
