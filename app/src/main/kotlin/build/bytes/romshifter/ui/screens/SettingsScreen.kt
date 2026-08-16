@@ -193,7 +193,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     Spacer(modifier = Modifier.height(8.dp))
@@ -213,8 +213,10 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            val subText =
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) "Use Monet colors based on wallpaper" else "Auto-detect accent colors from wallpaper"
                             Text(
-                                "Use wallpaper accents",
+                                subText,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -592,7 +594,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                             1 -> "Light"; 2 -> "Dark"; 3, 4 -> "Amoled"; else -> "System Default"
                         }
                         val dynamicText =
-                            if (dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) " (Dynamic)" else ""
+                            if (dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) " (Dynamic)" else ""
                         Text(
                             "Theme: $themeText$dynamicText",
                             style = MaterialTheme.typography.bodyMedium,

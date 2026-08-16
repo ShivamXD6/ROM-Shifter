@@ -1,5 +1,6 @@
 package build.bytes.romshifter.ui.theme
 
+import android.app.WallpaperManager
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,43 +30,81 @@ fun ROMShifterTheme(
     val systemDark = isSystemInDarkTheme()
     val context = LocalContext.current
 
+    fun getLegacySeedColor(): Color? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            try {
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+                if (colors != null) {
+                    return Color(colors.primaryColor.toArgb())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return null
+    }
+
     val colorScheme = when (themeMode) {
         0 -> {
-            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (dynamicColor) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (systemDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(
+                        context
+                    )
+                } else {
+                    val seed = getLegacySeedColor()
+                    seed?.toColorScheme(systemDark)
+                        ?: if (systemDark) DarkColorScheme else LightColorScheme
+                }
             } else {
                 if (systemDark) DarkColorScheme else LightColorScheme
             }
         }
 
         1 -> {
-            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicLightColorScheme(context)
+            if (dynamicColor) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    dynamicLightColorScheme(context)
+                } else {
+                    val seed = getLegacySeedColor()
+                    seed?.toColorScheme(false) ?: LightColorScheme
+                }
             } else {
                 LightColorScheme
             }
         }
 
         2 -> {
-            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicDarkColorScheme(context)
+            if (dynamicColor) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    dynamicDarkColorScheme(context)
+                } else {
+                    val seed = getLegacySeedColor()
+                    seed?.toColorScheme(true) ?: DarkColorScheme
+                }
             } else {
                 DarkColorScheme
             }
         }
 
         3, 4 -> {
-            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                dynamicDarkColorScheme(context).copy(
-                    background = Color(0xFF000000),
-                    surface = Color(0xFF000000),
-                    surfaceVariant = Color(0xFF000000),
-                    surfaceContainerLowest = Color(0xFF000000),
-                    surfaceContainerLow = Color(0xFF000000),
-                    surfaceContainer = Color(0xFF000000),
-                    surfaceContainerHigh = Color(0xFF000000),
-                    surfaceContainerHighest = Color(0xFF000000)
-                )
+            if (dynamicColor) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    dynamicDarkColorScheme(context).copy(
+                        background = Color(0xFF000000),
+                        surface = Color(0xFF000000),
+                        surfaceVariant = Color(0xFF000000),
+                        surfaceContainerLowest = Color(0xFF000000),
+                        surfaceContainerLow = Color(0xFF000000),
+                        surfaceContainer = Color(0xFF000000),
+                        surfaceContainerHigh = Color(0xFF000000),
+                        surfaceContainerHighest = Color(0xFF000000)
+                    )
+                } else {
+                    val seed = getLegacySeedColor()
+                    seed?.toColorScheme(isDark = true, isAmoled = true) ?: AmoledAccentColorScheme
+                }
             } else {
                 AmoledAccentColorScheme
             }
