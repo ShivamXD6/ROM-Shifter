@@ -473,9 +473,8 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
             val showAppFilters =
                 appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)
-            val hasFilters = showAppFilters
 
-            val activeGroups = listOf(hasButtons, hasComponents, hasFilters).count { it }
+            val activeGroups = listOf(hasButtons, hasComponents, showAppFilters).count { it }
 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -533,7 +532,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (activeGroups > 1 && hasButtons && (hasFilters)) {
+                if (activeGroups > 1 && hasButtons && (showAppFilters)) {
                     item {
                         Box(
                             modifier = Modifier
@@ -568,7 +567,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (hasFilters) {
+                if (showAppFilters) {
                     item {
                         AnimatedFilterChip(
                             selected = appState.showUserApps,
