@@ -6,7 +6,7 @@
 BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
-AM_TMP="/data/local/tmp/appmgr_tmp"
+AM_TMP="/data/local/tmp/shifter_apps "
 TARGETS="/data/local/tmp/shifter_targets.txt"
 
 init_shifter() {
@@ -403,6 +403,7 @@ do_backup() {
         if(comps ~ / 5 /) print "/data/media/0/Android/obb/" pkg "|" pkg "_obb"
     }' "$AM_TMP/pm_list.txt" "$TARGETS" > "$AM_TMP/paths.list"
 
+    echo "INFO:STEP|MSG:Calculating total sizes..."
     awk -F'|' '{print $1}' "$AM_TMP/paths.list" | tr '\n' '\0' | xargs -0 du -sk 2>/dev/null > "$AM_TMP/du.out"
 
     awk '

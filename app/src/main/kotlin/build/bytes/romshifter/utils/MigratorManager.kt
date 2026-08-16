@@ -283,7 +283,12 @@ object MigratorManager {
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
-                selectedApps.forEach { app ->
+                selectedApps.forEachIndexed { index, app ->
+                    updateProgress(
+                        "",
+                        "Analyzing backups (${index + 1}/${selectedApps.size})...",
+                        -1
+                    )
                     val sysType = if (app.isSystem) "System" else "User"
                     val basePath = "$currentPath/Apps/$sysType/${app.label}"
                     val parts = mutableListOf<String>()
@@ -303,6 +308,7 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
+                updateProgress("", "Checking app components...", -1)
                 val d = "/data"
                 val dlr = "$"
                 val script = buildString {
@@ -318,7 +324,12 @@ object MigratorManager {
                         appendLine("echo \"$pkg==${dlr}res\"")
                     }
                 }
-                val out = Shell.cmd("su -mm -c '${script.replace("'", "'\\''")}'").exec().out
+
+                val scriptFile = File(context.cacheDir, "check_comps.sh")
+                scriptFile.writeText(script)
+                val out = Shell.cmd("su -mm -c 'sh \"${scriptFile.absolutePath}\"'").exec().out
+                scriptFile.delete()
+
                 out.forEach { line ->
                     val split = line.split("==")
                     if (split.size == 2) {
@@ -345,7 +356,8 @@ object MigratorManager {
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
-                selectedApps.forEach { app ->
+                selectedApps.forEachIndexed { index, app ->
+                    updateProgress("", "Preparing icons (${index + 1}/${selectedApps.size})...", -1)
                     try {
                         val rawIcon = context.packageManager.getApplicationIcon(app.packageName)
                         val bitmap = getTinyBitmap(rawIcon)
@@ -370,6 +382,7 @@ object MigratorManager {
                     scriptFile.delete()
                 }
             }
+            updateProgress("", "Calculating sizes...", -1)
 
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
@@ -383,6 +396,10 @@ object MigratorManager {
                         val sizeInfo = if (formattedSize.isNotEmpty()) " [Size: $formattedSize]" else ""
 
                         updateProgress(actText, "${event.label}$sizeInfo (${event.current}/${event.total})$partsString", event.percent)
+                    }
+
+                    is ShifterEvent.InfoStep -> {
+                        updateProgress("", event.msg, -1)
                     }
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)
