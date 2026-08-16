@@ -18,7 +18,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
-import build.bytes.romshifter.models.FlashZip
+import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.utils.BackendInstaller
 import build.bytes.romshifter.utils.FlashManager
@@ -43,8 +43,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _appList = MutableStateFlow<List<AppInfo>>(emptyList())
     val appList: StateFlow<List<AppInfo>> = _appList.asStateFlow()
 
-    private val _flashZips = MutableStateFlow<List<FlashZip>>(emptyList())
-    val flashZips: StateFlow<List<FlashZip>> = _flashZips.asStateFlow()
+    private val _flashActions = MutableStateFlow<List<FlashAction>>(emptyList())
+    val flashActions: StateFlow<List<FlashAction>> = _flashActions.asStateFlow()
 
     private val prefs = application.getSharedPreferences("shifter_prefs", Context.MODE_PRIVATE)
 
@@ -311,8 +311,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openFlashWizard() {
-        _flashZips.value = emptyList()
-        _uiState.value = _uiState.value.copy(flashWizardStep = 1)
+        _flashActions.value = emptyList()
+        _uiState.value = _uiState.value.copy(
+            flashWizardStep = 1,
+            flashWipePartitions = setOf("dalvik", "cache"),
+            flashFormatData = false,
+            flashRebootOption = "system"
+        )
     }
 
     fun flashWizardStepBack() {
@@ -328,36 +333,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(flashWizardStep = 0)
     }
 
-    fun removeZip(index: Int) {
-        val l = _flashZips.value.toMutableList()
-        if (index in l.indices) l.removeAt(index)
-        _flashZips.value = l
+    fun removeAction(index: Int) {
+        val l = _flashActions.value.toMutableList()
+        if (index in l.indices) {
+            l.removeAt(index)
+            _flashActions.value = l
+        }
     }
 
-    fun moveZipUp(index: Int) {
-        val l = _flashZips.value.toMutableList()
+    fun moveActionUp(index: Int) {
         if (index > 0) {
-            val i = l.removeAt(index)
-            l.add(index - 1, i)
+            val l = _flashActions.value.toMutableList()
+            val item = l.removeAt(index)
+            l.add(index - 1, item)
+            _flashActions.value = l
         }
-        _flashZips.value = l
     }
 
-    fun moveZipDown(index: Int) {
-        val l = _flashZips.value.toMutableList()
+    fun moveActionDown(index: Int) {
+        val l = _flashActions.value.toMutableList()
         if (index < l.size - 1) {
-            val i = l.removeAt(index)
-            l.add(index + 1, i)
+            val item = l.removeAt(index)
+            l.add(index + 1, item)
+            _flashActions.value = l
         }
-        _flashZips.value = l
     }
 
     fun processSelectedZips(uris: List<Uri>, append: Boolean = false) {
         _uiState.value = _uiState.value.copy(isProcessingZips = true)
         viewModelScope.launch(Dispatchers.IO) {
-            val zips = FlashManager.processZips(uris, _flashZips.value, append, getApplication())
+            val currentZips =
+                if (append) _flashActions.value.filterIsInstance<FlashAction.InstallZip>()
+                    .map { it.zip } else emptyList()
+            val newZips = FlashManager.processZips(uris, currentZips, append, getApplication())
+            
             withContext(Dispatchers.Main) {
-                _flashZips.value = zips
+                val actions = mutableListOf<FlashAction>()
+
+                if (!append && _uiState.value.flashWipePartitions.isNotEmpty()) {
+                    actions.add(FlashAction.Wipe(_uiState.value.flashWipePartitions))
+                }
+
+                if (append) {
+                    val existing = _flashActions.value.toMutableList()
+                    newZips.filter { nz -> _flashActions.value.none { it is FlashAction.InstallZip && it.zip.path == nz.path } }
+                        .forEach { existing.add(FlashAction.InstallZip(it)) }
+                    _flashActions.value = existing
+                } else {
+                    newZips.forEach { actions.add(FlashAction.InstallZip(it)) }
+                    if (_uiState.value.flashFormatData) {
+                        actions.add(FlashAction.FormatData)
+                    }
+                    _flashActions.value = actions
+                }
+                
                 _uiState.value = _uiState.value.copy(
                     isProcessingZips = false,
                     flashWizardStep = 2
@@ -385,12 +414,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(flashFormatData = format)
     }
 
+    fun setFlashRebootOption(option: String) {
+        _uiState.value = _uiState.value.copy(flashRebootOption = option)
+    }
+
     fun generateOrsAndProceed() {
         viewModelScope.launch(Dispatchers.IO) {
             FlashManager.generateOrsAndProceed(
-                _uiState.value.flashWipePartitions,
-                _uiState.value.flashFormatData,
-                _flashZips.value
+                _flashActions.value,
+                _uiState.value.flashRebootOption
             )
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(flashWizardStep = 4)
@@ -401,7 +433,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun restartFlashWizard() {
         viewModelScope.launch(Dispatchers.IO) {
             FlashManager.restartFlashWizard(); withContext(Dispatchers.Main) {
-            _flashZips.value = emptyList()
+            _flashActions.value = emptyList()
             _uiState.value = _uiState.value.copy(
                 flashWizardStep = 1,
             )

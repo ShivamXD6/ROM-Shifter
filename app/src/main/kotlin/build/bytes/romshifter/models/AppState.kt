@@ -19,6 +19,19 @@ data class AppInfo(
 
 data class FlashZip(val name: String, val path: String, val category: String)
 
+sealed class FlashAction {
+    data class InstallZip(val zip: FlashZip) : FlashAction()
+    data class Wipe(val partitions: Set<String>) : FlashAction()
+    object FormatData : FlashAction()
+
+    val id: String
+        get() = when (this) {
+            is InstallZip -> zip.path
+            is Wipe -> "WIPE_${partitions.joinToString(",")}"
+            is FormatData -> "FORMAT_DATA"
+        }
+}
+
 data class AppState(
     val migratorMode: MigratorMode = MigratorMode.MENU,
     val isRunning: Boolean = false,
@@ -38,5 +51,6 @@ data class AppState(
     val flashWipePartitions: Set<String> = setOf("dalvik", "cache"),
     val flashFormatData: Boolean = false,
     val isProcessingZips: Boolean = false,
-    val hasLockscreen: Boolean = false
+    val hasLockscreen: Boolean = false,
+    val flashRebootOption: String = "system"
 )

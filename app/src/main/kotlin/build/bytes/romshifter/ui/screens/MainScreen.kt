@@ -111,7 +111,7 @@ import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.R
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
-import build.bytes.romshifter.models.FlashZip
+import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -129,7 +129,7 @@ fun openUriSafely(context: Context, uriString: String) {
 fun MainScreen(viewModel: MainViewModel) {
     val appState by viewModel.uiState.collectAsState()
     val appList by viewModel.appList.collectAsState()
-    val flashZips by viewModel.flashZips.collectAsState()
+    val flashActions by viewModel.flashActions.collectAsState()
     val isFirstRun by viewModel.isFirstRun.collectAsState()
     val selectedTab by viewModel.currentTab.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
@@ -280,17 +280,17 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
-            AppScaffold(
-                appState = frozenPreviousAppState,
-                appList = emptyList(),
-                flashZips = emptyList(),
-                showSettings = false,
-                selectedTab = selectedTab,
-                viewModel = viewModel,
-                onTabSelect = {},
-                onSettingsToggle = {},
-                onBackClick = {},
-            )
+                AppScaffold(
+                    appState = frozenPreviousAppState,
+                    appList = emptyList(),
+                    flashActions = emptyList(),
+                    showSettings = false,
+                    selectedTab = selectedTab,
+                    viewModel = viewModel,
+                    onTabSelect = {},
+                    onSettingsToggle = {},
+                    onBackClick = {},
+                )
         }
             Box(
                 modifier = Modifier
@@ -316,7 +316,7 @@ fun MainScreen(viewModel: MainViewModel) {
             AppScaffold(
                 appState = appState,
                 appList = appList,
-                flashZips = flashZips,
+                flashActions = flashActions,
                 showSettings = showSettings,
                 selectedTab = selectedTab,
                 viewModel = viewModel,
@@ -337,7 +337,7 @@ fun MainScreen(viewModel: MainViewModel) {
 fun AppScaffold(
     appState: AppState,
     appList: List<AppInfo>,
-    flashZips: List<FlashZip>,
+    flashActions: List<FlashAction>,
     showSettings: Boolean,
     selectedTab: Int,
     viewModel: MainViewModel,
@@ -506,7 +506,7 @@ fun AppScaffold(
                     SettingsTab(LocalContext.current, viewModel)
                 } else {
                     when (currentTab) {
-                        0 -> FlashTab(appState, flashZips, LocalContext.current, viewModel)
+                        0 -> FlashTab(appState, flashActions, LocalContext.current, viewModel)
                         1 -> MigratorTab(appState, appList, viewModel)
                         2 -> ToolsTab(appState, appList, viewModel)
                     }

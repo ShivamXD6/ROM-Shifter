@@ -94,7 +94,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
 import build.bytes.romshifter.models.AppState
-import build.bytes.romshifter.models.FlashZip
+import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.ui.components.MenuCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -104,11 +104,11 @@ import kotlin.math.roundToInt
 @Composable
 fun FlashTab(
     appState: AppState,
-    flashZips: List<FlashZip>,
+    flashActions: List<FlashAction>,
     context: Context,
     viewModel: MainViewModel
 ) {
-    val currentFlashZips by rememberUpdatedState(flashZips)
+    val currentFlashActions by rememberUpdatedState(flashActions)
     val currentViewModel by rememberUpdatedState(viewModel)
 
     var showBackupDialog by remember { mutableStateOf(false) }
@@ -536,10 +536,16 @@ fun FlashTab(
 
                             LazyColumn(modifier = Modifier.weight(1f)) {
                                 itemsIndexed(
-                                    items = flashZips,
-                                    key = { _, zip -> zip.path }) { index, zip ->
-                                    var dragOffset by remember(zip.path) { mutableFloatStateOf(0f) }
+                                    items = flashActions,
+                                    key = { _, action -> action.id }) { index, action ->
+                                    var dragOffset by remember(action.id) { mutableFloatStateOf(0f) }
                                     val currentIndexState by rememberUpdatedState(index)
+
+                                    val cardColor = when (action) {
+                                        is FlashAction.Wipe -> MaterialTheme.colorScheme.secondaryContainer
+                                        is FlashAction.FormatData -> MaterialTheme.colorScheme.errorContainer
+                                        is FlashAction.InstallZip -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                    }
 
                                     ElevatedCard(
                                         modifier = Modifier
@@ -548,15 +554,53 @@ fun FlashTab(
                                             .offset { IntOffset(0, dragOffset.roundToInt()) }
                                             .animateItem(),
                                         shape = MaterialTheme.shapes.large,
-                                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                                        colors = CardDefaults.elevatedCardColors(containerColor = cardColor)
                                     ) {
                                         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text("${index + 1}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                                             Spacer(modifier = Modifier.width(20.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(zip.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text("Category: ${zip.category}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                when (action) {
+                                                    is FlashAction.Wipe -> {
+                                                        Text(
+                                                            "Wipe Partitions",
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Text(
+                                                            action.partitions.joinToString(", "),
+                                                            style = MaterialTheme.typography.bodyMedium
+                                                        )
+                                                    }
+
+                                                    is FlashAction.FormatData -> {
+                                                        Text(
+                                                            "Format Data",
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                        Text(
+                                                            "Will erase all user data!",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+
+                                                    is FlashAction.InstallZip -> {
+                                                        Text(
+                                                            action.zip.name,
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Text(
+                                                            "Category: ${action.zip.category}",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
                                             }
 
                                             Icon(
@@ -564,7 +608,7 @@ fun FlashTab(
                                                 contentDescription = "Drag to reorder",
                                                 modifier = Modifier
                                                     .size(40.dp)
-                                                    .pointerInput(zip.path) {
+                                                    .pointerInput(action.id) {
                                                         detectVerticalDragGestures(
                                                             onDragEnd = { dragOffset = 0f },
                                                             onDragCancel = { dragOffset = 0f }
@@ -572,18 +616,18 @@ fun FlashTab(
                                                             change.consume()
                                                             dragOffset += dragAmount
 
-                                                            val list = currentFlashZips
+                                                            val list = currentFlashActions
                                                             val currentIndex =
-                                                                list.indexOfFirst { it.path == zip.path }
+                                                                list.indexOfFirst { it.id == action.id }
 
                                                             if (currentIndex != -1) {
                                                                 if (dragOffset > swapThreshold && currentIndex < list.size - 1) {
-                                                                    currentViewModel.moveZipDown(
+                                                                    currentViewModel.moveActionDown(
                                                                         currentIndex
                                                                     )
                                                                     dragOffset -= swapThreshold
                                                                 } else if (dragOffset < -swapThreshold && currentIndex > 0) {
-                                                                    currentViewModel.moveZipUp(
+                                                                    currentViewModel.moveActionUp(
                                                                         currentIndex
                                                                     )
                                                                     dragOffset += swapThreshold
@@ -596,9 +640,7 @@ fun FlashTab(
                                             )
 
                                             IconButton(onClick = {
-                                                currentViewModel.removeZip(
-                                                    currentIndexState
-                                                )
+                                                currentViewModel.removeAction(currentIndexState)
                                             }, modifier = Modifier.size(40.dp)) {
                                                 Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
                                             }
@@ -623,11 +665,10 @@ fun FlashTab(
                         }
                     }
                     3 -> {
-                        val hasRomZip = flashZips.any {
-                            it.category.contains(
-                                "ROM",
-                                ignoreCase = true
-                            ) || it.name.contains("ROM", ignoreCase = true)
+                        val hasRomZip =
+                            flashActions.filterIsInstance<FlashAction.InstallZip>().any {
+                                it.zip.category.contains("ROM", ignoreCase = true) ||
+                                        it.zip.name.contains("ROM", ignoreCase = true)
                         }
 
                         if (appState.hasLockscreen) {
@@ -767,6 +808,39 @@ fun FlashTab(
                                         textAlign = TextAlign.Center,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Text(
+                                        "Select an Option to Reboot after Flash:",
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            8.dp,
+                                            Alignment.CenterHorizontally
+                                        )
+                                    ) {
+                                        listOf("system", "recovery", "bootloader").forEach { opt ->
+                                            val isSelected = appState.flashRebootOption == opt
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    val newOpt = if (isSelected) "none" else opt
+                                                    viewModel.setFlashRebootOption(newOpt)
+                                                    viewModel.generateOrsAndProceed()
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = opt.replaceFirstChar { it.uppercase() },
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                },
+                                                shape = CircleShape
+                                            )
+                                        }
+                                    }
                             }
                             }
                             Spacer(modifier = Modifier.weight(1f))
@@ -783,7 +857,10 @@ fun FlashTab(
                                 OutlinedButton(onClick = { viewModel.restartFlashWizard() }, shape = CircleShape, modifier = Modifier
                                     .fillMaxWidth()
                                     .height(52.dp)) {
-                                    Text("Restart Wizard", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "Restart Wizard & Clear Script",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
                                 }
                             }
                         }
