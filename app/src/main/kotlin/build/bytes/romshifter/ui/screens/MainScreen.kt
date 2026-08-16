@@ -115,7 +115,6 @@ import build.bytes.romshifter.models.FlashZip
 import build.bytes.romshifter.models.MigratorMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 fun openUriSafely(context: Context, uriString: String) {
@@ -202,7 +201,10 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     if (!appState.hasRoot) {
-        NoRootScreen()
+        NoRootScreen(
+            isChecking = appState.isFetchingApps,
+            onRetry = { viewModel.checkRootAccess() }
+        )
         return
     }
 
@@ -1124,7 +1126,7 @@ fun OnboardingStepContent(
 }
 
 @Composable
-fun NoRootScreen() {
+fun NoRootScreen(isChecking: Boolean, onRetry: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.90f,
@@ -1168,12 +1170,18 @@ fun NoRootScreen() {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Root Access Required", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onErrorContainer)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, restart the app.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(
+                    "Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, tap retry.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = { exitProcess(0) },
+                    onClick = onRetry,
+                    enabled = !isChecking,
                     shape = CircleShape,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1183,7 +1191,17 @@ fun NoRootScreen() {
                         contentColor = MaterialTheme.colorScheme.onError
                     )
                 ) {
-                    Text("Restart App", style = MaterialTheme.typography.titleMedium)
+                    if (isChecking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onError,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Checking...", style = MaterialTheme.typography.titleMedium)
+                    } else {
+                        Text("Retry", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
         }

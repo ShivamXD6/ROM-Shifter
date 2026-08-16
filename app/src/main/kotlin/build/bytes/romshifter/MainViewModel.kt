@@ -185,9 +185,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        checkRootAccess()
+    }
+
+    fun checkRootAccess() {
         viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(isFetchingApps = true)
+            Shell.getCachedShell()?.close()
             val isRooted = Shell.getShell().isRoot
-            _uiState.value = _uiState.value.copy(hasRoot = isRooted)
+            _uiState.value = _uiState.value.copy(hasRoot = isRooted, isFetchingApps = false)
 
             if (isRooted) {
                 val whitelistJob = async {
@@ -195,7 +201,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val engineJob = async {
-                    val success = BackendInstaller.installEngine(application)
+                    val success = BackendInstaller.installEngine(getApplication())
                     if (success) prefs.edit { putBoolean("is_engine_installed", true) }
                 }
 
