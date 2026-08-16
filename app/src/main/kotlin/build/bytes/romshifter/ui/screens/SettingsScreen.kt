@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -52,6 +53,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -73,6 +76,7 @@ import build.bytes.romshifter.MainViewModel
 fun SettingsTab(context: Context, viewModel: MainViewModel) {
     val savedPath by viewModel.savedPath.collectAsState()
     val currentTheme by viewModel.themeMode.collectAsState()
+    val dynamicColor by viewModel.dynamicColor.collectAsState()
     val updateChannel by viewModel.updateChannel.collectAsState()
     val updateStatus by viewModel.updateStatus.collectAsState()
 
@@ -171,8 +175,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         0 to "System Default",
                         1 to "Light",
                         2 to "Dark",
-                        3 to "Amoled (Accent)",
-                        4 to "Amoled (Dynamic)"
+                        3 to "Amoled (Black)"
                     )
                 }
                 options.forEach { (value, label) ->
@@ -187,6 +190,46 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     ) {
                         Text(label, style = MaterialTheme.typography.titleMedium, color = if (currentTheme == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                         if (currentTheme == value) Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { viewModel.setDynamicColor(!dynamicColor) }
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                "Dynamic Colors",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "Use wallpaper accents",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = dynamicColor,
+                            onCheckedChange = { viewModel.setDynamicColor(it) },
+                            thumbContent = {
+                                Icon(
+                                    imageVector = if (dynamicColor) Icons.Filled.Check else Icons.Filled.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
@@ -545,8 +588,16 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        val themeText = when(currentTheme) { 1 -> "Light"; 2 -> "Dark"; 3 -> "Amoled (Accent)"; 4 -> "Amoled (Dynamic)"; else -> "System Default" }
-                        Text("Theme: $themeText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val themeText = when (currentTheme) {
+                            1 -> "Light"; 2 -> "Dark"; 3, 4 -> "Amoled"; else -> "System Default"
+                        }
+                        val dynamicText =
+                            if (dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) " (Dynamic)" else ""
+                        Text(
+                            "Theme: $themeText$dynamicText",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
 

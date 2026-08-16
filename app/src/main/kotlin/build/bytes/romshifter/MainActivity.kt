@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
+            val dynamicColor by viewModel.dynamicColor.collectAsState()
             val systemDark = isSystemInDarkTheme()
 
             val isDark = when (themeMode) {
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            ROMShifterTheme(themeMode = themeMode) {
+            ROMShifterTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     MainScreen(viewModel = viewModel)
                 }

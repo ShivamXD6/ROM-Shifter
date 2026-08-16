@@ -63,6 +63,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit { putInt("theme_mode", mode) }
     }
 
+    private val _dynamicColor = MutableStateFlow(prefs.getBoolean("dynamic_color", true))
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    fun setDynamicColor(enabled: Boolean) {
+        _dynamicColor.value = enabled
+        prefs.edit { putBoolean("dynamic_color", enabled) }
+    }
+
     private val _currentTab = MutableStateFlow(prefs.getInt("last_selected_tab", 1))
     val currentTab: StateFlow<Int> = _currentTab.asStateFlow()
 

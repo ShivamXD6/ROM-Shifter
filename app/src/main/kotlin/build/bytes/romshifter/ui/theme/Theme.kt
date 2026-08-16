@@ -38,13 +38,23 @@ fun ROMShifterTheme(
             }
         }
 
-        1 -> LightColorScheme
+        1 -> {
+            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicLightColorScheme(context)
+            } else {
+                LightColorScheme
+            }
+        }
 
-        2 -> DarkColorScheme
+        2 -> {
+            if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicDarkColorScheme(context)
+            } else {
+                DarkColorScheme
+            }
+        }
 
-        3 -> AmoledAccentColorScheme
-
-        4 -> {
+        3, 4 -> {
             if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 dynamicDarkColorScheme(context).copy(
                     background = Color(0xFF000000),
@@ -60,6 +70,7 @@ fun ROMShifterTheme(
                 AmoledAccentColorScheme
             }
         }
+
         else -> LightColorScheme
     }
 
