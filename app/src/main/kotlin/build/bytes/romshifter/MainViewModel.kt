@@ -617,7 +617,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun canSystemize(): Boolean = withContext(Dispatchers.IO) {
         if (isMagisk()) return@withContext true
         val check =
-            Shell.cmd("su -c '[ -d /data/adb/modules/meta-overlayfs ] || [ -d /data/adb/metamodule ] && echo YES'")
+            Shell.cmd("su -c '[ -d /data/adb/modules/mountify ] || [ -d /data/adb/modules/meta-overlayfs ] || [ -d /data/adb/metamodule ] && echo YES'")
                 .exec().out.joinToString("").trim()
         return@withContext check == "YES"
     }

@@ -54,13 +54,24 @@ fun ToolsTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewMode
         AlertDialog(
             shape = RoundedCornerShape(30.dp),
             onDismissRequest = { showMetaWarningDialog = false },
-            title = { Text("Meta-OverlayFS Required", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.error) },
-            text = { Text("You are not using Magisk. To systemize apps via KernelSU or APatch, you must have the Meta-OverlayFS module installed. Please download and flash it in your root manager, then try again.", style = MaterialTheme.typography.bodyLarge) },
+            title = {
+                Text(
+                    "Mountify Required",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Text(
+                    "You are not using Magisk. To systemize apps via KernelSU or APatch, you must have the Mountify module installed. Please download and flash it in your root manager, then try again.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            },
             confirmButton = {
                 Button(onClick = {
                     val intent = Intent(
                         Intent.ACTION_VIEW,
-                        "https://github.com/KernelSU-Modules-Repo/meta-overlayfs/releases".toUri()
+                        "https://github.com/backslashxx/mountify/releases".toUri()
                     )
                     context.startActivity(intent)
                     showMetaWarningDialog = false

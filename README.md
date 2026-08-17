@@ -38,7 +38,8 @@
 * **💾 Backup Flash Partitions**
   Directly clone or flash raw `.img` files to block devices (like `boot` or `recovery`) while Android is fully booted.
 * **🧹 App Management**
-  Debloat useless system apps, or systemize your own user apps seamlessly using Meta-OverlayFS (For KernelSU or it's forks).
+  Debloat useless system apps, or systemize your own user apps seamlessly using Mountify (For
+  KernelSU or it's forks).
 * <h3> Rest Features explore it by yourself ;') </h3>
 
 ## 📱 Screenshots & Previews
