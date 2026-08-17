@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -90,6 +91,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showUpdateDialog = MutableStateFlow(false)
     val updateInfo = MutableStateFlow<UpdateInfo?>(null)
 
+    private val _fullChangelogs = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val fullChangelogs: StateFlow<List<Pair<String, String>>> = _fullChangelogs.asStateFlow()
+
+    private val _isFetchingChangelogs = MutableStateFlow(false)
+    val isFetchingChangelogs: StateFlow<Boolean> = _isFetchingChangelogs.asStateFlow()
+
     fun setUpdateChannel(channel: Int) {
         _updateChannel.value = channel
         prefs.edit { putInt("update_channel", channel) }
@@ -100,77 +107,177 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val context: Application = getApplication()
 
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val url = java.net.URL("https://api.github.com/repos/ShivamXD6/ROM-Shifter/releases")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            var retryCount = 0
+            var success = false
 
-                if (connection.responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().use { it.readText() }
-                    val releases = org.json.JSONArray(response)
-                    var targetRelease: org.json.JSONObject? = null
+            while (retryCount < 2 && !success) {
+                try {
+                    val url =
+                        java.net.URL("https://api.github.com/repos/ShivamXD6/ROM-Shifter/releases")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty(
+                        "Accept",
+                        "application/json, application/vnd.github.v3+json"
+                    )
+                    connection.setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+                    )
+                    connection.connectTimeout = 30000
+                    connection.readTimeout = 30000
+                    connection.instanceFollowRedirects = true
 
-                    for (i in 0 until releases.length()) {
-                        val release = releases.getJSONObject(i)
-                        val isPreRelease = release.getBoolean("prerelease")
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val response = connection.inputStream.bufferedReader().use { it.readText() }
+                        val releases = org.json.JSONArray(response)
+                        var targetRelease: org.json.JSONObject? = null
 
-                        if (_updateChannel.value == 0 && isPreRelease) continue
+                        for (i in 0 until releases.length()) {
+                            val release = releases.getJSONObject(i)
+                            val isPreRelease = release.getBoolean("prerelease")
 
-                        targetRelease = release
-                        break
-                    }
+                            if (_updateChannel.value == 0 && isPreRelease) continue
 
-                    if (targetRelease != null) {
-                        val tagName = targetRelease.getString("tag_name")
-                        val htmlUrl = targetRelease.getString("html_url")
-
-                        val body = targetRelease.optString("body", "No release notes provided.")
-
-                        val assets = targetRelease.optJSONArray("assets")
-                        val downloadUrl = if (assets != null && assets.length() > 0) {
-                            assets.getJSONObject(0).getString("browser_download_url")
-                        } else {
-                            htmlUrl
+                            targetRelease = release
+                            break
                         }
 
-                        val currentVersionCode = try {
-                            val packageInfo =
-                                context.packageManager.getPackageInfo(context.packageName, 0)
-                            PackageInfoCompat.getLongVersionCode(packageInfo)
-                        } catch (_: Exception) {
-                            -1L
-                        }
-
-                        val cleanLatest = tagName.replace(Regex("[^0-9]"), "").toLongOrNull() ?: 0L
-
-                        withContext(Dispatchers.Main) {
-                            if (cleanLatest > currentVersionCode && currentVersionCode != -1L) {
-                                _updateStatus.value = "New version available: $tagName"
-
-                                updateInfo.value = UpdateInfo(tagName, body, downloadUrl)
-                                showUpdateDialog.value = true
-
+                        if (targetRelease != null) {
+                            val tagName = targetRelease.getString("tag_name")
+                            val htmlUrl = targetRelease.getString("html_url")
+                            val body = targetRelease.optString("body", "No release notes provided.")
+                            val assets = targetRelease.optJSONArray("assets")
+                            val downloadUrl = if (assets != null && assets.length() > 0) {
+                                assets.getJSONObject(0).getString("browser_download_url")
                             } else {
-                                _updateStatus.value = "App is up to date!"
-                                if (!isSilent) {
-                                    Toast.makeText(context, "You are on the latest version.", Toast.LENGTH_SHORT).show()
+                                htmlUrl
+                            }
+
+                            val currentVersionCode = try {
+                                val packageInfo =
+                                    context.packageManager.getPackageInfo(context.packageName, 0)
+                                PackageInfoCompat.getLongVersionCode(packageInfo)
+                            } catch (_: Exception) {
+                                -1L
+                            }
+
+                            val cleanLatest =
+                                tagName.replace(Regex("[^0-9]"), "").toLongOrNull() ?: 0L
+
+                            withContext(Dispatchers.Main) {
+                                if (cleanLatest > currentVersionCode && currentVersionCode != -1L) {
+                                    _updateStatus.value = "New version available: $tagName"
+                                    updateInfo.value = UpdateInfo(tagName, body, downloadUrl)
+                                    showUpdateDialog.value = true
+                                } else {
+                                    _updateStatus.value = "App is up to date!"
+                                    if (!isSilent) Toast.makeText(
+                                        context,
+                                        "You are on the latest version.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                            success = true
+                        }
+                    } else if (responseCode == 504 || responseCode == 502 || responseCode == 503) {
+                        retryCount++
+                        if (retryCount < 2) kotlinx.coroutines.delay(2000.milliseconds)
+                    } else {
+                        val errorMsg = try {
+                            connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                        } catch (_: Exception) {
+                            ""
+                        }
+                        withContext(Dispatchers.Main) {
+                            if (!isSilent) {
+                                _updateStatus.value = "Update check failed ($responseCode)"
+                                if (errorMsg.contains("rate limit", ignoreCase = true)) {
+                                    Toast.makeText(
+                                        context,
+                                        "GitHub API Rate limit exceeded.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             }
                         }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            if (!isSilent) _updateStatus.value = "No releases found on GitHub."
-                        }
+                        success = true
                     }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        if (!isSilent) _updateStatus.value = "Update check failed (${connection.responseCode})"
+                    connection.disconnect()
+                } catch (_: Exception) {
+                    retryCount++
+                    if (retryCount >= 2) {
+                        withContext(Dispatchers.Main) {
+                            if (!isSilent) _updateStatus.value =
+                                "Network error while checking updates"
+                        }
+                    } else {
+                        kotlinx.coroutines.delay(2000.milliseconds)
                     }
                 }
-            } catch (_: Exception) {
-                withContext(Dispatchers.Main) {
-                    if (!isSilent) _updateStatus.value = "Network error while checking updates"
+            }
+        }
+    }
+
+    fun fetchAllChangelogs() {
+        _isFetchingChangelogs.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            var retryCount = 0
+            var success = false
+
+            while (retryCount < 2 && !success) {
+                try {
+                    val url =
+                        java.net.URL("https://api.github.com/repos/ShivamXD6/ROM-Shifter/releases")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.requestMethod = "GET"
+                    connection.setRequestProperty(
+                        "Accept",
+                        "application/json, application/vnd.github.v3+json"
+                    )
+                    connection.setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+                    )
+                    connection.connectTimeout = 30000
+                    connection.readTimeout = 30000
+                    connection.instanceFollowRedirects = true
+
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val response = connection.inputStream.bufferedReader().use { it.readText() }
+                        val releases = org.json.JSONArray(response)
+                        val changelogs = mutableListOf<Pair<String, String>>()
+
+                        for (i in 0 until releases.length()) {
+                            val release = releases.getJSONObject(i)
+                            val tagName = release.getString("tag_name")
+                            val body = release.optString("body", "No release notes provided.")
+                            changelogs.add(tagName to body)
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            _fullChangelogs.value = changelogs
+                            _isFetchingChangelogs.value = false
+                        }
+                        success = true
+                    } else if (responseCode == 504 || responseCode == 502 || responseCode == 503) {
+                        retryCount++
+                        if (retryCount < 2) kotlinx.coroutines.delay(2000.milliseconds)
+                    } else {
+                        withContext(Dispatchers.Main) { _isFetchingChangelogs.value = false }
+                        success = true
+                    }
+                    connection.disconnect()
+                } catch (_: Exception) {
+                    retryCount++
+                    if (retryCount >= 2) {
+                        withContext(Dispatchers.Main) { _isFetchingChangelogs.value = false }
+                    } else {
+                        kotlinx.coroutines.delay(2000.milliseconds)
+                    }
                 }
             }
         }
