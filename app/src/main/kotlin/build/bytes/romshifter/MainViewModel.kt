@@ -318,6 +318,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val engineJob = async {
                     val success = BackendInstaller.installEngine(getApplication())
                     if (success) prefs.edit { putBoolean("is_engine_installed", true) }
+                    BackendInstaller.backupSelf(getApplication(), _savedPath.value)
                 }
 
                 val cleanupJob = async {
@@ -592,6 +593,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'")
                 .exec()
             _savedPath.value = newPath
+            BackendInstaller.backupSelf(getApplication(), newPath)
             withContext(Dispatchers.Main) { onSuccess() }
         }
     }
@@ -617,6 +619,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) {
                 if (detected.isNotEmpty()) {
                     _savedPath.value = detected
+                    viewModelScope.launch {
+                        BackendInstaller.backupSelf(
+                            getApplication(),
+                            detected
+                        )
+                    }
                     Toast.makeText(
                         getApplication(),
                         "Auto-detected folder at: $detected",

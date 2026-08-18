@@ -31,6 +31,28 @@ object BackendInstaller {
         return file.inputStream().use { it.md5() }
     }
 
+    suspend fun backupSelf(context: Context, shifterPath: String) = withContext(Dispatchers.IO) {
+        try {
+            val sourceApk = File(context.applicationInfo.sourceDir)
+            if (!sourceApk.exists()) return@withContext
+
+            val prefs = context.getSharedPreferences("shifter_backup_prefs", Context.MODE_PRIVATE)
+            val savedHash = prefs.getString("self_apk_hash", "")
+            val currentHash = getFileMd5(sourceApk) ?: ""
+
+            if (currentHash.isNotEmpty() && currentHash != savedHash) {
+                val targetDir = File(shifterPath).apply { mkdirs() }
+                val targetApk = File(targetDir, "ROM-Shifter.apk")
+
+                Shell.cmd("su -c 'cp \"${sourceApk.absolutePath}\" \"${targetApk.absolutePath}\" && chmod 644 \"${targetApk.absolutePath}\"'")
+                    .exec()
+
+                prefs.edit { putString("self_apk_hash", currentHash) }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     @Suppress("SameParameterValue")
     private fun getAssetMd5(context: Context, assetName: String): String? {
         return try {

@@ -51,7 +51,6 @@ object NativeManager {
             val unfoldedLines = mutableListOf<String>()
             var currentUnfoldedLine: StringBuilder? = null
 
-            // VCF Unfolding Logic: standard VCF folds lines starting with space or tab
             vcfFile.forEachLine { line ->
                 if (line.startsWith(" ") || line.startsWith("\t")) {
                     currentUnfoldedLine?.append(line.substring(1))
@@ -99,7 +98,6 @@ object NativeManager {
                             } else {
                                 value
                             }
-                        // N: format is Last;First;Middle;Prefix;Suffix
                         contactName =
                             decoded.split(";").filter { it.isNotBlank() }.joinToString(" ")
                     }
