@@ -292,10 +292,11 @@ object MigratorManager {
             val isRestore = state.migratorMode.name.contains("RESTORE")
             val cApp = state.globalComponents.contains(1)
             val cData = state.globalComponents.contains(2)
-            val cExt = state.globalComponents.contains(3)
-            val cMed = state.globalComponents.contains(4)
-            val cObb = state.globalComponents.contains(5)
+            val cPerm = state.globalComponents.contains(3)
+            val cExt = state.globalComponents.contains(4)
+            val cMed = state.globalComponents.contains(5)
             val cId = state.globalComponents.contains(6)
+            val cObb = state.globalComponents.contains(7)
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
@@ -310,17 +311,18 @@ object MigratorManager {
                     val parts = mutableListOf<String>()
                     if (cApp && File("$basePath/App.shift").exists()) parts.add("App")
                     if (cData && (File("$basePath/Data.shift").exists() || File("$basePath/UserDe.shift").exists())) parts.add("Data")
+                    if (cPerm && File("$basePath/Permissions.txt").exists()) parts.add("Perm")
                     if (cExt && File("$basePath/ExtData.shift").exists()) parts.add("ExtData")
                     if (cMed && File("$basePath/Media.shift").exists()) parts.add("Media")
-                    if (cObb && File("$basePath/Obb.shift").exists()) parts.add("Obb")
                     if (cId) {
                         try {
                             val metaFile = File("$basePath/Meta.txt")
                             if (metaFile.exists() && metaFile.readText().lines().any { it.startsWith("SSAID=") && it.length > 6 }) {
-                                parts.add("Android ID")
+                                parts.add("AndID")
                             }
                         } catch (_: Exception) {}
                     }
+                    if (cObb && File("$basePath/Obb.shift").exists()) parts.add("Obb")
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
@@ -333,10 +335,11 @@ object MigratorManager {
                         appendLine("res=\"\"")
                         if (cApp) appendLine("res=\"${dlr}res|App\"")
                         if (cData) appendLine("if [ -d \"$d/data/$pkg\" ] || [ -d \"$d/user_de/0/$pkg\" ]; then res=\"${dlr}res|Data\"; fi")
+                        if (cPerm) appendLine("res=\"${dlr}res|Perm\"")
                         if (cExt) appendLine("if [ -d \"$d/media/0/Android/data/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|ExtData\"; fi")
                         if (cMed) appendLine("if [ -d \"$d/media/0/Android/media/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Media\"; fi")
+                        if (cId) appendLine("if grep -q 'package=\"$pkg\"' $d/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"${dlr}res|AndID\"; fi")
                         if (cObb) appendLine("if [ -d \"$d/media/0/Android/obb/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/obb/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Obb\"; fi")
-                        if (cId) appendLine("if grep -q 'package=\"$pkg\"' $d/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"${dlr}res|Android ID\"; fi")
                         appendLine("echo \"$pkg==${dlr}res\"")
                     }
                 }

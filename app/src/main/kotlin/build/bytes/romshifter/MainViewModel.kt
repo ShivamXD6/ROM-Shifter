@@ -821,7 +821,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showSystemApps = showSysApps,
             systemAppsFetched = false,
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
-            globalComponents = setOf(1, 2, 3, 4, 5, 6)
+            globalComponents = setOf(1, 2, 3, 4, 5, 6, 7)
         )
 
         when (mode) {
