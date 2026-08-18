@@ -148,22 +148,18 @@ DO_BACKUP() {
     fi
 
     if CHK 1; then
-        if [ "$CUR_APP" != "$OLD_APP" ] || { [ "$CUR_APP" -gt 0 ] && [ ! -f "$APP_DIR/App.shift" ]; }; then
-            if [ "$CUR_APP" -gt 0 ]; then
-                apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
-                [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
-            else rm -f "$APP_DIR/App.shift"; fi
+        if [ "$CUR_APP" != "$OLD_APP" ] || [ ! -f "$APP_DIR/App.shift" ]; then
+            apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
+            [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
             OLD_APP=$CUR_APP
         fi
     fi
 
     if CHK 2; then
-        if [ "$CUR_DATA" != "$OLD_DATA" ] || { [ "$CUR_DATA" -gt 0 ] && [ ! -f "$APP_DIR/Data.shift" ] && [ ! -f "$APP_DIR/UserDe.shift" ]; }; then
-            if [ "$CUR_DATA" -gt 0 ]; then
-                [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
-                [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
-            else rm -f "$APP_DIR/Data.shift" "$APP_DIR/UserDe.shift"; fi
-                OLD_DATA=$CUR_DATA
+        if [ "$CUR_DATA" != "$OLD_DATA" ] || [ ! -f "$APP_DIR/Data.shift" ] || [ ! -f "$APP_DIR/UserDe.shift" ]; then
+            [ -d "/data/data/$PKG" ] && BUNDAPP "/data/data" "$PKG" "$APP_DIR" "Data"
+            [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
+            OLD_DATA=$CUR_DATA
         fi
     fi
 

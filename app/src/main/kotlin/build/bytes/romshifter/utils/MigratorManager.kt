@@ -333,8 +333,8 @@ object MigratorManager {
                     selectedApps.forEach { app ->
                         val pkg = app.packageName
                         appendLine("res=\"\"")
-                        if (cApp) appendLine("res=\"${dlr}res|App\"")
-                        if (cData) appendLine("if [ -d \"$d/data/$pkg\" ] || [ -d \"$d/user_de/0/$pkg\" ]; then res=\"${dlr}res|Data\"; fi")
+                        appendLine("res=\"${dlr}res|App\"")
+                        appendLine("res=\"${dlr}res|Data\"")
                         if (cPerm) appendLine("res=\"${dlr}res|Perm\"")
                         if (cExt) appendLine("if [ -d \"$d/media/0/Android/data/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|ExtData\"; fi")
                         if (cMed) appendLine("if [ -d \"$d/media/0/Android/media/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Media\"; fi")
