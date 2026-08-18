@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.PowerManager
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.graphics.createBitmap
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
@@ -61,7 +62,12 @@ object MigratorManager {
                         if (type == "AllInstalled" || (type == "System" && isSys) || (type == "User" && !isSys)) {
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
                             val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
-                            val version = try { pm.getPackageInfo(app.packageName, 0).versionName?.replace("|", "")?.replace("\n", "")?.trim() ?: "" } catch(_: Exception) { "" }
+                            val version = try {
+                                val pi = pm.getPackageInfo(app.packageName, 0)
+                                PackageInfoCompat.getLongVersionCode(pi).toString()
+                            } catch (_: Exception) {
+                                ""
+                            }
 
                             val iconFile = File(iconCacheDir, "${pkg}_icon.png")
                             if (!iconFile.exists()) {
@@ -123,6 +129,15 @@ object MigratorManager {
                             val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
                             val pkg = app.packageName
+                            val version = try {
+                                val pi = pm.getPackageInfo(
+                                    app.packageName,
+                                    PackageManager.MATCH_UNINSTALLED_PACKAGES
+                                )
+                                PackageInfoCompat.getLongVersionCode(pi).toString()
+                            } catch (_: Exception) {
+                                ""
+                            }
 
                             val iconFile = File(iconCacheDir, "${pkg}_icon.png")
                             if (!iconFile.exists()) {
@@ -148,6 +163,7 @@ object MigratorManager {
                             AppInfo(
                                 label = label,
                                 packageName = pkg,
+                                version = version,
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,

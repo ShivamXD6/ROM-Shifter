@@ -104,7 +104,7 @@ PKG_INSTALLED() {
     [ -z "$2" ] && return 0
     local apkpath="$(pm path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n 1 | tr -d '\r')"
     [ -z "$apkpath" ] && return 1
-    local inst_ver=$(dumpsys package "$1" | grep versionName | head -n1 | cut -d= -f2)
+    local inst_ver=$(dumpsys package "$1" | grep -m1 "versionCode=" | sed 's/.*versionCode=\([0-9]*\).*/\1/')
     [ "$inst_ver" = "$2" ] || return 1
     return 0
 }
