@@ -864,6 +864,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun smartSelect(visibleApps: List<AppInfo>) {
+        val state = _uiState.value
+        val visiblePackages = visibleApps.map { it.packageName }.toSet()
+
+        fun isSmartMatch(app: AppInfo): Boolean {
+            return when (state.migratorMode) {
+                MigratorMode.BACKUP_APPS -> app.backupTime == "No backup on device"
+                MigratorMode.RESTORE_APPS -> !app.isInstalled
+                MigratorMode.MANAGE -> app.isInstalled
+                MigratorMode.DEBLOAT -> state.actionFilterState == 1 && app.backupTime != "No backup on device"
+                else -> false
+            }
+        }
+
+        val matches = visibleApps.filter { isSmartMatch(it) }
+        val allMatchesSelected = matches.isNotEmpty() && matches.all { it.isSelected }
+
+        val updatedList = _appList.value.map { app ->
+            if (visiblePackages.contains(app.packageName) && isSmartMatch(app)) {
+                app.copy(isSelected = !allMatchesSelected)
+            } else app
+        }
+        _appList.value = updatedList
+    }
+
     fun selectAllVisibleApps(select: Boolean, visibleApps: List<AppInfo>) {
         val visiblePackageNames = visibleApps.map { it.packageName }.toSet()
         val updatedList = _appList.value.map {

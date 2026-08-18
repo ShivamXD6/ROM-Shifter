@@ -40,6 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -493,7 +494,14 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             val showAppFilters =
                 appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)
 
-            val activeGroups = listOf(hasButtons, hasComponents, showAppFilters).count { it }
+            val showSmartSelect = when (appState.migratorMode) {
+                MigratorMode.BACKUP_APPS, MigratorMode.RESTORE_APPS, MigratorMode.MANAGE -> true
+                MigratorMode.DEBLOAT -> appState.actionFilterState == 1
+                else -> false
+            }
+
+            val activeGroups =
+                listOf(hasButtons, hasComponents, showAppFilters, showSmartSelect).count { it }
 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -604,6 +612,32 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 .width(1.dp)
                                 .height(24.dp)
                                 .background(MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                }
+
+                if (showSmartSelect) {
+                    item {
+                        val allSmartMatchesSelected = remember(filteredApps) {
+                            val matches = filteredApps.filter { app ->
+                                when (appState.migratorMode) {
+                                    MigratorMode.BACKUP_APPS -> app.backupTime == "No backup on device"
+                                    MigratorMode.RESTORE_APPS -> !app.isInstalled
+                                    MigratorMode.MANAGE -> app.isInstalled
+                                    MigratorMode.DEBLOAT -> appState.actionFilterState == 1 && app.backupTime != "No backup on device"
+                                    else -> false
+                                }
+                            }
+                            matches.isNotEmpty() && matches.all { it.isSelected }
+                        }
+
+                        AnimatedFilterChip(
+                            selected = allSmartMatchesSelected,
+                            onClick = { viewModel.smartSelect(filteredApps) },
+                            label = "Auto Select",
+                            leadingIcon = Icons.Default.AutoAwesome,
+                            showLabel = expandedChipLabel == "Auto Select",
+                            onExpand = { expandChip("Auto Select") }
                         )
                     }
                 }
