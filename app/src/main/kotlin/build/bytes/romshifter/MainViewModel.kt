@@ -325,10 +325,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "mkdir -p /data/local/tmp",
                         "chmod 1777 /data/local/tmp",
                         "chown shell:shell /data/local/tmp",
-                        "rm -rf /data/local/tmp/shifter_apps  /data/local/tmp/shifter_targets.txt",
-                        "mkdir -p /data/local/tmp/shifter_apps ",
-                        "chmod 777 /data/local/tmp/shifter_apps ",
-                        "chown shell:shell /data/local/tmp/shifter_apps "
+                        "rm -rf /data/local/tmp/shifter_apps /data/local/tmp/shifter_targets.txt",
+                        "mkdir -p /data/local/tmp/shifter_apps",
+                        "chmod 777 /data/local/tmp/shifter_apps",
+                        "chown shell:shell /data/local/tmp/shifter_apps"
                     )
                     Shell.cmd(*commands).exec()
                 }

@@ -6,7 +6,7 @@
 BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
-AM_TMP="/data/local/tmp/shifter_apps "
+AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
 
 init_shifter() {
@@ -246,7 +246,7 @@ DO_RESTORE() {
     [ -f "$APP_DIR/Meta.txt" ] || return
     PKG=$(grep "Package=" "$APP_DIR/Meta.txt" | cut -d= -f2); [ -z "$PKG" ] && return
     VER=$(grep "Version=" "$APP_DIR/Meta.txt" | cut -d= -f2)
-    TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"
+    TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"; chmod 777 "$TMP_PKG"
 
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
@@ -260,7 +260,7 @@ DO_RESTORE() {
     if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
         if ! PKG_INSTALLED "$PKG" "$VER"; then
             "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
-            chmod 777 "$TMP_PKG"/*.apk 2>/dev/null
+            chmod -R 777 "$TMP_PKG" 2>/dev/null
             local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
             if [ -n "$apks_to_install" ]; then
                 local SESSION_ID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')

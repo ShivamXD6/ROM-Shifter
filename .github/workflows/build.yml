@@ -59,7 +59,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: "${{ env.COMMIT_COUNT }}"
-          name: "⚡ ROM Shifter - ${{ env.VERSION_NAME }} - ${{ env.COMMIT_COUNT }}"
+          name: "${{ env.VERSION_NAME }} - ${{ env.COMMIT_COUNT }}"
           body: |
             Automated pre-release build for **${{ env.VERSION_NAME }}** (Build ${{ env.COMMIT_COUNT }}).
             

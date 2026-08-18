@@ -1,8 +1,8 @@
 package build.bytes.romshifter.utils
 
+import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import android.util.JsonReader
@@ -19,6 +19,191 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 
 object NativeManager {
+
+    private fun decodeQuotedPrintable(input: String): String {
+        return try {
+            val out = java.io.ByteArrayOutputStream()
+            var i = 0
+            while (i < input.length) {
+                val c = input[i]
+                if (c == '=') {
+                    val hex = input.substring(i + 1, i + 3)
+                    out.write(hex.toInt(16))
+                    i += 3
+                } else {
+                    out.write(c.code)
+                    i++
+                }
+            }
+            out.toString("UTF-8")
+        } catch (_: Exception) {
+            input
+        }
+    }
+
+    private fun importVcf(
+        context: Context,
+        vcfFile: File,
+        updateState: (step: String, progress: Int) -> Unit
+    ) {
+        try {
+            val ops = ArrayList<ContentProviderOperation>()
+            val unfoldedLines = mutableListOf<String>()
+            var currentUnfoldedLine: StringBuilder? = null
+
+            // VCF Unfolding Logic: standard VCF folds lines starting with space or tab
+            vcfFile.forEachLine { line ->
+                if (line.startsWith(" ") || line.startsWith("\t")) {
+                    currentUnfoldedLine?.append(line.substring(1))
+                } else {
+                    currentUnfoldedLine?.let { unfoldedLines.add(it.toString()) }
+                    currentUnfoldedLine = StringBuilder(line)
+                }
+            }
+            currentUnfoldedLine?.let { unfoldedLines.add(it.toString()) }
+
+            var contactName: String? = null
+            val phoneNumbers = mutableListOf<String>()
+            var photoBytes: ByteArray? = null
+
+            val totalLines = unfoldedLines.size
+            unfoldedLines.forEachIndexed { index, line ->
+                when {
+                    line.startsWith("BEGIN:VCARD", ignoreCase = true) -> {
+                        contactName = null
+                        phoneNumbers.clear()
+                        photoBytes = null
+                    }
+
+                    (line.startsWith("FN:", ignoreCase = true) || line.startsWith(
+                        "FN;",
+                        ignoreCase = true
+                    )) -> {
+                        val value = line.substringAfter(":").trim()
+                        contactName =
+                            if (line.contains("ENCODING=QUOTED-PRINTABLE", ignoreCase = true)) {
+                                decodeQuotedPrintable(value)
+                            } else {
+                                value
+                            }
+                    }
+
+                    (line.startsWith("N:", ignoreCase = true) || line.startsWith(
+                        "N;",
+                        ignoreCase = true
+                    )) && contactName == null -> {
+                        val value = line.substringAfter(":").trim()
+                        val decoded =
+                            if (line.contains("ENCODING=QUOTED-PRINTABLE", ignoreCase = true)) {
+                                decodeQuotedPrintable(value)
+                            } else {
+                                value
+                            }
+                        // N: format is Last;First;Middle;Prefix;Suffix
+                        contactName =
+                            decoded.split(";").filter { it.isNotBlank() }.joinToString(" ")
+                    }
+
+                    line.startsWith("TEL", ignoreCase = true) -> {
+                        val number = line.substringAfter(":").trim()
+                        if (number.isNotEmpty()) phoneNumbers.add(number)
+                    }
+
+                    line.startsWith("PHOTO", ignoreCase = true) -> {
+                        val base64Data = line.substringAfter(":").trim()
+                        try {
+                            photoBytes =
+                                android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                        } catch (_: Exception) {
+                        }
+                    }
+
+                    line.startsWith("END:VCARD", ignoreCase = true) -> {
+                        if (!contactName.isNullOrEmpty() || phoneNumbers.isNotEmpty()) {
+                            val rawContactIndex = ops.size
+                            ops.add(
+                                ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+                                    .build()
+                            )
+
+                            ops.add(
+                                ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                                    .withValueBackReference(
+                                        ContactsContract.Data.RAW_CONTACT_ID,
+                                        rawContactIndex
+                                    )
+                                    .withValue(
+                                        ContactsContract.Data.MIMETYPE,
+                                        ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
+                                    )
+                                    .withValue(
+                                        ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
+                                        contactName ?: "Unknown"
+                                    )
+                                    .build()
+                            )
+
+                            for (number in phoneNumbers) {
+                                ops.add(
+                                    ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                                        .withValueBackReference(
+                                            ContactsContract.Data.RAW_CONTACT_ID,
+                                            rawContactIndex
+                                        )
+                                        .withValue(
+                                            ContactsContract.Data.MIMETYPE,
+                                            ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE
+                                        )
+                                        .withValue(
+                                            ContactsContract.CommonDataKinds.Phone.NUMBER,
+                                            number
+                                        )
+                                        .withValue(
+                                            ContactsContract.CommonDataKinds.Phone.TYPE,
+                                            ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
+                                        )
+                                        .build()
+                                )
+                            }
+
+                            photoBytes?.let {
+                                ops.add(
+                                    ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                                        .withValueBackReference(
+                                            ContactsContract.Data.RAW_CONTACT_ID,
+                                            rawContactIndex
+                                        )
+                                        .withValue(
+                                            ContactsContract.Data.MIMETYPE,
+                                            ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
+                                        )
+                                        .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, it)
+                                        .build()
+                                )
+                            }
+                        }
+
+                        if (ops.size > 100) {
+                            context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+                            ops.clear()
+                        }
+                    }
+                }
+                if (index % 50 == 0 && totalLines > 0) updateState(
+                    "Importing contacts...",
+                    90 + (index * 10 / totalLines).coerceAtMost(9)
+                )
+            }
+            if (ops.isNotEmpty()) context.contentResolver.applyBatch(
+                ContactsContract.AUTHORITY,
+                ops
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     suspend fun runOperation(
         context: Context,
@@ -208,10 +393,8 @@ object NativeManager {
                 Shell.cmd("su -c 'chmod 666 \"${tempVcf.absolutePath}\"'").exec()
 
                 if (tempVcf.exists()) {
-                    val intent = Intent(Intent.ACTION_VIEW)
-                    intent.setDataAndType(Uri.fromFile(tempVcf), "text/x-vcard")
-                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    try { context.startActivity(intent) } catch (_: Exception) {}
+                    importVcf(context, tempVcf, updateState)
+                    tempVcf.delete()
                 }
             }
         }

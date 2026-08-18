@@ -1254,7 +1254,19 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
 
                 if (currentLine.startsWith("> ")) {
                     currentLine = currentLine.removePrefix("> ")
-                    lineStyle = quoteStyle
+                    val isImportant = currentLine.contains(
+                        "Note:",
+                        ignoreCase = true
+                    ) || currentLine.contains(
+                        "Warning:",
+                        ignoreCase = true
+                    ) || currentLine.contains("Important:", ignoreCase = true)
+
+                    lineStyle = if (isImportant) {
+                        quoteStyle.copy(color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
+                    } else {
+                        quoteStyle
+                    }
                     prefix = "┃ "
                 }
 

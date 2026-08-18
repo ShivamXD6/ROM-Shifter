@@ -40,7 +40,7 @@
 * **🧹 App Management**
   Debloat useless system apps, or systemize your own user apps seamlessly using Mountify (For
   KernelSU or it's forks).
-* <h3> Rest Features explore it by yourself ;') </h3>
+  <h3> Rest Features explore it by yourself ;') </h3>
 
 ## 📱 Screenshots & Previews
 
@@ -48,9 +48,9 @@
   <summary><b>Tap to view Screenshots</b></summary>
   <br>
   <div align="center">
-    <img src="https://github.com/user-attachments/assets/d0ec7ca7-7ecf-420a-8be6-f4249f8d5fef" width="30%" alt="Flash Tab"/>
-    <img src="https://github.com/user-attachments/assets/e3cd2c2e-be25-4ef4-a6e9-43c69b22a007" width="30%" alt="Migrate Tab"/>
-    <img src="https://github.com/user-attachments/assets/20424390-2264-4cc2-b6c3-528da5f4a256" width="30%" alt="Settings Tab"/>
+    <img src="screenshots/Flash.png" width="30%" alt="Flash Tab"/>
+    <img src="screenshots/Migrate.png" width="30%" alt="Migrate Tab"/>
+    <img src="screenshots/Tools.png" width="30%" alt="Tools Tab"/>
   </div>
 </details>
 

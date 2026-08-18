@@ -46,7 +46,7 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            isEnable = System.getenv("GITHUB_ACTIONS") == "true"
             reset()
             isUniversalApk = false
             include("armeabi-v7a", "arm64-v8a")
