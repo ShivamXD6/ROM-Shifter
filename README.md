@@ -29,17 +29,187 @@
 
 ## ✨ Features
 
-* **📦 Apps Migration**
-  Backs up and restores User/System apps at blazing fast speed **(~52.77 GB in just 7m 28s)** using a custom ZSTD `zapdos` binary to create highly compressed `.shift` archives.
-* **💬 Native Data Backup**
-  Backs up your Messages, Call Logs, and Contacts into single, `.shift` files for easy restoration.
-* **⚡ Auto Flash Wizard**
-  Queue up your Firmware, ROMs, GApps, and Kernels, select your wipe partitions, and the app will auto-flash everything in Your Custom Recovery like TWRP. (Perfect when your recovery touchscreen doesn't work).
-* **💾 Backup Flash Partitions**
-  Directly clone or flash raw `.img` files to block devices (like `boot` or `recovery`) while Android is fully booted.
-* **🧹 App Management**
-  Debloat useless system apps, or systemize your own user apps seamlessly using Mountify (For
-  KernelSU or it's forks).
+### ⚡ Flash
+
+*Everything you need to flash, install, and restore device partitions.*
+
+<details>
+<summary><b>Auto Flash Wizard</b></summary>
+
+*Automate the complete ROM flashing process directly from Android.*
+
+* Configure the required wipes before flashing, including Dalvik, Cache, Data, Metadata, System, and
+  Format Data.
+* Select and arrange Firmware, ROM, G-Apps, Kernel, Recovery, and other flashable ZIPs in the order
+  you want.
+* Automatically creates the recovery flashing sequence using commonly recommended flashing
+  practices.
+* Warns you if a screen lock is enabled to help prevent FRP issues when booting into the new ROM.
+* Choose what to boot into after flashing: System, Recovery, or Bootloader.
+* Useful when recovery touch is not working or when you want to flash multiple ZIPs without manually
+  interacting with recovery.
+
+</details>
+
+<details>
+<summary><b>Backup Partitions</b></summary>
+
+*Create raw `.img` backups of selected device partitions.*
+
+* Search for and select the partitions you want to back up.
+* Back up multiple partitions at the same time.
+* Useful before flashing ROMs, kernels, recoveries, or making other low-level system changes.
+
+</details>
+
+<details>
+<summary><b>Flash / Restore Partitions</b></summary>
+
+*Flash a raw `.img` file directly to a selected partition.*
+
+* Restore partition images created with ROM Shifter.
+* Flash custom `.img` files to supported partitions.
+* Useful for recovering or replacing individual partitions.
+
+</details>
+
+---
+
+### 🔄 Migrate
+
+*Everything you need to move your apps and personal or ROM data between ROMs.*
+
+<details>
+<summary><b>Backup Apps</b></summary>
+
+*Back up user and system apps so they can be restored later.*
+
+* Select individual apps or back up multiple apps at once.
+* Choose exactly which components to back up, including:
+
+  * APK / Split APKs
+  * App Data
+  * External Data
+  * Media
+  * OBB
+  * Android ID
+  * Granted Permissions
+* All component, action, and filter controls are organized for quick and easy selection.
+* Backup Benchmarks (Performed by users):
+
+  * ~15.60 GB in 1m 1s (Internal Storage, UFS 4.0, 5 Apps) - Poco X6 Pro
+  * ~811.42 MB in 10s (Internal Storage, eMMC 5.1, 1 App) - realme 3 Pro
+  * ~509 MB in 34s (SD Card, 2 Apps) - Redmi 10C
+* Fully compresses base APKs and split APKs along with other backup components.
+
+  * This results in backup sizes around 3% smaller for a single app and 15%+ smaller for bulk
+    backups.
+* Use Auto Select to automatically select apps that have not been backed up yet.
+* Toggle between User Apps and System Apps to show or hide them.
+* Useful before a clean ROM installation or when moving to another ROM.
+
+</details>
+
+> [!NOTE]
+> App caches are not backed up because they are not required. Apps automatically recreate their
+> caches when needed.
+
+<details>
+<summary><b>Restore Apps</b></summary>
+
+*Restore apps and their backed-up data after installing a new ROM.*
+
+* Select individual apps or restore multiple apps at once.
+* Choose exactly which components to restore, including:
+
+  * APK / Split APKs
+  * App Data
+  * External Data
+  * Media
+  * OBB
+  * Android ID
+  * Granted Permissions
+* All component, action, and filter controls are organized for quick and easy selection.
+* Restore Benchmarks (Performed by users):
+
+  * ~52.77 GB in 7m 28s (Internal Storage, UFS 4.0, 312 Apps) - Poco X6 Pro
+  * ~16.33 GB in 1m 41s (Internal Storage, UFS 3.1, 1 App) - realme GT NEO 3T
+  * ~1.31 GB in 32s (Internal Storage, eMMC 5.1, 5 Apps) - realme 3 Pro
+* Removes GMS transport files to prevent notification delays after restoration.
+* Restores SELinux contexts to ensure apps such as Termux work correctly after restoration.
+* Installs restored apps with Google Play Store as the installer source to prevent crashes in apps
+  such as Airtel.
+* Use Auto Select to automatically select apps that have not been restored yet.
+* Toggle between User Apps and System Apps to show or hide them.
+
+</details>
+
+> [!NOTE]
+> Backup and restore speeds automatically adapt to your device's hardware to deliver the best
+> possible I/O performance across UFS, eMMC, and SD cards.
+
+<details>
+<summary><b>Native Data Backup & Restore</b></summary>
+
+*Back up and restore important Android data that is not tied to individual apps.*
+
+* Supports native backup and restore of:
+
+  * SMS (including RCS)
+  * Call Logs
+  * Contacts
+* Unlike other solutions, you do not need to set ROM Shifter as the default app to restore SMS, Call
+  Logs, or Contacts.
+
+</details>
+
+<details>
+<summary><b>Manage Backups</b></summary>
+
+*Browse, manage, and delete existing app and native backups to keep your storage organized.*
+
+* Use Auto Select to automatically select apps that have already been restored.
+* Toggle between User Apps and System Apps to show or hide them.
+
+</details>
+
+---
+
+### 🛠️ Tools
+
+*Utilities for managing, customizing, and maintaining your rooted Android system.*
+
+<details>
+<summary><b>Debloat / Restore Apps</b></summary>
+
+*Remove unwanted user or system apps from your device.*
+
+* Select individual apps or multiple apps at once.
+* Choose between User Apps and System Apps.
+* Use Auto Select to automatically select apps that have already been backed up.
+* Toggle User Apps or System Apps to show or hide them.
+* Enable Restore to bring back previously debloated system apps.
+* Enable Force Delete to permanently remove an app from its system directory.
+
+  * ⚠️ This is destructive and cannot be restored through ROM Shifter.
+* Useful for removing vendor bloatware and unnecessary system packages after installing a ROM.
+
+</details>
+
+<details>
+<summary><b>Systemize / De-Systemize</b></summary>
+
+*Move supported apps into or out of the Android system environment.*
+
+* Requires the Mountify Module because directly moving apps into the system can be risky and is not
+  supported on Dynamic Partitions.
+* Shows only User Apps by default, since systemizing an existing System App is unnecessary.
+* Supports De-Systemization when you no longer want a user app to remain installed as a system app.
+* Useful when you want an app to become part of the system and no longer be removable like a normal
+  user app.
+
+</details>
+
   <h3> Rest Features explore it by yourself ;') </h3>
 
 ## 📱 Screenshots & Previews
