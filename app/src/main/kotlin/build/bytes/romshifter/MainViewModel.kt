@@ -103,8 +103,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun checkForUpdates(isSilent: Boolean = false) {
-        if (!isSilent) _updateStatus.value = "Checking for updates..."
         val context: Application = getApplication()
+        val currentTime = System.currentTimeMillis()
+
+        val lastCheck = prefs.getLong(PREF_LAST_UPDATE_CHECK, 0L)
+        val lastError = prefs.getLong("last_update_error_time", 0L)
+
+        if (isSilent) {
+            if (currentTime - lastCheck < 24 * 60 * 60 * 1000L) return
+            if (currentTime - lastError < 60 * 60 * 1000L) return
+        }
+
+        if (!isSilent) _updateStatus.value = "Checking for updates..."
 
         viewModelScope.launch(Dispatchers.IO) {
             var retryCount = 0
@@ -122,24 +132,72 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     connection.setRequestProperty(
                         "User-Agent",
-                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+                        "ROMShifter-App-Updater"
                     )
-                    connection.connectTimeout = 30000
-                    connection.readTimeout = 30000
+
+                    val cachedEtag = prefs.getString(PREF_GITHUB_ETAG, "")
+                    if (!cachedEtag.isNullOrEmpty()) {
+                        connection.setRequestProperty("If-None-Match", cachedEtag)
+                    }
+
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
                     connection.instanceFollowRedirects = true
 
                     val responseCode = connection.responseCode
-                    if (responseCode == 200) {
-                        val response = connection.inputStream.bufferedReader().use { it.readText() }
-                        val releases = org.json.JSONArray(response)
+
+                    val responseJson = when (responseCode) {
+                        200 -> {
+                            val etag = connection.getHeaderField("ETag")
+                            val body = connection.inputStream.bufferedReader().use { it.readText() }
+                            if (!etag.isNullOrEmpty()) {
+                                prefs.edit {
+                                    putString(PREF_GITHUB_ETAG, etag)
+                                    putString(PREF_RELEASES_CACHE, body)
+                                }
+                            }
+                            body
+                        }
+
+                        304 -> {
+                            prefs.getString(PREF_RELEASES_CACHE, "[]") ?: "[]"
+                        }
+
+                        403 -> {
+                            val errorMsg =
+                                connection.errorStream?.bufferedReader()?.use { it.readText() }
+                                    ?: ""
+                            if (errorMsg.contains("rate limit", ignoreCase = true)) {
+                                prefs.edit { putLong("last_update_error_time", currentTime) }
+                                withContext(Dispatchers.Main) {
+                                    if (!isSilent) Toast.makeText(
+                                        context,
+                                        "Rate limit hit, using cached info.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                prefs.getString(PREF_RELEASES_CACHE, null)
+                            } else {
+                                null
+                            }
+                        }
+
+                        else -> null
+                    }
+
+                    if (responseJson != null) {
+                        prefs.edit {
+                            putLong(PREF_LAST_UPDATE_CHECK, currentTime)
+                            remove("last_update_error_time")
+                        }
+
+                        val releases = org.json.JSONArray(responseJson)
                         var targetRelease: org.json.JSONObject? = null
 
                         for (i in 0 until releases.length()) {
                             val release = releases.getJSONObject(i)
                             val isPreRelease = release.getBoolean("prerelease")
-
                             if (_updateChannel.value == 0 && isPreRelease) continue
-
                             targetRelease = release
                             break
                         }
@@ -223,6 +281,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchAllChangelogs() {
         _isFetchingChangelogs.value = true
+
+        val cachedJson = prefs.getString(PREF_RELEASES_CACHE, "")
+        if (!cachedJson.isNullOrEmpty()) {
+            try {
+                val releases = org.json.JSONArray(cachedJson)
+                val changelogs = mutableListOf<Pair<String, String>>()
+                for (i in 0 until releases.length()) {
+                    val release = releases.getJSONObject(i)
+                    changelogs.add(
+                        release.getString("tag_name") to release.optString(
+                            "body",
+                            "No release notes provided."
+                        )
+                    )
+                }
+                _fullChangelogs.value = changelogs
+            } catch (_: Exception) {
+            }
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             var retryCount = 0
             var success = false
@@ -241,14 +319,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "User-Agent",
                         "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
                     )
+
+                    val cachedEtag = prefs.getString(PREF_GITHUB_ETAG, "")
+                    if (!cachedEtag.isNullOrEmpty()) {
+                        connection.setRequestProperty("If-None-Match", cachedEtag)
+                    }
+
                     connection.connectTimeout = 30000
                     connection.readTimeout = 30000
                     connection.instanceFollowRedirects = true
 
                     val responseCode = connection.responseCode
-                    if (responseCode == 200) {
-                        val response = connection.inputStream.bufferedReader().use { it.readText() }
-                        val releases = org.json.JSONArray(response)
+                    if (responseCode == 200 || responseCode == 304) {
+                        val responseJson = if (responseCode == 200) {
+                            val etag = connection.getHeaderField("ETag")
+                            val body = connection.inputStream.bufferedReader().use { it.readText() }
+                            if (etag != null) {
+                                prefs.edit {
+                                    putString(PREF_GITHUB_ETAG, etag)
+                                    putString(PREF_RELEASES_CACHE, body)
+                                }
+                            }
+                            body
+                        } else {
+                            prefs.getString(PREF_RELEASES_CACHE, "[]") ?: "[]"
+                        }
+
+                        val releases = org.json.JSONArray(responseJson)
                         val changelogs = mutableListOf<Pair<String, String>>()
 
                         for (i in 0 until releases.length()) {
@@ -289,6 +386,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
         private const val CHANNEL_ALERT_ID = "rom_shifter_alerts_v2"
         private const val NOTIFICATION_ID = 1001
+
+        private const val PREF_GITHUB_ETAG = "github_releases_etag"
+        private const val PREF_RELEASES_CACHE = "github_releases_json"
+        private const val PREF_LAST_UPDATE_CHECK = "last_update_check_time"
     }
 
     init {
