@@ -9,79 +9,73 @@ import androidx.core.graphics.ColorUtils
 
 val PrimaryBlueLight = Color(0xFF2D5BD0)
 val PrimaryBlueDark = Color(0xFF8EABFF)
+val Periwrinkle = Color(0xFFE4E5F0)
 
 fun Color.toColorScheme(isDark: Boolean, isAmoled: Boolean = false): ColorScheme {
     val argb = this.toArgb()
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(argb, hsl)
 
-    if (hsl[1] < 0.4f) hsl[1] = 0.5f
-
-    if (isDark) {
-        hsl[2] = 0.75f
-    } else {
-        hsl[2] = 0.40f
+    if (hsl[1] < 0.10f) {
+        hsl[0] = 225f
+        hsl[1] = 0.40f
     }
 
-    val primaryColorArgb = ColorUtils.HSLToColor(hsl)
-    val primary = Color(primaryColorArgb)
+    if (hsl[1] < 0.15f) hsl[1] = 0.30f
+    if (hsl[1] > 0.5f) hsl[1] = 0.45f
 
-    val onPrimary =
-        if (ColorUtils.calculateLuminance(primaryColorArgb) > 0.5) Color.Black else Color.White
-
-    val containerHsl = hsl.copyOf()
-    if (isDark) {
-        containerHsl[2] = 0.15f
-    } else {
-        containerHsl[2] = 0.90f
-    }
-    val containerColor = Color(ColorUtils.HSLToColor(containerHsl))
-
-    val onContainerHsl = hsl.copyOf()
-    if (isDark) {
-        onContainerHsl[2] = 0.85f
-    } else {
-        onContainerHsl[2] = 0.15f
-    }
-    val onContainerColor = Color(ColorUtils.HSLToColor(onContainerHsl))
+    fun getColor(h: Float, s: Float, l: Float) = Color(ColorUtils.HSLToColor(floatArrayOf(h, s, l)))
 
     return if (isDark) {
+        val accent = getColor(hsl[0], 0.65f, 0.82f)
+        val container = getColor(hsl[0], 0.10f, 0.12f)
+        val darkText = getColor(hsl[0], 0.50f, 0.15f)
+
         darkColorScheme(
-            primary = primary,
-            onPrimary = onPrimary,
-            primaryContainer = containerColor,
-            onPrimaryContainer = onContainerColor,
-            secondaryContainer = containerColor,
-            onSecondaryContainer = onContainerColor,
+            primary = accent,
+            onPrimary = darkText,
+            primaryContainer = container,
+            onPrimaryContainer = accent,
+            secondaryContainer = getColor(hsl[0], 0.15f, 0.22f),
+            onSecondaryContainer = accent,
 
-            background = if (isAmoled) Color.Black else Color(0xFF0B0D11),
-            surface = if (isAmoled) Color.Black else Color(0xFF0B0D11),
-            surfaceVariant = if (isAmoled) Color.Black else Color(0xFF1A1D26),
+            background = if (isAmoled) Color.Black else getColor(hsl[0], 0.08f, 0.05f),
+            surface = if (isAmoled) Color.Black else getColor(hsl[0], 0.08f, 0.05f),
+            surfaceVariant = if (isAmoled) Color.Black else container,
 
-            surfaceContainerLowest = if (isAmoled) Color.Black else Color(0xFF0F1218),
-            surfaceContainerLow = if (isAmoled) Color.Black else Color(0xFF14171E),
-            surfaceContainer = if (isAmoled) Color.Black else Color(0xFF1A1D26),
-            surfaceContainerHigh = if (isAmoled) Color.Black else Color(0xFF21252F),
-            surfaceContainerHighest = if (isAmoled) Color.Black else Color(0xFF282D38)
+            surfaceContainerLowest = if (isAmoled) Color.Black else container,
+            surfaceContainerLow = if (isAmoled) Color.Black else container,
+            surfaceContainer = if (isAmoled) Color.Black else container,
+            surfaceContainerHigh = if (isAmoled) Color.Black else container,
+            surfaceContainerHighest = if (isAmoled) Color.Black else container,
+
+            onSurface = Periwrinkle,
+            onSurfaceVariant = Periwrinkle.copy(alpha = 0.7f)
         )
     } else {
+        val accent = getColor(hsl[0], 0.65f, 0.40f)
+        val container = getColor(hsl[0], 0.15f, 0.94f)
+
         lightColorScheme(
-            primary = primary,
-            onPrimary = onPrimary,
-            primaryContainer = containerColor,
-            onPrimaryContainer = onContainerColor,
-            secondaryContainer = containerColor,
-            onSecondaryContainer = onContainerColor,
+            primary = accent,
+            onPrimary = Color.White,
+            primaryContainer = container,
+            onPrimaryContainer = accent,
+            secondaryContainer = getColor(hsl[0], 0.35f, 0.85f),
+            onSecondaryContainer = accent,
 
-            background = Color(0xFFFCFCFC),
-            surface = Color(0xFFFCFCFC),
-            surfaceVariant = Color(0xFFE5E7EB),
+            background = getColor(hsl[0], 0.08f, 0.98f),
+            surface = getColor(hsl[0], 0.08f, 0.98f),
+            surfaceVariant = container,
 
-            surfaceContainerLowest = Color(0xFFFFFFFF),
-            surfaceContainerLow = Color(0xFFF8FAFF),
-            surfaceContainer = Color(0xFFF1F5FF),
-            surfaceContainerHigh = Color(0xFFE9F0FF),
-            surfaceContainerHighest = Color(0xFFE2EAFF)
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = container,
+            surfaceContainer = container,
+            surfaceContainerHigh = container,
+            surfaceContainerHighest = container,
+
+            onSurface = Color.Black,
+            onSurfaceVariant = Color.Black.copy(alpha = 0.7f)
         )
     }
 }
@@ -89,48 +83,54 @@ fun Color.toColorScheme(isDark: Boolean, isAmoled: Boolean = false): ColorScheme
 val LightColorScheme = lightColorScheme(
     primary = PrimaryBlueLight,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE0E7FF),
-    onPrimaryContainer = Color(0xFF1E1B4B),
-    secondaryContainer = Color(0xFFE0E7FF),
-    onSecondaryContainer = Color(0xFF1E1B4B),
+    primaryContainer = Color(0xFFF1F5FF),
+    onPrimaryContainer = PrimaryBlueLight,
+    secondaryContainer = Color(0xFFD0DBFF),
+    onSecondaryContainer = PrimaryBlueLight,
 
-    background = Color(0xFFFCFCFC),
-    surface = Color(0xFFFCFCFC),
-    surfaceVariant = Color(0xFFE5E7EB),
+    background = Color(0xFFF5F8FF),
+    surface = Color(0xFFF5F8FF),
+    surfaceVariant = Color(0xFFF1F5FF),
 
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF8FAFF),
+    surfaceContainerLow = Color(0xFFF1F5FF),
     surfaceContainer = Color(0xFFF1F5FF),
-    surfaceContainerHigh = Color(0xFFE9F0FF),
-    surfaceContainerHighest = Color(0xFFE2EAFF)
+    surfaceContainerHigh = Color(0xFFF1F5FF),
+    surfaceContainerHighest = Color(0xFFF1F5FF),
+
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.Black.copy(alpha = 0.7f)
 )
 
 val DarkColorScheme = darkColorScheme(
     primary = PrimaryBlueDark,
     onPrimary = Color(0xFF00144B),
-    primaryContainer = Color(0xFF1E3A8A),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondaryContainer = Color(0xFF1E3A8A),
-    onSecondaryContainer = Color(0xFFDBEAFE),
+    primaryContainer = Color(0xFF1D1F26),
+    onPrimaryContainer = PrimaryBlueDark,
+    secondaryContainer = Color(0xFF213A75),
+    onSecondaryContainer = PrimaryBlueDark,
 
-    background = Color(0xFF0B0D11),
-    surface = Color(0xFF0B0D11),
-    surfaceVariant = Color(0xFF44474E),
+    background = Color(0xFF0A0F1A),
+    surface = Color(0xFF0A0F1A),
+    surfaceVariant = Color(0xFF1D1F26),
 
-    surfaceContainerLowest = Color(0xFF0F1218),
-    surfaceContainerLow = Color(0xFF14171E),
-    surfaceContainer = Color(0xFF1A1D26),
-    surfaceContainerHigh = Color(0xFF21252F),
-    surfaceContainerHighest = Color(0xFF282D38)
+    surfaceContainerLowest = Color(0xFF1D1F26),
+    surfaceContainerLow = Color(0xFF1D1F26),
+    surfaceContainer = Color(0xFF1D1F26),
+    surfaceContainerHigh = Color(0xFF1D1F26),
+    surfaceContainerHighest = Color(0xFF1D1F26),
+
+    onSurface = Periwrinkle,
+    onSurfaceVariant = Periwrinkle.copy(alpha = 0.7f)
 )
 
 val AmoledAccentColorScheme = darkColorScheme(
     primary = PrimaryBlueDark,
     onPrimary = Color(0xFF00144B),
-    primaryContainer = Color(0xFF1E3A8A),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondaryContainer = Color(0xFF1E3A8A),
-    onSecondaryContainer = Color(0xFFDBEAFE),
+    primaryContainer = Color(0xFF1D1F26),
+    onPrimaryContainer = PrimaryBlueDark,
+    secondaryContainer = Color(0xFF213A75),
+    onSecondaryContainer = PrimaryBlueDark,
 
     background = Color(0xFF000000),
     surface = Color(0xFF000000),
@@ -140,5 +140,8 @@ val AmoledAccentColorScheme = darkColorScheme(
     surfaceContainerLow = Color(0xFF000000),
     surfaceContainer = Color(0xFF000000),
     surfaceContainerHigh = Color(0xFF000000),
-    surfaceContainerHighest = Color(0xFF000000)
+    surfaceContainerHighest = Color(0xFF000000),
+
+    onSurface = Periwrinkle,
+    onSurfaceVariant = Periwrinkle.copy(alpha = 0.7f)
 )

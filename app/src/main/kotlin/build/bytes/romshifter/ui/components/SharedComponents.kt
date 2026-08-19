@@ -221,8 +221,9 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
                 indication = LocalIndication.current,
                 onClick = onClick
             ),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = MaterialTheme.shapes.large
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 0.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
@@ -232,7 +233,7 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -307,7 +308,7 @@ fun AppListItem(
             modifier = Modifier
                 .size(50.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             if (app.iconPath != null) {
@@ -323,12 +324,12 @@ fun AppListItem(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        .background(Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = letter,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color.White,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 22.sp
                     )
@@ -343,7 +344,7 @@ fun AppListItem(
                 text = app.label,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (app.isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -351,9 +352,7 @@ fun AppListItem(
             Text(
                 text = app.packageName,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (app.isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(
-                    alpha = 0.8f
-                ) else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
             if (showBackupTime && app.backupTime.isNotEmpty()) {
@@ -361,9 +360,11 @@ fun AppListItem(
                 Text(
                     text = app.backupTime,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (app.backupTime == "No backup on device") MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                        alpha = 0.7f
-                    ) else MaterialTheme.colorScheme.primary,
+                    color = if (app.backupTime == "No backup on device") {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

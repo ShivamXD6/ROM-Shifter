@@ -67,6 +67,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -451,15 +452,16 @@ fun FlashTab(
 
             Column(modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.background)
                 .navigationBarsPadding()
                 .padding(16.dp)) {
                 when (step) {
                     1 -> {
-                        ElevatedCard(
+                        Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.large,
-                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            tonalElevation = 0.dp
                         ) {
                             Column(modifier = Modifier.padding(vertical = 12.dp)) {
                                 val availableWipes = listOf(
@@ -482,7 +484,11 @@ fun FlashTab(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(label, style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            label,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
                                         Switch(
                                             checked = isChecked,
                                             onCheckedChange = null,
@@ -544,17 +550,18 @@ fun FlashTab(
                                     val cardColor = when (action) {
                                         is FlashAction.Wipe -> MaterialTheme.colorScheme.secondaryContainer
                                         is FlashAction.FormatData -> MaterialTheme.colorScheme.errorContainer
-                                        is FlashAction.InstallZip -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                        is FlashAction.InstallZip -> MaterialTheme.colorScheme.surfaceContainer
                                     }
 
-                                    ElevatedCard(
+                                    Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 6.dp)
                                             .offset { IntOffset(0, dragOffset.roundToInt()) }
                                             .animateItem(),
                                         shape = MaterialTheme.shapes.large,
-                                        colors = CardDefaults.elevatedCardColors(containerColor = cardColor)
+                                        color = cardColor,
+                                        tonalElevation = 0.dp
                                     ) {
                                         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Text("${index + 1}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
@@ -565,11 +572,13 @@ fun FlashTab(
                                                         Text(
                                                             "Wipe Partitions",
                                                             style = MaterialTheme.typography.titleMedium,
-                                                            fontWeight = FontWeight.Bold
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
                                                         )
                                                         Text(
                                                             action.partitions.joinToString(", "),
-                                                            style = MaterialTheme.typography.bodyMedium
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
                                                     }
 
@@ -592,7 +601,8 @@ fun FlashTab(
                                                             action.zip.name,
                                                             style = MaterialTheme.typography.titleMedium,
                                                             maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            color = MaterialTheme.colorScheme.onSurface
                                                         )
                                                         Text(
                                                             "Category: ${action.zip.category}",
@@ -735,7 +745,7 @@ fun FlashTab(
                                         modifier = Modifier
                                             .size(64.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -768,12 +778,13 @@ fun FlashTab(
                                 .align(Alignment.CenterHorizontally)
                                 .padding(top = 40.dp))
                         } else {
-                            ElevatedCard(
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 24.dp),
                                 shape = MaterialTheme.shapes.large,
-                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                tonalElevation = 0.dp
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -785,7 +796,7 @@ fun FlashTab(
                                         modifier = Modifier
                                             .size(60.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -799,7 +810,8 @@ fun FlashTab(
                                     Text(
                                         "Ready to Flash!",
                                         style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.ExtraBold
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -811,7 +823,8 @@ fun FlashTab(
                                     Spacer(modifier = Modifier.height(20.dp))
                                     Text(
                                         "Select an Option to Reboot after Flash:",
-                                        style = MaterialTheme.typography.labelLarge
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(
@@ -871,7 +884,7 @@ fun FlashTab(
 
             Column(modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier
                     .weight(1f)

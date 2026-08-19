@@ -231,7 +231,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
     }
     Column(modifier = Modifier
         .fillMaxSize()
-        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        .background(MaterialTheme.colorScheme.background)
         .padding(horizontal = 16.dp)) {
         Column(modifier = Modifier
             .weight(1f)
@@ -433,7 +433,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Spacer(modifier = Modifier.height(14.dp))
         Row(
@@ -696,7 +696,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             if (appState.isFetchingApps) {
                 LazyColumn(modifier = Modifier.fillMaxSize()) { items(8) { ShimmerAppListItem() } }
@@ -739,7 +739,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         val showProgressPanel = appState.isRunning || appState.currentStep.isNotEmpty()
 
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
             modifier = Modifier
                 .fillMaxWidth()

@@ -104,7 +104,7 @@ fun ToolsTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewMode
 
             Column(modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp)) {
                 Column(modifier = Modifier
                     .weight(1f)

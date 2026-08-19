@@ -267,7 +267,8 @@ fun MainScreen(viewModel: MainViewModel) {
     }
     Box(modifier = Modifier
         .fillMaxSize()
-        .background(MaterialTheme.colorScheme.scrim)) {
+        .background(MaterialTheme.colorScheme.background)
+    ) {
 
         if (backProgress.value > 0f) {
             Box(
@@ -278,7 +279,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
                 AppScaffold(
                     appState = frozenPreviousAppState,
@@ -311,7 +312,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             AppScaffold(
                 appState = appState,
@@ -386,9 +387,10 @@ fun AppScaffold(
         containerColor = Color.Transparent,
         topBar = {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp),
-                shadowElevation = 8.dp,
+                shadowElevation = 0.dp,
+                tonalElevation = 0.dp,
                 modifier = Modifier.zIndex(1f)
             ) {
                 TopAppBar(
@@ -530,7 +532,7 @@ fun AppScaffold(
                         .height(64.dp)
                         .fillMaxWidth()
                         .clip(CircleShape),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     tonalElevation = 0.dp
                 ) {
                     Row(
@@ -679,7 +681,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
 
     Box(modifier = Modifier
         .fillMaxSize()
-        .background(MaterialTheme.colorScheme.scrim)) {
+        .background(MaterialTheme.colorScheme.background)
+    ) {
 
         if (backProgress.value > 0f) {
             Box(
@@ -690,7 +693,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         scaleX = 0.95f + (backProgress.value * 0.05f)
                         scaleY = 0.95f + (backProgress.value * 0.05f)
                     }
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
                 OnboardingStepContent(
                     step = frozenBgStep,
@@ -724,7 +727,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         shadowElevation = 40f
                     }
                 }
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             AnimatedContent(
                 targetState = step,
@@ -817,14 +820,14 @@ fun OnboardingStepContent(
                             .size(100.dp)
                             .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_home),
                             contentDescription = "ROM Shifter",
                             modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Spacer(Modifier.height(32.dp))
@@ -895,14 +898,14 @@ fun OnboardingStepContent(
                             .size(100.dp)
                             .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Folder,
                             null,
                             modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Spacer(Modifier.height(32.dp))
@@ -972,14 +975,14 @@ fun OnboardingStepContent(
                             .size(100.dp)
                             .graphicsLayer { scaleX = iconScale.value; scaleY = iconScale.value }
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Favorite,
                             null,
                             modifier = Modifier.size(56.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
