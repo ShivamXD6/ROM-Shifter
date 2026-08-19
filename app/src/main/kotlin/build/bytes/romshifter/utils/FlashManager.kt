@@ -1,5 +1,6 @@
 package build.bytes.romshifter.utils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
@@ -15,6 +16,7 @@ import java.util.Locale
 
 object FlashManager {
 
+    @SuppressLint("SdCardPath")
     fun getPathFromUri(context: Context, uri: Uri): String? {
         if (DocumentsContract.isDocumentUri(context, uri)) {
             val docId = DocumentsContract.getDocumentId(uri)
@@ -115,6 +117,7 @@ object FlashManager {
 
     fun checkLockscreen(): Boolean = !Shell.cmd("su -mm -c 'locksettings verify'").exec().isSuccess
 
+    @SuppressLint("SdCardPath")
     fun generateOrsAndProceed(actions: List<FlashAction>, rebootOption: String) {
         val script = StringBuilder()
 
