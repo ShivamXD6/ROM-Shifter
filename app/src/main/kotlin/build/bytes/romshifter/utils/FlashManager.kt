@@ -68,7 +68,12 @@ object FlashManager {
 
                 val hasModuleProp = contents.contains("module.prop", ignoreCase = true)
                 val hasUpdateBinary =
-                    contents.contains(Regex("META-INF/.*update-binary", RegexOption.IGNORE_CASE))
+                    contents.contains(
+                        Regex(
+                            "META-INF/.*update-binary|META-INF/.*updater-script",
+                            RegexOption.IGNORE_CASE
+                        )
+                    )
                 var isGapps = false
                 var isAddon = false
 
@@ -82,9 +87,19 @@ object FlashManager {
                     isGapps -> if (isAddon) "Addon" else "GApps"
                     hasModuleProp -> null
                     contents.contains(Regex("firmware-update", RegexOption.IGNORE_CASE)) ||
-                            contents.contains(Regex("abl\\.elf|xbl\\.elf|tz\\.mbn|devcfg\\.mbn")) -> "Firmware"
+                            contents.contains(
+                                Regex(
+                                    "abl\\.elf|xbl\\.elf|tz\\.mbn|devcfg\\.mbn",
+                                    RegexOption.IGNORE_CASE
+                                )
+                            ) -> "Firmware"
 
-                    contents.contains(Regex("payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list|apex_info\\.pb|care_map\\.pb")) -> "ROM"
+                    contents.contains(
+                        Regex(
+                            "payload\\.bin|system\\.new\\.dat|system\\.transfer\\.list|apex_info\\.pb|care_map\\.pb|payload_properties\\.txt|META-INF/com/android/metadata",
+                            RegexOption.IGNORE_CASE
+                        )
+                    ) -> "ROM"
                     contents.contains(
                         Regex(
                             "anykernel|zimage|image\\.gz",
