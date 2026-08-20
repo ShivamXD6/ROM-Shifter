@@ -13,6 +13,7 @@ data class AppInfo(
     val isSelected: Boolean = false,
     val iconPath: String? = null,
     val backupTime: String = "",
+    val size: String = "",
     val isInstalled: Boolean = true,
     val isSystemized: Boolean = false
 )

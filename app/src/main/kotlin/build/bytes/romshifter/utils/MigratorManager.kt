@@ -1,11 +1,13 @@
 package build.bytes.romshifter.utils
 
+import android.app.usage.StorageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.PowerManager
+import android.os.storage.StorageManager.UUID_DEFAULT
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.graphics.createBitmap
 import build.bytes.romshifter.models.AppInfo
@@ -92,6 +94,8 @@ object MigratorManager {
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
 
+                            val appSize = getPackageSize(context, pkg)
+
                             AppInfo(
                                 label = label,
                                 packageName = pkg,
@@ -99,6 +103,7 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
+                                size = appSize,
                                 isSystemized = isSystemizedApp
                             )
                         } else {
@@ -160,6 +165,8 @@ object MigratorManager {
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
+                            val appSize = getPackageSize(context, pkg)
+
                             AppInfo(
                                 label = label,
                                 packageName = pkg,
@@ -167,6 +174,7 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
+                                size = appSize,
                                 isInstalled = false
                             )
                         } else {
@@ -209,6 +217,21 @@ object MigratorManager {
                     Shell.cmd("su -c \"$iconScript\"").exec()
                 }
 
+                val backupSizes = mutableMapOf<String, String>()
+                if (appMap.isNotEmpty()) {
+                    val batchSize = 100
+                    appMap.keys.chunked(batchSize).forEach { batch ->
+                        val paths = batch.joinToString(" ") { "'$it'" }
+                        Shell.cmd("su -mm -c \"du -sk $paths 2>/dev/null\"")
+                            .exec().out.forEach { line ->
+                            val parts = line.trim().split(Regex("\\s+"), 2)
+                            if (parts.size == 2) {
+                                backupSizes[parts[1]] = formatSize(parts[0])
+                            }
+                        }
+                    }
+                }
+
                 val deferredBackups = appMap.map { (basePath, data) ->
                     async(Dispatchers.IO) {
                         val sysType = basePath.split("/").lastOrNull { it == "System" || it == "User" } ?: "User"
@@ -227,13 +250,25 @@ object MigratorManager {
                                 "Last backup: " + sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
+                            val backupSize = backupSizes[basePath] ?: ""
+
                             val isInst = try {
                                 pm.getPackageInfo(pkg, 0); true
                             } catch (_: Exception) {
                                 false
                             }
 
-                            AppInfo(label = label, packageName = pkg, version = version, isSystem = isSys, iconPath = iconPath, backupTime = bTime, isInstalled = isInst)                        } else null
+                            AppInfo(
+                                label = label,
+                                packageName = pkg,
+                                version = version,
+                                isSystem = isSys,
+                                iconPath = iconPath,
+                                backupTime = bTime,
+                                size = backupSize,
+                                isInstalled = isInst
+                            )
+                        } else null
                     }
                 }
                 apps.addAll(deferredBackups.awaitAll().filterNotNull())
@@ -457,6 +492,22 @@ object MigratorManager {
             kb >= 1048576 -> String.format(Locale.US, "%.2f GB", kb / 1048576.0)
             kb >= 1024 -> String.format(Locale.US, "%.2f MB", kb / 1024.0)
             else -> "$kb KB"
+        }
+    }
+
+    private fun getPackageSize(context: Context, packageName: String): String {
+        return try {
+            val storageStatsManager =
+                context.getSystemService(Context.STORAGE_STATS_SERVICE) as StorageStatsManager
+            val stats = storageStatsManager.queryStatsForPackage(
+                UUID_DEFAULT,
+                packageName,
+                android.os.Process.myUserHandle()
+            )
+            val totalBytes = stats.appBytes + stats.dataBytes + stats.cacheBytes
+            formatSize((totalBytes / 1024).toString())
+        } catch (_: Exception) {
+            ""
         }
     }
 }

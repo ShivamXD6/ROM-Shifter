@@ -430,7 +430,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "rm -rf /data/local/tmp/shifter_apps /data/local/tmp/shifter_targets.txt",
                         "mkdir -p /data/local/tmp/shifter_apps",
                         "chmod 777 /data/local/tmp/shifter_apps",
-                        "chown shell:shell /data/local/tmp/shifter_apps"
+                        "chown shell:shell /data/local/tmp/shifter_apps",
+                        "pm grant ${getApplication<Application>().packageName} android.permission.PACKAGE_USAGE_STATS",
+                        "appops set ${getApplication<Application>().packageName} GET_USAGE_STATS allow"
                     )
                     Shell.cmd(*commands).exec()
                 }

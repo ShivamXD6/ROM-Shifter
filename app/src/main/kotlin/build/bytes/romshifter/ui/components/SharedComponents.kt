@@ -370,14 +370,25 @@ fun AppListItem(
                 )
             }
         }
-        Checkbox(
-            checked = app.isSelected,
-            onCheckedChange = { onToggleSelect(app.packageName) },
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                checkmarkColor = MaterialTheme.colorScheme.onPrimary
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Checkbox(
+                checked = app.isSelected,
+                onCheckedChange = { onToggleSelect(app.packageName) },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                )
             )
-        )
+            if (app.size.isNotEmpty()) {
+                Text(
+                    text = app.size,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 
