@@ -864,7 +864,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "Uninstalled",
                             true,
-                            _appList.value
+                            _appList.value,
+                            isRestore = false
                         )
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
@@ -886,7 +887,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "System",
                             true,
-                            _appList.value
+                            _appList.value,
+                            isRestore = false
                         )
                         _appList.value = sys
                         _uiState.value = _uiState.value.copy(
@@ -1012,7 +1014,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _savedPath.value,
                 type,
                 append,
-                _appList.value
+                _appList.value,
+                isRestore = _uiState.value.migratorMode == MigratorMode.RESTORE_APPS
             )
             withContext(Dispatchers.Main) {
                 _appList.value = apps

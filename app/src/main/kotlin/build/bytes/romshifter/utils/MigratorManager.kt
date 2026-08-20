@@ -35,7 +35,14 @@ object MigratorManager {
         uninstalledCache = null
     }
 
-    suspend fun fetchAppsList(context: Context, currentPath: String, type: String, append: Boolean, currentList: List<AppInfo>): List<AppInfo> = withContext(Dispatchers.IO) {
+    suspend fun fetchAppsList(
+        context: Context,
+        currentPath: String,
+        type: String,
+        append: Boolean,
+        currentList: List<AppInfo>,
+        isRestore: Boolean = false
+    ): List<AppInfo> = withContext(Dispatchers.IO) {
 
         if (!append) {
             when (type) {
@@ -188,7 +195,7 @@ object MigratorManager {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
                 val command =
-                    "grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null"
+                    "grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^TotalSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -239,6 +246,7 @@ object MigratorManager {
                         val label = data["Name"] ?: ""
                         val pkg = data["Package"] ?: ""
                         val version = data["Version"] ?: ""
+                        val totalSizeMeta = data["TotalSize"] ?: ""
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
@@ -250,7 +258,11 @@ object MigratorManager {
                                 sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
-                            val backupSize = backupSizes[basePath] ?: ""
+                            val backupSize = if (isRestore && totalSizeMeta.isNotBlank()) {
+                                formatSize(totalSizeMeta)
+                            } else {
+                                backupSizes[basePath] ?: ""
+                            }
 
                             val isInst = try {
                                 pm.getPackageInfo(pkg, 0); true
