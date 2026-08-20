@@ -428,22 +428,53 @@ object MigratorManager {
             val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
+                val iconCacheDir = File(context.cacheDir, "shifter_icons")
+
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("", "Preparing icons (${index + 1}/${selectedApps.size})...", -1)
+                    val sysType = if (app.isSystem) "System" else "User"
+                    val destDir = "$currentPath/Apps/$sysType/${app.label}"
+                    val destIcon = File(destDir, "Icon.png")
+
+                    if (destIcon.exists() && destIcon.length() > 0) return@forEachIndexed
+
                     try {
-                        val rawIcon = context.packageManager.getApplicationIcon(app.packageName)
-                        val bitmap = getTinyBitmap(rawIcon)
+                        val cacheFile = File(iconCacheDir, "${app.packageName}_icon.png")
 
-                        if (bitmap != null) {
-                            val tempFile = File(context.cacheDir, "icon_${app.packageName}.png")
-                            FileOutputStream(tempFile).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                            val sysType = if (app.isSystem) "System" else "User"
-                            val destDir = "$currentPath/Apps/$sysType/${app.label}"
-
+                        if (cacheFile.exists() && cacheFile.length() > 0) {
                             iconScript.append("mkdir -p '$destDir'\n")
-                            iconScript.append("cp '${tempFile.absolutePath}' '$destDir/Icon.png'\n")
-                            iconScript.append("chmod 644 '$destDir/Icon.png'\n")
-                            iconScript.append("rm -f '${tempFile.absolutePath}'\n")
+                            iconScript.append("cp '${cacheFile.absolutePath}' '${destIcon.absolutePath}'\n")
+                            iconScript.append("chmod 644 '${destIcon.absolutePath}'\n")
+                        } else {
+                            val rawIcon = context.packageManager.getApplicationIcon(app.packageName)
+                            val bitmap = getTinyBitmap(rawIcon)
+
+                            if (bitmap != null) {
+                                val tempFile = File(context.cacheDir, "icon_${app.packageName}.png")
+                                FileOutputStream(tempFile).use { out ->
+                                    bitmap.compress(
+                                        Bitmap.CompressFormat.PNG,
+                                        100,
+                                        out
+                                    )
+                                }
+
+                                try {
+                                    FileOutputStream(cacheFile).use { out ->
+                                        bitmap.compress(
+                                            Bitmap.CompressFormat.PNG,
+                                            100,
+                                            out
+                                        )
+                                    }
+                                } catch (_: Exception) {
+                                }
+
+                                iconScript.append("mkdir -p '$destDir'\n")
+                                iconScript.append("cp '${tempFile.absolutePath}' '${destIcon.absolutePath}'\n")
+                                iconScript.append("chmod 644 '${destIcon.absolutePath}'\n")
+                                iconScript.append("rm -f '${tempFile.absolutePath}'\n")
+                            }
                         }
                     } catch (_: Exception) { }
                 }
