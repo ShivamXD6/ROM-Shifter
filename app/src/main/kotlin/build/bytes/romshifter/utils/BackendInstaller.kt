@@ -44,7 +44,7 @@ object BackendInstaller {
                 val targetDir = File(shifterPath).apply { mkdirs() }
                 val targetApk = File(targetDir, "ROM-Shifter.apk")
 
-                Shell.cmd("su -c 'cp \"${sourceApk.absolutePath}\" \"${targetApk.absolutePath}\" && chmod 644 \"${targetApk.absolutePath}\"'")
+                Shell.cmd("cp \"${sourceApk.absolutePath}\" \"${targetApk.absolutePath}\" && chmod 644 \"${targetApk.absolutePath}\"")
                     .exec()
 
                 prefs.edit { putString("self_apk_hash", currentHash) }

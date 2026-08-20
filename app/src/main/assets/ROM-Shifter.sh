@@ -8,6 +8,10 @@ ZAPDOS="$BIN_DIR/zapdos"
 JOBS=$(nproc 2>/dev/null || echo 4)
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
+BIN_DIR=$(echo "$BIN_DIR" | tr -d '\r')
+AM_TMP=$(echo "$AM_TMP" | tr -d '\r')
+TARGETS=$(echo "$TARGETS" | tr -d '\r')
+ZAPDOS=$(echo "$ZAPDOS" | tr -d '\r')
 
 init_shifter() {
      mkdir -p "$BIN_DIR" "$AM_TMP"
@@ -646,18 +650,21 @@ shifter_main() {
     case "$1" in
         --backup)
             MAIN_DIR="${3:-/sdcard/Shifter}"
+            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
             BACKUP_BASE="$MAIN_DIR/Apps"
             init_shifter
             do_backup "$2"
             ;;
         --restore)
             MAIN_DIR="${3:-/sdcard/Shifter}"
+            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
             BACKUP_BASE="$MAIN_DIR/Apps"
             init_shifter
             do_restore "$2"
             ;;
         --live-backup)
             MAIN_DIR="${3:-/sdcard/Shifter}"
+            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
             LP_DIR="$MAIN_DIR/Partitions"
             init_shifter
             do_live_backup "$2"

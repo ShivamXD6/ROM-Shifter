@@ -64,7 +64,7 @@ object FlashManager {
                 val name = path.substringAfterLast("/")
                 val nameLower = name.lowercase(Locale.ROOT)
                 val contents =
-                    Shell.cmd("su -mm -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
+                    Shell.cmd("unzip -l '$path'").exec().out.joinToString("\n")
 
                 val hasModuleProp = contents.contains("module.prop", ignoreCase = true)
                 val hasUpdateBinary =
@@ -130,7 +130,7 @@ object FlashManager {
         }.thenBy { it.name })
     }
 
-    fun checkLockscreen(): Boolean = !Shell.cmd("su -mm -c 'locksettings verify'").exec().isSuccess
+    fun checkLockscreen(): Boolean = !Shell.cmd("locksettings verify").exec().isSuccess
 
     @SuppressLint("SdCardPath")
     fun generateOrsAndProceed(actions: List<FlashAction>, rebootOption: String) {
@@ -157,25 +157,27 @@ object FlashManager {
         }
 
         val scriptContent = script.toString().replace("'", "'\\''")
-        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --ors '$scriptContent' '$rebootOption'\"")
+        Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --ors '$scriptContent' '$rebootOption'")
             .exec()
     }
 
     fun restartFlashWizard() {
         val locations = listOf("/cache/recovery", "/data/cache/recovery", "/metadata/recovery")
         val shellCommand =
-            "su -mm -c \"mount -o rw,remount /cache 2>/dev/null; mount -o rw,remount /metadata 2>/dev/null; rm -f ${
+            "mount -o rw,remount /cache 2>/dev/null; mount -o rw,remount /metadata 2>/dev/null; rm -f ${
                 locations.joinToString(
                     " "
                 ) { "$it/openrecoveryscript" }
-            } 2>/dev/null\""
+            } 2>/dev/null"
         Shell.cmd(shellCommand).exec()
     }
 
-    fun executeFlashNow() { Shell.cmd("su -mm -c \"sync; reboot recovery\"").exec() }
+    fun executeFlashNow() {
+        Shell.cmd("sync; reboot recovery").exec()
+    }
 
     fun getAllPartitions(): List<String> {
-        return Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --get-partitions\"")
+        return Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --get-partitions")
             .exec().out
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -183,24 +185,24 @@ object FlashManager {
     }
 
     fun getBackedUpImages(savedPath: String): List<String> {
-        return Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --get-images '$savedPath'\"")
+        return Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --get-images '$savedPath'")
             .exec().out
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }
 
     fun deleteLivePartitionImage(savedPath: String, imgName: String) {
-        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --delete-image '$savedPath' '$imgName'\"")
+        Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --delete-image '$savedPath' '$imgName'")
             .exec()
     }
 
     fun runLiveOperation(action: String, partition: String, customPath: String?, savedPath: String) {
         if (action == "--live-backup") {
-            Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$savedPath'\"")
+            Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$savedPath'")
                 .exec()
         } else {
             val imgPath = customPath ?: "$savedPath/Partitions/${partition}_backup.img"
-            Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$imgPath'\"")
+            Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh $action '$partition' '$imgPath'")
                 .exec()
         }
     }
