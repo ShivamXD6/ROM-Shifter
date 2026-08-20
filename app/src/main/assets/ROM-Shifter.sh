@@ -161,13 +161,6 @@ DO_BACKUP() {
             [ -d "/data/user_de/0/$PKG" ] && BUNDAPP "/data/user_de/0" "$PKG" "$APP_DIR" "UserDe"
             OLD_DATA=$CUR_DATA
         fi
-    fi
-
-    if CHK 3; then
-        GETPERM "$PKG" "$APP_DIR/Permissions.txt" &
-    fi
-
-    if CHK 4; then
         if [ "$CUR_EXT" != "$OLD_EXT" ] || { [ "$CUR_EXT" -gt 0 ] && [ ! -f "$APP_DIR/ExtData.shift" ]; }; then
             if [ "$CUR_EXT" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/data" "$PKG" "$APP_DIR" "ExtData"
@@ -176,28 +169,29 @@ DO_BACKUP() {
         fi
     fi
 
-    if CHK 5; then
+    if CHK 3; then
+        GETPERM "$PKG" "$APP_DIR/Permissions.txt" &
+    fi
+
+    if CHK 4; then
         if [ "$CUR_MED" != "$OLD_MED" ] || { [ "$CUR_MED" -gt 0 ] && [ ! -f "$APP_DIR/Media.shift" ]; }; then
             if [ "$CUR_MED" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/media" "$PKG" "$APP_DIR" "Media"
             else rm -f "$APP_DIR/Media.shift"; fi
             OLD_MED=$CUR_MED
         fi
-    fi
-
-    if CHK 6; then
-        CUR_SSAID=$(READID "$PKG")
-        if [ -n "$CUR_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
-            OLD_SSAID=$CUR_SSAID
-        fi
-    fi
-
-    if CHK 7; then
         if [ "$CUR_OBB" != "$OLD_OBB" ] || { [ "$CUR_OBB" -gt 0 ] && [ ! -f "$APP_DIR/Obb.shift" ]; }; then
             if [ "$CUR_OBB" -gt 0 ]; then
                 BUNDAPP "/data/media/0/Android/obb" "$PKG" "$APP_DIR" "Obb"
             else rm -f "$APP_DIR/Obb.shift"; fi
             OLD_OBB=$CUR_OBB
+        fi
+    fi
+
+    if CHK 5; then
+        CUR_SSAID=$(READID "$PKG")
+        if [ -n "$CUR_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
+            OLD_SSAID=$CUR_SSAID
         fi
     fi
 
@@ -290,37 +284,43 @@ DO_RESTORE() {
 
     if [ "$FORCE_DATA" -eq 0 ]; then
         TMP_SIZES="$AM_TMP/${PKG}_sizes"; mkdir -p "$TMP_SIZES"
-        CHK 2 && { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; } && ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
-        CHK 4 && [ -f "$APP_DIR/ExtData.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
-        CHK 5 && [ -f "$APP_DIR/Media.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
-        CHK 7 && [ -f "$APP_DIR/Obb.shift" ] && ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
+        CHK 2 && {
+            ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
+            ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
+        }
+        CHK 4 && {
+            ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
+            ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
+        }
         wait
         CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); CUR_DATA=${CUR_DATA:-0}; CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}; CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}; CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
         rm -rf "$TMP_SIZES"
     fi
 
-    if CHK 2 && { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; }; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-            [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
-            [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
+    if CHK 2; then
+        if { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; }; then
+            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
+                [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
+                [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
+            fi
+        fi
+        if [ -f "$APP_DIR/ExtData.shift" ]; then
+            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
+                UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
+            fi
         fi
     fi
 
-    if CHK 4 && [ -f "$APP_DIR/ExtData.shift" ]; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
-            UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
+    if CHK 4; then
+        if [ -f "$APP_DIR/Media.shift" ]; then
+            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
+                UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
+            fi
         fi
-    fi
-
-    if CHK 5 && [ -f "$APP_DIR/Media.shift" ]; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
-            UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
-        fi
-    fi
-
-    if CHK 7 && [ -f "$APP_DIR/Obb.shift" ]; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
-            UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
+        if [ -f "$APP_DIR/Obb.shift" ]; then
+            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
+                UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
+            fi
         fi
     fi
 
@@ -328,11 +328,12 @@ DO_RESTORE() {
 
     while jobs | grep -q 'Running' 2>/dev/null; do
         local cur_ext_size=0
-        local s1=$(du -sk "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
-        local s2=$(du -sk "/data/user_de/0/$PKG" 2>/dev/null | awk '{print $1}')
-        local s3=$(du -sk "/data/media/0/Android/data/$PKG" 2>/dev/null | awk '{print $1}')
-        local s4=$(du -sk "/data/media/0/Android/media/$PKG" 2>/dev/null | awk '{print $1}')
-        local s5=$(du -sk "/data/media/0/Android/obb/$PKG" 2>/dev/null | awk '{print $1}')
+        local s1=0; local s2=0; local s3=0; local s4=0; local s5=0
+        [ -d "/data/data/$PKG" ] && s1=$(du -sk "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
+        [ -d "/data/user_de/0/$PKG" ] && s2=$(du -sk "/data/user_de/0/$PKG" 2>/dev/null | awk '{print $1}')
+        [ -d "/data/media/0/Android/data/$PKG" ] && s3=$(du -sk "/data/media/0/Android/data/$PKG" 2>/dev/null | awk '{print $1}')
+        [ -d "/data/media/0/Android/media/$PKG" ] && s4=$(du -sk "/data/media/0/Android/media/$PKG" 2>/dev/null | awk '{print $1}')
+        [ -d "/data/media/0/Android/obb/$PKG" ] && s5=$(du -sk "/data/media/0/Android/obb/$PKG" 2>/dev/null | awk '{print $1}')
         cur_ext_size=$(( ${s1:-0} + ${s2:-0} + ${s3:-0} + ${s4:-0} + ${s5:-0} ))
 
         [ "$cur_ext_size" -gt "$SIZE" ] && cur_ext_size=$SIZE
@@ -352,7 +353,7 @@ DO_RESTORE() {
     local final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
 
-    if CHK 6; then
+    if CHK 5; then
         CUR_SSAID=$(READID "$PKG")
         if [ -n "$OLD_SSAID" ] && [ "$CUR_SSAID" != "$OLD_SSAID" ]; then
             CHANID "$PKG" "$OLD_SSAID"
@@ -407,10 +408,14 @@ do_backup() {
         if(pkg == "") next
 
         if(comps ~ / 1 / && pkg in apk_dirs) print apk_dirs[pkg] "|" pkg "_app"
-        if(comps ~ / 2 /) { print "/data/data/" pkg "|" pkg "_data"; print "/data/user_de/0/" pkg "|" pkg "_data" }
-        if(comps ~ / 4 /) print "/data/media/0/Android/data/" pkg "|" pkg "_ext"
-        if(comps ~ / 5 /) print "/data/media/0/Android/media/" pkg "|" pkg "_med"
-        if(comps ~ / 7 /) print "/data/media/0/Android/obb/" pkg "|" pkg "_obb"
+        if(comps ~ / 2 /) {
+            print "/data/data/" pkg "|" pkg "_data"; print "/data/user_de/0/" pkg "|" pkg "_data"
+            print "/data/media/0/Android/data/" pkg "|" pkg "_ext"
+        }
+        if(comps ~ / 4 /) {
+            print "/data/media/0/Android/media/" pkg "|" pkg "_med"
+            print "/data/media/0/Android/obb/" pkg "|" pkg "_obb"
+        }
     }' "$AM_TMP/pm_list.txt" "$TARGETS" > "$AM_TMP/paths.list"
 
     echo "INFO:STEP|MSG:Calculating total sizes..."
@@ -478,10 +483,14 @@ do_restore() {
         if [ -f "$APP_PATH" ]; then
             local s=0
             CHK 1 && { val=$(grep "^AppSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
-            CHK 2 && { val=$(grep "^DataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
-            CHK 4 && { val=$(grep "^ExtDataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
-            CHK 5 && { val=$(grep "^MediaSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
-            CHK 7 && { val=$(grep "^ObbSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0})); }
+            CHK 2 && {
+                val=$(grep "^DataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0}));
+                val=$(grep "^ExtDataSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0}));
+            }
+            CHK 4 && {
+                val=$(grep "^MediaSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0}));
+                val=$(grep "^ObbSize=" "$APP_PATH" | cut -d= -f2); s=$((s + ${val:-0}));
+            }
             echo "${s:-0}|${label}|${type}" >> "$AM_TMP/selected_restores.txt"
         fi
     done < "$TARGETS"

@@ -844,10 +844,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
     }
 
-    fun toggleShowUserApps(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(showUserApps = enabled)
-    }
-
     fun toggleActionFilter() {
         val mode = _uiState.value.migratorMode
         val currentState = _uiState.value.actionFilterState
@@ -924,7 +920,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showSystemApps = showSysApps,
             systemAppsFetched = false,
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
-            globalComponents = setOf(1, 2, 3, 4, 5, 6, 7)
+            globalComponents = setOf(1, 2, 3, 4, 5)
         )
 
         when (mode) {
@@ -973,7 +969,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         fun isSmartMatch(app: AppInfo): Boolean {
             return when (state.migratorMode) {
-                MigratorMode.BACKUP_APPS -> app.backupTime == "No backup on device"
+                MigratorMode.BACKUP_APPS -> app.backupTime != "No backup on device"
                 MigratorMode.RESTORE_APPS -> !app.isInstalled
                 MigratorMode.MANAGE -> app.isInstalled
                 MigratorMode.DEBLOAT -> state.actionFilterState == 1 && app.backupTime != "No backup on device"

@@ -409,12 +409,7 @@ fun AppListItem(
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularCheckbox(
-                checked = app.isSelected,
-                onCheckedChange = { onToggleSelect(app.packageName) }
-            )
             if (app.size.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(5.dp))
                 Text(
                     text = app.size,
                     style = MaterialTheme.typography.labelSmall,
@@ -422,7 +417,12 @@ fun AppListItem(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
+                Spacer(modifier = Modifier.height(8.dp))
             }
+            CircularCheckbox(
+                checked = app.isSelected,
+                onCheckedChange = { onToggleSelect(app.packageName) }
+            )
         }
     }
 }

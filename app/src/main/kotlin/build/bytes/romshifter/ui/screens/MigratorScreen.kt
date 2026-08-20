@@ -48,12 +48,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PermMedia
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.RestorePage
 import androidx.compose.material.icons.filled.Search
@@ -257,7 +254,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         appList,
         appState.searchQuery,
         appState.showSystemApps,
-        appState.showUserApps,
         appState.actionFilterState
     ) {
         derivedStateOf {
@@ -270,7 +266,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 val isDebloatedMode =
                     appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2
                 val matchesType =
-                    isDebloatedMode || ((app.isSystem && appState.showSystemApps) || (!app.isSystem && appState.showUserApps))
+                    isDebloatedMode || (app.isSystem && appState.showSystemApps) || !app.isSystem
                 val matchesAction = when (appState.migratorMode) {
                     MigratorMode.SYSTEMIZE -> {
                         if (appState.actionFilterState == 1) !app.isSystem && !app.isSystemized else app.isSystemized
@@ -310,22 +306,18 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     val compIcons = mapOf(
         1 to Icons.Default.Android,
         2 to Icons.Default.Storage,
-        7 to Icons.Default.Security,
-        3 to Icons.Default.Folder,
+        3 to Icons.Default.Security,
         4 to Icons.Default.PermMedia,
-        6 to Icons.Default.Smartphone,
-        5 to Icons.Default.Description
+        5 to Icons.Default.Smartphone
     )
     val compNames = mapOf(
         1 to "App",
-        2 to "Data",
-        7 to "Perm",
-        3 to "ExtData",
-        4 to "Media",
-        6 to "AndID",
-        5 to "Obb"
+        2 to "Data & External",
+        3 to "Permissions",
+        4 to "Media & OBB",
+        5 to "Android ID"
     )
-    val compOrder = listOf(1, 2, 7, 3, 4, 6, 5)
+    val compOrder = listOf(1, 2, 3, 4, 5)
 
     if (showNativeDeleteDialog) {
         AlertDialog(
@@ -509,41 +501,12 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 else -> false
             }
 
-            val activeGroups =
-                listOf(hasButtons, hasComponents, showAppFilters, showSmartSelect).count { it }
-
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (showSmartSelect) {
-                    item {
-                        val allSmartMatchesSelected = remember(filteredApps) {
-                            val matches = filteredApps.filter { app ->
-                                when (appState.migratorMode) {
-                                    MigratorMode.BACKUP_APPS -> app.backupTime == "No backup on device"
-                                    MigratorMode.RESTORE_APPS -> !app.isInstalled
-                                    MigratorMode.MANAGE -> app.isInstalled
-                                    MigratorMode.DEBLOAT -> appState.actionFilterState == 1 && app.backupTime != "No backup on device"
-                                    else -> false
-                                }
-                            }
-                            matches.isNotEmpty() && matches.all { it.isSelected }
-                        }
-
-                        AnimatedFilterChip(
-                            selected = allSmartMatchesSelected,
-                            onClick = { viewModel.smartSelect(filteredApps) },
-                            label = "Auto Select",
-                            leadingIcon = Icons.Default.AutoAwesome,
-                            showLabel = expandedChipLabel == "Auto Select",
-                            onExpand = { expandChip("Auto Select") }
-                        )
-                    }
-                }
-
                 if (showEraseNative) {
                     item {
                         AnimatedFilterChip(
@@ -590,8 +553,8 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             onClick = { viewModel.toggleActionFilter() },
                             label = actionChipLabel,
                             leadingIcon = actionIcon,
-                            showLabel = expandedChipLabel == actionChipLabel,
-                            onExpand = { expandChip(actionChipLabel) }
+                            showLabel = expandedChipLabel == "ActionGroup",
+                            onExpand = { expandChip("ActionGroup") }
                         )
                     }
                 }
@@ -614,7 +577,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (activeGroups > 1 && (showEraseNative || showActionChip || showSmartSelect)) {
+                if (hasButtons && (showSmartSelect || showAppFilters)) {
                     item {
                         Box(
                             modifier = Modifier
@@ -640,7 +603,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (activeGroups > 1 && hasComponents) {
+                if (hasComponents) {
                     item {
                         Box(
                             modifier = Modifier
@@ -652,17 +615,33 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (showAppFilters) {
+                if (showSmartSelect) {
                     item {
+                        val allSmartMatchesSelected = remember(filteredApps) {
+                            val matches = filteredApps.filter { app ->
+                                when (appState.migratorMode) {
+                                    MigratorMode.BACKUP_APPS -> app.backupTime != "No backup on device"
+                                    MigratorMode.RESTORE_APPS -> !app.isInstalled
+                                    MigratorMode.MANAGE -> app.isInstalled
+                                    MigratorMode.DEBLOAT -> appState.actionFilterState == 1 && app.backupTime != "No backup on device"
+                                    else -> false
+                                }
+                            }
+                            matches.isNotEmpty() && matches.all { it.isSelected }
+                        }
+
                         AnimatedFilterChip(
-                            selected = appState.showUserApps,
-                            onClick = { viewModel.toggleShowUserApps(!appState.showUserApps) },
-                            label = "User Apps",
-                            leadingIcon = Icons.Default.Person,
-                            showLabel = expandedChipLabel == "User Apps",
-                            onExpand = { expandChip("User Apps") }
+                            selected = allSmartMatchesSelected,
+                            onClick = { viewModel.smartSelect(filteredApps) },
+                            label = "Auto Select",
+                            leadingIcon = Icons.Default.AutoAwesome,
+                            showLabel = expandedChipLabel == "Auto Select",
+                            onExpand = { expandChip("Auto Select") }
                         )
                     }
+                }
+
+                if (showAppFilters) {
                     item {
                         AnimatedFilterChip(
                             selected = appState.showSystemApps,

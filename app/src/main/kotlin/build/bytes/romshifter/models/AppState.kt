@@ -45,7 +45,7 @@ data class AppState(
     val showUserApps: Boolean = true,
     val showSystemApps: Boolean = false,
     val actionFilterState: Int = 0,
-    val globalComponents: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
+    val globalComponents: Set<Int> = setOf(1, 2, 3, 4, 5),
     val hasRoot: Boolean = true,
     val forceRemoveEnabled: Boolean = false,
     val flashWizardStep: Int = 0,
