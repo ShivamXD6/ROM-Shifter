@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.RemoveDone
@@ -734,6 +735,10 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             ) { isProcessing ->
                 if (isProcessing) {
                     val isCompleted = !appState.isRunning && appState.progress == 100
+                    val isError = remember(appState.currentAction) {
+                        appState.currentAction.contains("Insufficient Space", ignoreCase = true) ||
+                                appState.currentAction.contains("Error", ignoreCase = true)
+                    }
 
                     val processingApp = remember(appState.currentAction, appState.currentStep) {
                         appList.firstOrNull { app ->
@@ -779,11 +784,11 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (completed) {
                                         Icon(
-                                            imageVector = Icons.Default.Verified,
-                                            contentDescription = "Success",
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            imageVector = if (isError) Icons.Default.Error else Icons.Default.Verified,
+                                            contentDescription = if (isError) "Error" else "Success",
+                                            tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(42.dp)
-                                            )
+                                        )
                                         Spacer(modifier = Modifier.width(16.dp))
                                     } else if (hasApp) {
                                         val iconModifier = Modifier
@@ -822,13 +827,13 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 }
 
                             Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = appState.currentAction,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                Text(
+                                    text = appState.currentAction,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 if (appState.currentStep.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
@@ -874,7 +879,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     .fillMaxWidth()
                                     .height(6.dp)
                                     .clip(CircleShape),
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             )
                         } else {
@@ -883,7 +888,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     .fillMaxWidth()
                                     .height(6.dp)
                                     .clip(CircleShape),
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             )
                         }

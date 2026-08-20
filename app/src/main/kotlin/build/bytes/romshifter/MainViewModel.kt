@@ -1053,50 +1053,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
-                val safeAction = action.ifEmpty { "ROM Shifter" }
-                updateProgressNotification(safeAction, step, prog)
+                viewModelScope.launch(Dispatchers.Main) {
+                    val safeAction = action.ifEmpty { "ROM Shifter" }
+                    updateProgressNotification(safeAction, step, prog)
 
-                _uiState.value = _uiState.value.copy(
-                    currentAction = action.ifEmpty { _uiState.value.currentAction },
-                    currentStep = step.ifEmpty { _uiState.value.currentStep },
-                    progress = if (prog >= 0) prog else _uiState.value.progress
-                )
+                    _uiState.value = _uiState.value.copy(
+                        currentAction = action.ifEmpty { _uiState.value.currentAction },
+                        currentStep = step.ifEmpty { _uiState.value.currentStep },
+                        progress = if (prog >= 0) prog else _uiState.value.progress
+                    )
+                }
             }
 
             val onComplete: (String, String) -> Unit = { action, step ->
+                viewModelScope.launch(Dispatchers.Main) {
+                    val finalStepText = when (state.migratorMode) {
+                        MigratorMode.MANAGE -> {
+                            val cleanStep =
+                                if (step == "Freed up storage space.") "Freed space" else step
+                            if (cleanStep.isNotBlank()) "$cleanStep | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
+                        }
 
-                val finalStepText = when (state.migratorMode) {
-                    MigratorMode.MANAGE -> {
-                        val cleanStep = if (step == "Freed up storage space.") "Freed space" else step
-                        if (cleanStep.isNotBlank()) "$cleanStep | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
+                        MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> step
+                        else -> {
+                            if (step.isNotBlank()) "$step | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
+                        }
                     }
-                    MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> step
-                    else -> {
-                        if (step.isNotBlank()) "$step | Apps: ${selectedApps.size}" else "Apps: ${selectedApps.size}"
+
+                    showCompletionNotification(action, finalStepText)
+
+                    when (state.migratorMode) {
+                        MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> {
+                            MigratorManager.clearCache()
+                            fetchAppsList("AllInstalled")
+                        }
+
+                        MigratorMode.MANAGE -> {
+                            MigratorManager.clearCache()
+                            fetchAppsList("AllBackups")
+                        }
+
+                        else -> {}
                     }
+                    _uiState.value = _uiState.value.copy(
+                        isRunning = false,
+                        currentAction = action,
+                        currentStep = finalStepText,
+                        progress = 100
+                    )
                 }
-
-                showCompletionNotification(action, finalStepText)
-
-                when (state.migratorMode) {
-                    MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> {
-                        MigratorManager.clearCache()
-                        fetchAppsList("AllInstalled")
-                    }
-
-                    MigratorMode.MANAGE -> {
-                        MigratorManager.clearCache()
-                        fetchAppsList("AllBackups")
-                    }
-
-                    else -> {}
-                }
-                _uiState.value = _uiState.value.copy(
-                    isRunning = false,
-                    currentAction = action,
-                    currentStep = finalStepText,
-                    progress = 100
-                )
             }
 
             when (state.migratorMode) {

@@ -1,5 +1,6 @@
 package build.bytes.romshifter.utils
 
+import android.annotation.SuppressLint
 import android.app.usage.StorageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -301,6 +302,20 @@ object MigratorManager {
         return@withContext finalApps
     }
 
+    private fun getAvailableSpaceKb(path: String): Long {
+        return try {
+            var file: File? = File(path)
+            while (file != null && !file.exists()) {
+                file = file.parentFile
+            }
+            val stat = android.os.StatFs(file?.absolutePath ?: "/")
+            (stat.availableBlocksLong * stat.blockSizeLong) / 1024
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+    @SuppressLint("SdCardPath")
     suspend fun runDynamicOperation(
         context: Context, state: AppState, selectedApps: List<AppInfo>, currentPath: String,
         updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
@@ -313,6 +328,84 @@ object MigratorManager {
         } catch (_: SecurityException) { }
 
         try {
+            val isRestore = state.migratorMode.name.contains("RESTORE")
+
+            updateProgress("", "Checking available storage...", -1)
+            val bufferKb = 51200L
+            try {
+                if (isRestore) {
+                    val paths = selectedApps.joinToString(" ") { app ->
+                        val sysType = if (app.isSystem) "System" else "User"
+                        "\"$currentPath/Apps/$sysType/${app.label}/Meta.txt\""
+                    }
+                    val sizeCmd =
+                        "grep \"^TotalSize=\" $paths 2>/dev/null | cut -d= -f2 | awk '{s+=$1} END {print s+0}'"
+                    val totalRequiredKb =
+                        Shell.cmd(sizeCmd).exec().out.firstOrNull()?.toLongOrNull() ?: 0L
+
+                    val availableKb = getAvailableSpaceKb("/data")
+                    if (availableKb < (totalRequiredKb + bufferKb)) {
+                        withContext(Dispatchers.Main) {
+                            onComplete(
+                                "Insufficient Space",
+                                "Need: ${formatSize((totalRequiredKb + bufferKb).toString())} | Available: ${
+                                    formatSize(availableKb.toString())
+                                }"
+                            )
+                        }
+                        return@withContext
+                    }
+                } else if (state.migratorMode == MigratorMode.BACKUP_APPS) {
+                    val cApp = state.globalComponents.contains(1)
+                    val cData = state.globalComponents.contains(2)
+                    val cMedia = state.globalComponents.contains(4)
+
+                    val pathsToSize = mutableListOf<String>()
+                    selectedApps.forEach { app ->
+                        val pkg = app.packageName
+                        if (cApp) {
+                            val apkPath = Shell.cmd("pm path $pkg").exec().out.firstOrNull()
+                                ?.removePrefix("package:")
+                            if (!apkPath.isNullOrBlank()) pathsToSize.add(
+                                File(apkPath).parent ?: ""
+                            )
+                        }
+                        if (cData) {
+                            pathsToSize.add("/data/data/$pkg")
+                            pathsToSize.add("/data/user_de/0/$pkg")
+                            pathsToSize.add("/data/media/0/Android/data/$pkg")
+                        }
+                        if (cMedia) {
+                            pathsToSize.add("/data/media/0/Android/media/$pkg")
+                            pathsToSize.add("/data/media/0/Android/obb/$pkg")
+                        }
+                    }
+
+                    val sizeCmd = "du -sk ${
+                        pathsToSize.filter { it.isNotBlank() }.joinToString(" ")
+                    } 2>/dev/null | awk '{s+=$1} END {print s+0}'"
+                    val totalSourceKb =
+                        Shell.cmd(sizeCmd).exec().out.firstOrNull()?.toLongOrNull() ?: 0L
+
+                    val estimatedCompressedKb = (totalSourceKb * 0.75).toLong()
+                    val availableKb = getAvailableSpaceKb(currentPath)
+
+                    if (availableKb < (estimatedCompressedKb + bufferKb)) {
+                        withContext(Dispatchers.Main) {
+                            onComplete(
+                                "Insufficient Space",
+                                "Need: ${formatSize((estimatedCompressedKb + bufferKb).toString())} | Available: ${
+                                    formatSize(availableKb.toString())
+                                }"
+                            )
+                        }
+                        return@withContext
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
             if (state.migratorMode == MigratorMode.MANAGE) {
                 val baseDir = File(currentPath)
                 if (!baseDir.exists()) {
@@ -336,7 +429,6 @@ object MigratorManager {
                 return@withContext
             }
 
-            val isRestore = state.migratorMode.name.contains("RESTORE")
             val cApp = state.globalComponents.contains(1)
             val cData = state.globalComponents.contains(2)
             val cPerm = state.globalComponents.contains(3)
@@ -365,10 +457,11 @@ object MigratorManager {
                     )
                     if (cId) {
                         try {
-                            val metaFile = File("$basePath/Meta.txt")
-                            if (metaFile.exists() && metaFile.readText().lines().any { it.startsWith("SSAID=") && it.length > 6 }) {
-                                parts.add("AndID")
-                            }
+                            val sysType = if (app.isSystem) "System" else "User"
+                            val metaPath = "$currentPath/Apps/$sysType/${app.label}/Meta.txt"
+                            val hasAndId = Shell.cmd("grep -q '^SSAID=' \"$metaPath\" && echo YES")
+                                .exec().out.joinToString("").trim() == "YES"
+                            if (hasAndId) parts.add("AndID")
                         } catch (_: Exception) {}
                     }
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
