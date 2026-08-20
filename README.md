@@ -34,7 +34,7 @@
 *Everything you need to flash, install, and restore device partitions.*
 
 <details>
-<summary><b>Auto Flash Wizard</b></summary>
+<summary><b>Auto Flash Wizard (Click to Expand)</b></summary>
 
 *Automate the complete ROM flashing process directly from Android.*
 
@@ -52,7 +52,7 @@
 </details>
 
 <details>
-<summary><b>Backup Partitions</b></summary>
+<summary><b>Backup Partitions (Click to Expand)</b></summary>
 
 *Create raw `.img` backups of selected device partitions.*
 
@@ -63,7 +63,7 @@
 </details>
 
 <details>
-<summary><b>Flash / Restore Partitions</b></summary>
+<summary><b>Flash / Restore Partitions (Click to Expand)</b></summary>
 
 *Flash a raw `.img` file directly to a selected partition.*
 
@@ -80,7 +80,7 @@
 *Everything you need to move your apps and personal or ROM data between ROMs.*
 
 <details>
-<summary><b>Backup Apps</b></summary>
+<summary><b>Backup Apps (Click to Expand)</b></summary>
 
 *Back up user and system apps so they can be restored later.*
 
@@ -115,7 +115,7 @@
 > caches when needed.
 
 <details>
-<summary><b>Restore Apps</b></summary>
+<summary><b>Restore Apps (Click to Expand)</b></summary>
 
 *Restore apps and their backed-up data after installing a new ROM.*
 
@@ -149,7 +149,7 @@
 > possible I/O performance across UFS, eMMC, and SD cards.
 
 <details>
-<summary><b>Native Data Backup & Restore</b></summary>
+<summary><b>Native Data Backup & Restore (Click to Expand)</b></summary>
 
 *Back up and restore important Android data that is not tied to individual apps.*
 
@@ -164,7 +164,7 @@
 </details>
 
 <details>
-<summary><b>Manage Backups</b></summary>
+<summary><b>Manage Backups (Click to Expand)</b></summary>
 
 *Browse, manage, and delete existing app and native backups to keep your storage organized.*
 
@@ -180,7 +180,7 @@
 *Utilities for managing, customizing, and maintaining your rooted Android system.*
 
 <details>
-<summary><b>Debloat / Restore Apps</b></summary>
+<summary><b>Debloat / Restore Apps (Click to Expand)</b></summary>
 
 *Remove unwanted user or system apps from your device.*
 
@@ -197,7 +197,7 @@
 </details>
 
 <details>
-<summary><b>Systemize / De-Systemize</b></summary>
+<summary><b>Systemize / De-Systemize (Click to Expand)</b></summary>
 
 *Move supported apps into or out of the Android system environment.*
 
