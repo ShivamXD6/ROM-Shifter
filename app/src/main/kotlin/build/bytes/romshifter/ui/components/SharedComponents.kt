@@ -21,6 +21,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -38,8 +39,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +71,43 @@ import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
+
+@Composable
+fun CircularCheckbox(
+    checked: Boolean,
+    onCheckedChange: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    val containerColor by animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.primary else Color.Transparent,
+        label = "checkbox_container"
+    )
+    val borderColor by animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(
+            alpha = 0.5f
+        ),
+        label = "checkbox_border"
+    )
+
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(containerColor)
+            .border(2.dp, borderColor, CircleShape)
+            .clickable(enabled = onCheckedChange != null) { onCheckedChange?.invoke() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (checked) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -371,15 +409,12 @@ fun AppListItem(
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Checkbox(
+            CircularCheckbox(
                 checked = app.isSelected,
-                onCheckedChange = { onToggleSelect(app.packageName) },
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                )
+                onCheckedChange = { onToggleSelect(app.packageName) }
             )
             if (app.size.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(5.dp))
                 Text(
                     text = app.size,
                     style = MaterialTheme.typography.labelSmall,
