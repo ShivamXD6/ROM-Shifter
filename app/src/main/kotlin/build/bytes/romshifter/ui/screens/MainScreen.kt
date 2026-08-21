@@ -203,7 +203,16 @@ fun MainScreen(viewModel: MainViewModel) {
     if (!appState.hasRoot) {
         NoRootScreen(
             isChecking = appState.isFetchingApps,
-            onRetry = { viewModel.checkRootAccess() }
+            onRestart = {
+                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                    context.startActivity(intent)
+                    Runtime.getRuntime().exit(0)
+                } else {
+                    viewModel.checkRootAccess()
+                }
+            }
         )
         return
     }
@@ -1129,7 +1138,7 @@ fun OnboardingStepContent(
 }
 
 @Composable
-fun NoRootScreen(isChecking: Boolean, onRetry: () -> Unit) {
+fun NoRootScreen(isChecking: Boolean, onRestart: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.90f,
@@ -1174,7 +1183,7 @@ fun NoRootScreen(isChecking: Boolean, onRetry: () -> Unit) {
                 Text("Root Access Required", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onErrorContainer)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, tap retry.",
+                    "Please grant root permissions in Magisk/KernelSU to use ROM Shifter. Then, tap restart.",
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -1183,7 +1192,7 @@ fun NoRootScreen(isChecking: Boolean, onRetry: () -> Unit) {
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = onRetry,
+                    onClick = onRestart,
                     enabled = !isChecking,
                     shape = CircleShape,
                     modifier = Modifier
@@ -1203,7 +1212,7 @@ fun NoRootScreen(isChecking: Boolean, onRetry: () -> Unit) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Text("Checking...", style = MaterialTheme.typography.titleMedium)
                     } else {
-                        Text("Retry", style = MaterialTheme.typography.titleMedium)
+                        Text("Restart", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
