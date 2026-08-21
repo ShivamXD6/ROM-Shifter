@@ -5,13 +5,10 @@
 
 BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
-JOBS=$(nproc 2>/dev/null || echo 4)
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-BIN_DIR=$(echo "$BIN_DIR" | tr -d '\r')
-AM_TMP=$(echo "$AM_TMP" | tr -d '\r')
-TARGETS=$(echo "$TARGETS" | tr -d '\r')
-ZAPDOS=$(echo "$ZAPDOS" | tr -d '\r')
+JOBS=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || nproc 2>/dev/null || echo 4)
+CORES_TO_USE=$((JOBS > 2 ? JOBS - 2 : 1))
 
 init_shifter() {
      mkdir -p "$BIN_DIR" "$AM_TMP"
@@ -113,12 +110,12 @@ PKG_INSTALLED() {
     return 0
 }
 BUNDAPP() {
-    COOLDOWN "$((JOBS / 2))"
+    COOLDOWN "$CORES_TO_USE"
     tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
 }
 
 UNBUNDAPP() {
-    COOLDOWN "$((JOBS - 2))"
+    COOLDOWN "$CORES_TO_USE"
     "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
 }
 
@@ -215,10 +212,8 @@ DO_BACKUP() {
         [ "$global_pct" -gt 100 ] && global_pct=100
 
         echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
-        sleep 0.8
+        sleep 0.1
     done
-
-    wait
 
     local final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
@@ -296,7 +291,6 @@ DO_RESTORE() {
             ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
             ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
         }
-        wait
         CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); CUR_DATA=${CUR_DATA:-0}; CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}; CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}; CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
         rm -rf "$TMP_SIZES"
     fi
@@ -349,10 +343,8 @@ DO_RESTORE() {
         local global_pct=$(( BASE_PCT + (app_pct / TOT_IDX) ))
         [ "$global_pct" -gt 100 ] && global_pct=100
         echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$global_pct|SIZE:$SIZE"
-        sleep 0.8
+        sleep 0.1
     done
-
-    wait
 
     local final_pct=$(( CUR_IDX * 100 / TOT_IDX ))
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
@@ -388,8 +380,7 @@ DO_RESTORE() {
 
 do_backup() {
     export APP_COMPS="$1"
-    rm -rf "$AM_TMP/precalc" "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" "$AM_TMP/paths.list" "$AM_TMP/du.out" "$AM_TMP/sizes.map" 2>/dev/null
-    mkdir -p "$AM_TMP/precalc"
+    rm -rf "$AM_TMP/selected_apps_sizes.txt" "$AM_TMP/selected_apps_sorted.txt" "$AM_TMP/paths.list" "$AM_TMP/du.out" "$AM_TMP/sizes.map" 2>/dev/null
 
     if CHK 1; then
         pm list packages -f 2>/dev/null > "$AM_TMP/pm_list.txt"
@@ -523,6 +514,7 @@ do_restore() {
     setprop pm.dexopt.install-bulk speed-profile
     setprop pm.dexopt.install-bulk-downgraded verify
 
+    wait
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB|TIME:$((( $(date +%s) - START )))"
 }
 

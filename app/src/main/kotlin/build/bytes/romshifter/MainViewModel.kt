@@ -693,7 +693,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun migrateFolder(newPath: String, onSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             SettingsManager.migrateFolder(_savedPath.value.trimEnd('/'), newPath, prefs)
-            Shell.cmd("mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"")
+            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'")
                 .exec()
             _savedPath.value = newPath
             BackendInstaller.backupSelf(getApplication(), newPath)
@@ -704,7 +704,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun autoDetectShifterFolder(onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val searchCmd =
-                "find /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name \".shifter_dir\" 2>/dev/null | head -n 1"
+                "su -mm -c 'find /data/media/0 /mnt/media_rw -maxdepth 5 -type f -name \".shifter_dir\" 2>/dev/null | head -n 1'"
             val markerFile = Shell.cmd(searchCmd).exec().out.joinToString("").trim()
             var detected =
                 if (markerFile.isNotEmpty()) markerFile.removeSuffix("/.shifter_dir") else ""
@@ -814,9 +814,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = _savedPath.value
 
-            if (doSms) Shell.cmd("rm -f '$path/Native/Messages.shift'").exec()
-            if (doCall) Shell.cmd("rm -f '$path/Native/CallLogs.shift'").exec()
-            if (doContacts) Shell.cmd("rm -f '$path/Native/Contacts.shift'").exec()
+            if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/Messages.shift'\"").exec()
+            if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/CallLogs.shift'\"").exec()
+            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/Contacts.shift'\"").exec()
 
             withContext(Dispatchers.Main) {
                 Toast.makeText(
@@ -828,14 +828,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     suspend fun isMagisk(): Boolean = withContext(Dispatchers.IO) {
-        Shell.cmd("[ -d /data/adb/magisk ] && echo YES").exec().out.joinToString("")
+        Shell.cmd("su -c '[ -d /data/adb/magisk ] && echo YES'").exec().out.joinToString("")
             .trim() == "YES"
     }
 
     suspend fun canSystemize(): Boolean = withContext(Dispatchers.IO) {
         if (isMagisk()) return@withContext true
         val check =
-            Shell.cmd("[ -d /data/adb/modules/mountify ] || [ -d /data/adb/modules/meta-overlayfs ] || [ -d /data/adb/metamodule ] && echo YES")
+            Shell.cmd("su -c '[ -d /data/adb/modules/mountify ] || [ -d /data/adb/modules/meta-overlayfs ] || [ -d /data/adb/metamodule ] && echo YES'")
                 .exec().out.joinToString("").trim()
         return@withContext check == "YES"
     }
@@ -1123,7 +1123,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val safeLabel = it.label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             "'/data/adb/modules/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/app/$safeLabel'"
                         }
-                        Shell.cmd("rm -rf $appPaths").exec()
+                        Shell.cmd("su -c \"rm -rf $appPaths\"").exec()
                         updateProgress("De-Systemizing", "Removed from module folder", 100)
                         onComplete("De-Systemize Complete!", "Reboot required to apply changes.")
                     } else {

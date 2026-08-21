@@ -217,7 +217,7 @@ object NativeManager {
         val cacheDir = context.cacheDir.absolutePath
         val zapdosPath = "/data/adb/Shifter/zapdos"
 
-        Shell.cmd("mkdir -p \"$backupDir\"").exec()
+        Shell.cmd("su -c 'mkdir -p \"$backupDir\"'").exec()
 
         val permsToGrant = mutableListOf<String>()
         if (doSms) permsToGrant.addAll(listOf("READ_SMS", "WRITE_SMS"))
@@ -251,13 +251,14 @@ object NativeManager {
                 writer.close()
 
                 updateState("Backing up Advanced MMS & RCS...", 30)
-                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"")
+                Shell.cmd("su -mm -c 'sh /data/adb/Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"'")
                     .exec()
 
                 updateState("Compressing Messages...", 40)
-                Shell.cmd("cd \"$cacheDir\" && tar -cf - SMS_DB.json Advanced_Msgs 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"")
+                Shell.cmd("su -mm -c 'cd \"$cacheDir\" && tar -cf - SMS_DB.json Advanced_Msgs 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"'")
                     .exec()
-                Shell.cmd("rm -rf \"$cacheDir/SMS_DB.json\" \"$cacheDir/Advanced_Msgs\"").exec()
+                Shell.cmd("su -mm -c 'rm -rf \"$cacheDir/SMS_DB.json\" \"$cacheDir/Advanced_Msgs\"'")
+                    .exec()
             }
             if (doCall) {
                 updateState("Backing up Call Logs...", 50)
@@ -282,7 +283,7 @@ object NativeManager {
                 writer.close()
 
                 updateState("Compressing Call Logs...", 80)
-                Shell.cmd("cd \"$cacheDir\" && tar -cf - CallLog_DB.json 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/CallLogs.shift\"")
+                Shell.cmd("su -mm -c 'cd \"$cacheDir\" && tar -cf - CallLog_DB.json 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/CallLogs.shift\"'")
                     .exec()
                 callFile.delete()
             }
@@ -305,7 +306,7 @@ object NativeManager {
                 }
                 if (vcfFile.exists()) {
                     updateState("Compressing Contacts...", 95)
-                    Shell.cmd("cd \"$cacheDir\" && tar -cf - Contacts.vcf 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Contacts.shift\"")
+                    Shell.cmd("su -mm -c 'cd \"$cacheDir\" && tar -cf - Contacts.vcf 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Contacts.shift\"'")
                         .exec()
                     vcfFile.delete()
                 }
@@ -313,26 +314,27 @@ object NativeManager {
         } else {
             if (doSms) {
                 updateState("Extracting Messages...", 0)
-                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Messages.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                Shell.cmd("su -mm -c '\"$zapdosPath\" -d -q -c \"$backupDir/Messages.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null'")
                     .exec()
 
                 val hasRawDbs =
-                    Shell.cmd("[ -d \"$cacheDir/Advanced_Msgs/Telephony\" ] && echo YES")
+                    Shell.cmd("su -c '[ -d \"$cacheDir/Advanced_Msgs/Telephony\" ] && echo YES'")
                         .exec().out.joinToString("").trim() == "YES"
 
                 if (hasRawDbs) {
                     updateState("Injecting Raw MMS & RCS Databases...", 10)
-                    Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-msgs \"$cacheDir\"")
+                    Shell.cmd("su -mm -c 'sh /data/adb/Shifter/ROM-Shifter.sh --restore-msgs \"$cacheDir\"'")
                         .exec()
                 } else {
                     updateState("Restoring SMS from JSON...", 10)
-                    val currentSmsApp = Shell.cmd("cmd role get-role-holders android.app.role.SMS")
+                    val currentSmsApp =
+                        Shell.cmd("su -c 'cmd role get-role-holders android.app.role.SMS'")
                         .exec().out.joinToString("").trim()
-                    Shell.cmd("cmd role add-role-holder android.app.role.SMS $pkg").exec()
-                    Shell.cmd("appops set $pkg WRITE_SMS allow").exec()
+                    Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $pkg'").exec()
+                    Shell.cmd("su -c 'appops set $pkg WRITE_SMS allow'").exec()
 
                     val tempSms = File(context.cacheDir, "SMS_DB.json")
-                    Shell.cmd("chmod 666 \"${tempSms.absolutePath}\"").exec()
+                    Shell.cmd("su -c 'chmod 666 \"${tempSms.absolutePath}\"'").exec()
 
                     if (tempSms.exists()) {
                         val reader = JsonReader(InputStreamReader(FileInputStream(tempSms), "UTF-8"))
@@ -356,20 +358,21 @@ object NativeManager {
                     }
 
                     if (currentSmsApp.isNotEmpty()) {
-                        Shell.cmd("cmd role add-role-holder android.app.role.SMS $currentSmsApp")
+                        Shell.cmd("su -c 'cmd role add-role-holder android.app.role.SMS $currentSmsApp'")
                             .exec()
                     }
                 }
-                Shell.cmd("rm -rf \"$cacheDir/Advanced_Msgs\" \"$cacheDir/SMS_DB.json\"").exec()
+                Shell.cmd("su -mm -c 'rm -rf \"$cacheDir/Advanced_Msgs\" \"$cacheDir/SMS_DB.json\"'")
+                    .exec()
             }
             if (doCall) {
                 updateState("Extracting Call Logs...", 50)
-                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/CallLogs.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                Shell.cmd("su -mm -c '\"$zapdosPath\" -d -q -c \"$backupDir/CallLogs.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null'")
                     .exec()
 
-                Shell.cmd("appops set $pkg WRITE_CALL_LOG allow").exec()
+                Shell.cmd("su -c 'appops set $pkg WRITE_CALL_LOG allow'").exec()
                 val tempCall = File(context.cacheDir, "CallLog_DB.json")
-                Shell.cmd("chmod 666 \"${tempCall.absolutePath}\"").exec()
+                Shell.cmd("su -c 'chmod 666 \"${tempCall.absolutePath}\"'").exec()
 
                 if (tempCall.exists()) {
                     val reader = JsonReader(InputStreamReader(FileInputStream(tempCall), "UTF-8"))
@@ -394,11 +397,11 @@ object NativeManager {
             }
             if (doContacts) {
                 updateState("Extracting Contacts (vCard)...", 90)
-                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Contacts.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                Shell.cmd("su -mm -c '\"$zapdosPath\" -d -q -c \"$backupDir/Contacts.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null'")
                     .exec()
 
                 val tempVcf = File(context.cacheDir, "Contacts.vcf")
-                Shell.cmd("chmod 666 \"${tempVcf.absolutePath}\"").exec()
+                Shell.cmd("su -c 'chmod 666 \"${tempVcf.absolutePath}\"'").exec()
 
                 if (tempVcf.exists()) {
                     importVcf(context, tempVcf, updateState)
