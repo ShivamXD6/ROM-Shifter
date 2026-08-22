@@ -2,7 +2,7 @@ package build.bytes.romshifter.utils
 
 import android.content.Context
 import androidx.core.content.edit
-import androidx.core.content.pm.PackageInfoCompat
+import build.bytes.romshifter.BuildConfig
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -72,8 +72,7 @@ object BackendInstaller {
         if (!nativeLibFile.exists()) return@withContext false
 
         try {
-            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            val currentVersionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
+            val currentVersionCode = BuildConfig.VERSION_CODE.toLong()
             val prefs = context.getSharedPreferences("shifter_backend_prefs", Context.MODE_PRIVATE)
             val savedVersionCode = prefs.getLong("installed_version", -1L)
 

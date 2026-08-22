@@ -19,7 +19,7 @@ android {
         } catch (_: Exception) {
             10
         }
-        versionName = "Eevee (v1)"
+        versionName = "Eevee"
     }
 
     signingConfigs {
@@ -59,6 +59,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         jniLibs {

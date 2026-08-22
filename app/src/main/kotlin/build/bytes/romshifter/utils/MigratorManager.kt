@@ -11,6 +11,7 @@ import android.os.PowerManager
 import android.os.storage.StorageManager.UUID_DEFAULT
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.graphics.createBitmap
+import build.bytes.romshifter.BuildConfig
 import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.MigratorMode
@@ -289,7 +290,8 @@ object MigratorManager {
             else -> {}
         }
 
-        val finalApps = apps.filter { it.packageName != context.packageName }.distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
+        val finalApps = apps.filter { it.packageName != BuildConfig.APPLICATION_ID }
+            .distinctBy { it.packageName }.sortedBy { it.label.lowercase(Locale.ROOT) }
 
         if (!append) {
             when (type) {

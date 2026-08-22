@@ -140,12 +140,17 @@ DO_BACKUP() {
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
     OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
     if [ -f "$APP_DIR/Meta.txt" ]; then
-        OLD_APP=$(grep "^AppSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_APP=${OLD_APP:-0}
-        OLD_DATA=$(grep "^DataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_DATA=${OLD_DATA:-0}
-        OLD_EXT=$(grep "^ExtDataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_EXT=${OLD_EXT:-0}
-        OLD_MED=$(grep "^MediaSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_MED=${OLD_MED:-0}
-        OLD_OBB=$(grep "^ObbSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_OBB=${OLD_OBB:-0}
-        OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
+        while IFS='=' read -r key value; do
+            case "$key" in
+                AppSize) OLD_APP=$value ;;
+                DataSize) OLD_DATA=$value ;;
+                ExtDataSize) OLD_EXT=$value ;;
+                MediaSize) OLD_MED=$value ;;
+                ObbSize) OLD_OBB=$value ;;
+                SSAID) OLD_SSAID=$value ;;
+            esac
+        done < "$APP_DIR/Meta.txt"
+        OLD_APP=${OLD_APP:-0}; OLD_DATA=${OLD_DATA:-0}; OLD_EXT=${OLD_EXT:-0}; OLD_MED=${OLD_MED:-0}; OLD_OBB=${OLD_OBB:-0}
     fi
 
     if CHK 1; then
@@ -241,18 +246,27 @@ DO_RESTORE() {
     LABEL="$1"; TYPE="$2"; CUR_IDX="$3"; TOT_IDX="$4"; PCT="$5"; SIZE="$6"
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"
     [ -f "$APP_DIR/Meta.txt" ] || return
-    PKG=$(grep "Package=" "$APP_DIR/Meta.txt" | cut -d= -f2); [ -z "$PKG" ] && return
-    VER=$(grep "Version=" "$APP_DIR/Meta.txt" | cut -d= -f2)
+
+    PKG=""; VER=""; OLD_APP=0; OLD_DATA=0; OLD_EXT=0; OLD_MED=0; OLD_OBB=0; OLD_SSAID=""
+    while IFS='=' read -r key value; do
+        case "$key" in
+            Package) PKG=$value ;;
+            Version) VER=$value ;;
+            AppSize) OLD_APP=$value ;;
+            DataSize) OLD_DATA=$value ;;
+            ExtDataSize) OLD_EXT=$value ;;
+            MediaSize) OLD_MED=$value ;;
+            ObbSize) OLD_OBB=$value ;;
+            SSAID) OLD_SSAID=$value ;;
+        esac
+    done < "$APP_DIR/Meta.txt"
+
+    [ -z "$PKG" ] && return
+    OLD_APP=${OLD_APP:-0}; OLD_DATA=${OLD_DATA:-0}; OLD_EXT=${OLD_EXT:-0}; OLD_MED=${OLD_MED:-0}; OLD_OBB=${OLD_OBB:-0}
     TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"; chmod 777 "$TMP_PKG"
 
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
-    OLD_APP=$(grep "^AppSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_APP=${OLD_APP:-0}
-    OLD_DATA=$(grep "^DataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_DATA=${OLD_DATA:-0}
-    OLD_EXT=$(grep "^ExtDataSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_EXT=${OLD_EXT:-0}
-    OLD_MED=$(grep "^MediaSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_MED=${OLD_MED:-0}
-    OLD_OBB=$(grep "^ObbSize=" "$APP_DIR/Meta.txt" | cut -d= -f2); OLD_OBB=${OLD_OBB:-0}
-    OLD_SSAID=$(grep "^SSAID=" "$APP_DIR/Meta.txt" | cut -d= -f2)
     FORCE_DATA=0
 
     if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
@@ -544,10 +558,12 @@ do_restore_debloat() {
 do_systemize() {
     local PKG="$1"
     local LABEL="$2"
+    local APP_VER="${3:-1.0}"
+    local APP_VER_CODE="${4:-1}"
 
     local MOD_DIR="/data/adb/modules/ROM-Shifter"
     local UP_DIR="/data/adb/modules_update/ROM-Shifter"
-    local PROP="id=ROM-Shifter\nname=ROM Shifter Module\nversion=1.0\nversionCode=1\nauthor=ROM Shifter\ndescription=Used for some system dependent features such as Systemizer"
+    local PROP="id=ROM-Shifter\nname=ROM Shifter Module\nversion=$APP_VER\nversionCode=$APP_VER_CODE\nauthor=ROM Shifter\ndescription=Used for some system dependent features such as Systemizer"
 
     mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
     mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
@@ -667,7 +683,7 @@ shifter_main() {
             ;;
         --remove) init_shifter; do_remove "$2" "$3" ;;
         --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
-        --systemize) init_shifter; do_systemize "$2" "$3" ;;
+        --systemize) init_shifter; do_systemize "$2" "$3" "$4" "$5" ;;
         --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
         --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
         --ors) do_ors "$2" "$3" ;;

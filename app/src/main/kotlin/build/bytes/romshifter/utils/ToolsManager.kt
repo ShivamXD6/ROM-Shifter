@@ -2,6 +2,7 @@ package build.bytes.romshifter.utils
 
 import android.content.Context
 import android.os.PowerManager
+import build.bytes.romshifter.BuildConfig
 import build.bytes.romshifter.models.AppInfo
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +61,7 @@ object ToolsManager {
                 updateProgress("Systemizing Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
 
                 val result =
-                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}'\"")
+                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --systemize '${app.packageName}' '${app.label}' '${BuildConfig.VERSION_NAME}' '${BuildConfig.VERSION_CODE}'\"")
                         .exec().out.joinToString("").trim()
 
                 if (result == "SYSTEMIZED") updateLog("Systemized: ${app.label}")
