@@ -859,7 +859,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             "Uninstalled",
                             true,
                             _appList.value,
-                            isManage = false
+                            isManage = false,
+                            includeOverhead = false
                         )
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
@@ -882,7 +883,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             "System",
                             true,
                             _appList.value,
-                            isManage = false
+                            isManage = false,
+                            includeOverhead = false
                         )
                         _appList.value = sys
                         _uiState.value = _uiState.value.copy(
@@ -937,10 +939,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
-    }
-
-    fun setForceRemove(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(forceRemoveEnabled = enabled)
     }
 
     fun toggleGlobalComponent(id: Int) {
@@ -1009,8 +1007,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         var totalBackupsKb = 0L
 
-        val selectedKb = if (state.migratorMode == MigratorMode.MANAGE) {
-            totalBackupsKb = allApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+        val selectedKb = if (state.migratorMode == MigratorMode.MANAGE ||
+            state.migratorMode == MigratorMode.DEBLOAT ||
+            state.migratorMode == MigratorMode.SYSTEMIZE
+        ) {
+            if (state.migratorMode == MigratorMode.MANAGE) {
+                totalBackupsKb = allApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+            }
             selectedApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
         } else {
             val count = selectedApps.size
@@ -1027,7 +1030,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val targetPath =
-            if (state.migratorMode == MigratorMode.RESTORE_APPS) "/data" else _savedPath.value
+            if (state.migratorMode == MigratorMode.RESTORE_APPS ||
+                state.migratorMode == MigratorMode.DEBLOAT ||
+                state.migratorMode == MigratorMode.SYSTEMIZE
+            ) "/data" else _savedPath.value
         val availableKb = MigratorManager.getAvailableSpaceKb(targetPath)
 
         _uiState.value = _uiState.value.copy(
@@ -1055,7 +1061,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 type,
                 append,
                 _appList.value,
-                isManage = _uiState.value.migratorMode == MigratorMode.MANAGE
+                isManage = _uiState.value.migratorMode == MigratorMode.MANAGE,
+                includeOverhead = _uiState.value.migratorMode == MigratorMode.BACKUP_APPS || _uiState.value.migratorMode == MigratorMode.RESTORE_APPS
             )
             withContext(Dispatchers.Main) {
                 _appList.value = apps
@@ -1151,7 +1158,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         context = getApplication(),
                         selectedApps = selectedApps,
                         isRestore = state.actionFilterState == 2,
-                        forceRemove = state.forceRemoveEnabled,
                         updateLog = {},
                         updateProgress = updateProgress,
                         onComplete = onComplete
@@ -1194,12 +1200,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshCurrentList() {
         MigratorManager.clearCache()
-        val currentMode = _uiState.value.migratorMode
-        if (currentMode != MigratorMode.MENU) {
-            when (currentMode) {
+        val state = _uiState.value
+        if (state.migratorMode != MigratorMode.MENU) {
+            when (state.migratorMode) {
                 MigratorMode.BACKUP_APPS -> fetchAppsList("AllInstalled")
                 MigratorMode.RESTORE_APPS -> fetchAppsList("AllBackups")
-                MigratorMode.DEBLOAT, MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
+                MigratorMode.DEBLOAT -> {
+                    val type = if (state.actionFilterState == 2) "Uninstalled" else "AllInstalled"
+                    fetchAppsList(type)
+                }
+
+                MigratorMode.SYSTEMIZE -> fetchAppsList("AllInstalled")
                 MigratorMode.MANAGE -> fetchAppsList("AllBackups")
             }
         }

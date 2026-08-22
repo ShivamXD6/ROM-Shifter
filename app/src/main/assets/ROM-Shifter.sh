@@ -543,20 +543,7 @@ do_restore() {
 
 do_remove() {
     local PKG="$1"
-    local FORCE="$2"
-    if [ "$FORCE" == "true" ]; then
-        local APK_PATH=$(pm path "$PKG" | sed 's/^package://')
-        if [[ "$APK_PATH" == /system/* ]] || [[ "$APK_PATH" == /product/* ]] || [[ "$APK_PATH" == /vendor/* ]]; then
-            local DIR_PATH=$(dirname "$APK_PATH")
-            mount -o rw,remount /
-            mount -o rw,remount /system
-            mount -o rw,remount /product
-            mount -o rw,remount /vendor
-            rm -rf "$DIR_PATH"
-            pm uninstall --user 0 "$PKG" >/dev/null 2>&1
-            return
-        fi
-    fi
+    pm uninstall "$PKG" >/dev/null 2>&1
     pm uninstall --user 0 "$PKG" >/dev/null 2>&1
 }
 

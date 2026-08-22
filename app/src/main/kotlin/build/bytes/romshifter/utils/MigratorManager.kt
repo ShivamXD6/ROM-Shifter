@@ -41,7 +41,7 @@ object MigratorManager {
     suspend fun fetchAppsList(
         context: Context, currentPath: String, type: String,
         append: Boolean = false, currentList: List<AppInfo> = emptyList(),
-        isManage: Boolean = false
+        isManage: Boolean = false, includeOverhead: Boolean = true
     ): List<AppInfo> = withContext(Dispatchers.IO) {
         if (!append) {
             when (type) {
@@ -119,7 +119,8 @@ object MigratorManager {
                             val dataSizeKb = stats.second + (extDataSizes[pkg] ?: 0L)
                             val mediaSizeKb = mediaSizes[pkg] ?: 0L
 
-                            val displaySizeKb = appSizeKb + dataSizeKb + mediaSizeKb + 31
+                            val displaySizeKb =
+                                appSizeKb + dataSizeKb + mediaSizeKb + if (includeOverhead) 31 else 0
 
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
@@ -220,7 +221,8 @@ object MigratorManager {
                             mediaSizeKb = mSize + oSize
                         }
 
-                        val displaySizeKb = appSizeKb + dataSizeKb + mediaSizeKb + 31
+                        val displaySizeKb =
+                            appSizeKb + dataSizeKb + mediaSizeKb + if (includeOverhead) 31 else 0
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
@@ -523,7 +525,7 @@ object MigratorManager {
     }
 
     private fun getDetailedPackageSizes(context: Context, packageName: String): Pair<Long, Long> {
-        return try {
+        try {
             val storageStatsManager =
                 context.getSystemService(Context.STORAGE_STATS_SERVICE) as StorageStatsManager
             val stats = storageStatsManager.queryStatsForPackage(
@@ -535,9 +537,22 @@ object MigratorManager {
             val appSize = stats.appBytes / 1024
             val dataSize = (stats.dataBytes + stats.cacheBytes) / 1024
 
-            appSize to dataSize
+            return appSize to dataSize
         } catch (_: Exception) {
-            0L to 0L
+            try {
+                val pathCmd = "pm path $packageName"
+                val apkPath = Shell.cmd(pathCmd).exec().out.firstOrNull()?.removePrefix("package:")
+                if (!apkPath.isNullOrBlank() && (apkPath.startsWith("/data/app") || apkPath.startsWith(
+                        "/data/priv-app"
+                    ))
+                ) {
+                    val sizeCmd = "du -sk $(dirname \"$apkPath\") 2>/dev/null | awk '{print $1}'"
+                    val sizeKb = Shell.cmd(sizeCmd).exec().out.firstOrNull()?.toLongOrNull() ?: 0L
+                    return sizeKb to 0L
+                }
+            } catch (_: Exception) {
+            }
+            return 0L to 0L
         }
     }
 

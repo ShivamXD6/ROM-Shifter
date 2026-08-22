@@ -62,7 +62,6 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -92,8 +91,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -303,7 +305,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         }
     }
 
-    var showForceRemoveWarning by remember { mutableStateOf(false) }
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
@@ -392,42 +393,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         )
     }
 
-    if (showForceRemoveWarning) {
-        AlertDialog(
-            shape = MaterialTheme.shapes.large,
-            onDismissRequest = { showForceRemoveWarning = false },
-            icon = {
-                Icon(
-                    Icons.Default.Warning,
-                    null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(28.dp)
-                )
-            },
-            title = { Text("Enable Force Deletion?") },
-            text = {
-                Text(
-                    "This will completely wipe the app data from the root partitions to free up space.\n\nWarning: Apps removed this way CANNOT be restored later using ROM Shifter!",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.setForceRemove(true); showForceRemoveWarning = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("I Understand, Enable") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showForceRemoveWarning = false
-                }) { Text("Cancel") }
-            }
-        )
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -491,8 +456,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             }
 
             val showEraseNative = appState.migratorMode == MigratorMode.MANAGE
-            val showForceDeletion =
-                appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1
             val hasButtons = showActionChip || showEraseNative
 
             val hasComponents =
@@ -561,24 +524,6 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             leadingIcon = actionIcon,
                             showLabel = expandedChipLabel == "ActionGroup",
                             onExpand = { expandChip("ActionGroup") }
-                        )
-                    }
-                }
-
-                if (showForceDeletion) {
-                    item {
-                        AnimatedFilterChip(
-                            selected = appState.forceRemoveEnabled,
-                            onClick = {
-                                if (appState.forceRemoveEnabled) viewModel.setForceRemove(false)
-                                else showForceRemoveWarning = true
-                            },
-                            label = "Force Deletion",
-                            leadingIcon = Icons.Default.DeleteForever,
-                            showLabel = expandedChipLabel == "Force Deletion",
-                            onExpand = { expandChip("Force Deletion") },
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                            selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                 }
@@ -908,8 +853,17 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
 
+                        val isNeedFreeMode = appState.migratorMode == MigratorMode.BACKUP_APPS ||
+                                appState.migratorMode == MigratorMode.RESTORE_APPS ||
+                                (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2) ||
+                                (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 1)
+
+                        val isNowMayFreeMode = appState.migratorMode == MigratorMode.MANAGE ||
+                                (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1) ||
+                                (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 2)
+
                         val isInsufficientSpace =
-                            appState.totalRequiredKb > appState.availableSpaceKb && (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS)
+                            appState.totalRequiredKb > appState.availableSpaceKb && isNeedFreeMode
 
                         Column(modifier = Modifier.weight(1f)) {
                             AnimatedContent(
@@ -931,23 +885,51 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                                 )
                             }
-                            if (selectedCount > 0 && (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS)) {
+                            if (selectedCount > 0 && isNeedFreeMode) {
                                 val reqSize =
-                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.totalRequiredKb.toString())
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(
+                                        appState.totalRequiredKb.toString()
+                                    )
                                 val availSize =
-                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.availableSpaceKb.toString())
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(
+                                        appState.availableSpaceKb.toString()
+                                    )
                                 Text(
-                                    text = "Need: $reqSize | Free: $availSize",
+                                    text = buildAnnotatedString {
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append("Now: ")
+                                        }
+                                        append(availSize)
+                                        append(" | ")
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append("Need: ")
+                                        }
+                                        append(reqSize)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            } else if (appState.migratorMode == MigratorMode.MANAGE) {
+                            } else if (selectedCount > 0 && isNowMayFreeMode) {
                                 val selSize =
-                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.totalRequiredKb.toString())
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(
+                                        appState.totalRequiredKb.toString()
+                                    )
                                 val freeSize =
-                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.availableSpaceKb.toString())
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(
+                                        appState.availableSpaceKb.toString()
+                                    )
                                 Text(
-                                    text = "Now: $freeSize | Will Free: $selSize",
+                                    text = buildAnnotatedString {
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append("Now: ")
+                                        }
+                                        append(freeSize)
+                                        append(" | ")
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append("May Free: ")
+                                        }
+                                        append(selSize)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -51,7 +51,6 @@ data class AppState(
     val actionFilterState: Int = 0,
     val globalComponents: Set<Int> = setOf(1, 2, 3, 4, 5),
     val hasRoot: Boolean = true,
-    val forceRemoveEnabled: Boolean = false,
     val flashWizardStep: Int = 0,
     val flashWipePartitions: Set<String> = setOf("dalvik", "cache"),
     val flashFormatData: Boolean = false,

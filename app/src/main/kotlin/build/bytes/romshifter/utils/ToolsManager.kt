@@ -11,7 +11,9 @@ import kotlinx.coroutines.withContext
 object ToolsManager {
 
     suspend fun runDebloatOperation(
-        context: Context, selectedApps: List<AppInfo>, isRestore: Boolean, forceRemove: Boolean,
+        context: Context,
+        selectedApps: List<AppInfo>,
+        isRestore: Boolean,
         updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
         var wakeLock: PowerManager.WakeLock? = null
@@ -31,13 +33,9 @@ object ToolsManager {
             } else {
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-                    val isForce = if (forceRemove) "true" else "false"
-                    val result =
-                        Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --remove '${app.packageName}' '$isForce'\"")
-                            .exec().out.joinToString("").trim()
-
-                    if (result == "FORCE_REMOVED") updateLog("Force Removed (rm -rf): ${app.label}")
-                    else updateLog("Uninstalled: ${app.label}")
+                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --remove '${app.packageName}'\"")
+                        .exec()
+                    updateLog("Uninstalled: ${app.label}")
                 }
                 onComplete("Debloat Complete!", "Successfully removed ${selectedApps.size} apps.")
             }
