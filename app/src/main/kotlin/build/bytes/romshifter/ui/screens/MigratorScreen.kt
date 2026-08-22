@@ -941,6 +941,16 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            } else if (appState.migratorMode == MigratorMode.MANAGE) {
+                                val selSize =
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.totalRequiredKb.toString())
+                                val freeSize =
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.availableSpaceKb.toString())
+                                Text(
+                                    text = "Now: $freeSize | Will Free: $selSize",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))

@@ -40,7 +40,8 @@ object MigratorManager {
     @SuppressLint("SimpleDateFormat")
     suspend fun fetchAppsList(
         context: Context, currentPath: String, type: String,
-        append: Boolean = false, currentList: List<AppInfo> = emptyList()
+        append: Boolean = false, currentList: List<AppInfo> = emptyList(),
+        isManage: Boolean = false
     ): List<AppInfo> = withContext(Dispatchers.IO) {
         if (!append) {
             when (type) {
@@ -118,7 +119,7 @@ object MigratorManager {
                             val dataSizeKb = stats.second + (extDataSizes[pkg] ?: 0L)
                             val mediaSizeKb = mediaSizes[pkg] ?: 0L
 
-                            val totalSizeKb = appSizeKb + dataSizeKb + mediaSizeKb
+                            val displaySizeKb = appSizeKb + dataSizeKb + mediaSizeKb + 31
 
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
@@ -130,7 +131,7 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
-                                size = formatSize(totalSizeKb.toString()),
+                                size = formatSize(displaySizeKb.toString()),
                                 isSystemized = isSystemizedApp,
                                 appSizeKb = appSizeKb,
                                 dataSizeKb = dataSizeKb,
@@ -165,6 +166,20 @@ object MigratorManager {
                     }
                 }
 
+                val diskSizes = mutableMapOf<String, Long>()
+                if (isManage && appMap.isNotEmpty()) {
+                    appMap.keys.chunked(100).forEach { batch ->
+                        val paths = batch.joinToString(" ") { "'$it'" }
+                        Shell.cmd("su -mm -c \"du -sk $paths 2>/dev/null\"")
+                            .exec().out.forEach { line ->
+                                val parts = line.trim().split(Regex("\\s+"), 2)
+                                if (parts.size == 2) {
+                                    diskSizes[parts[1]] = parts[0].toLongOrNull() ?: 0L
+                                }
+                        }
+                    }
+                }
+
                 val iconScript = StringBuilder()
                 appMap.forEach { (basePath, data) ->
                     val pkg = data["Package"] ?: return@forEach
@@ -185,15 +200,27 @@ object MigratorManager {
                         val pkg = data["Package"] ?: ""
                         val version = data["Version"] ?: ""
 
-                        val appSizeKb = data["AppSize"]?.toLongOrNull() ?: 0L
-                        val dataSizeKb = data["DataSize"]?.toLongOrNull() ?: 0L
-                        val extDataSizeKb = data["ExtDataSize"]?.toLongOrNull() ?: 0L
-                        val mediaSizeKb = data["MediaSize"]?.toLongOrNull() ?: 0L
-                        val obbSizeKb = data["ObbSize"]?.toLongOrNull() ?: 0L
+                        val appSizeKb: Long
+                        val dataSizeKb: Long
+                        val mediaSizeKb: Long
 
-                        val totalDataKb = dataSizeKb + extDataSizeKb
-                        val totalMediaKb = mediaSizeKb + obbSizeKb
-                        val totalSizeKb = appSizeKb + totalDataKb + totalMediaKb
+                        if (isManage) {
+                            appSizeKb = diskSizes[basePath] ?: 0L
+                            dataSizeKb = 0
+                            mediaSizeKb = 0
+                        } else {
+                            val aSize = data["AppSize"]?.toLongOrNull() ?: 0L
+                            val dSize = data["DataSize"]?.toLongOrNull() ?: 0L
+                            val eSize = data["ExtDataSize"]?.toLongOrNull() ?: 0L
+                            val mSize = data["MediaSize"]?.toLongOrNull() ?: 0L
+                            val oSize = data["ObbSize"]?.toLongOrNull() ?: 0L
+
+                            appSizeKb = aSize
+                            dataSizeKb = dSize + eSize
+                            mediaSizeKb = mSize + oSize
+                        }
+
+                        val displaySizeKb = appSizeKb + dataSizeKb + mediaSizeKb + 31
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
@@ -218,11 +245,11 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
-                                size = formatSize(totalSizeKb.toString()),
+                                size = formatSize(displaySizeKb.toString()),
                                 isInstalled = isInst,
                                 appSizeKb = appSizeKb,
-                                dataSizeKb = totalDataKb,
-                                mediaSizeKb = totalMediaKb
+                                dataSizeKb = dataSizeKb,
+                                mediaSizeKb = mediaSizeKb
                             )
                         } else null
                     }

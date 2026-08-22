@@ -858,7 +858,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "Uninstalled",
                             true,
-                            _appList.value
+                            _appList.value,
+                            isManage = false
                         )
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
@@ -880,7 +881,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "System",
                             true,
-                            _appList.value
+                            _appList.value,
+                            isManage = false
                         )
                         _appList.value = sys
                         _uiState.value = _uiState.value.copy(
@@ -996,7 +998,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateStorageInfo() {
         val state = _uiState.value
-        val selectedApps = _appList.value.filter { it.isSelected }
+        val allApps = _appList.value
+        val selectedApps = allApps.filter { it.isSelected }
 
         val cApp = state.globalComponents.contains(1)
         val cData = state.globalComponents.contains(2)
@@ -1004,15 +1007,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val cMedia = state.globalComponents.contains(4)
         val cId = state.globalComponents.contains(5)
 
-        val count = selectedApps.size
-        var totalKb = count * 25L
-        if (cPerm) totalKb += count * 5L
-        if (cId) totalKb += count * 1L
+        var totalBackupsKb = 0L
 
-        selectedApps.forEach { app ->
-            if (cApp) totalKb += app.appSizeKb
-            if (cData) totalKb += app.dataSizeKb
-            if (cMedia) totalKb += app.mediaSizeKb
+        val selectedKb = if (state.migratorMode == MigratorMode.MANAGE) {
+            totalBackupsKb = allApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+            selectedApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+        } else {
+            val count = selectedApps.size
+            var tempKb = count * 25L
+            if (cPerm) tempKb += count * 5L
+            if (cId) tempKb += count * 1L
+
+            selectedApps.forEach { app ->
+                if (cApp) tempKb += app.appSizeKb
+                if (cData) tempKb += app.dataSizeKb
+                if (cMedia) tempKb += app.mediaSizeKb
+            }
+            tempKb
         }
 
         val targetPath =
@@ -1020,7 +1031,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val availableKb = MigratorManager.getAvailableSpaceKb(targetPath)
 
         _uiState.value = _uiState.value.copy(
-            totalRequiredKb = totalKb,
+            totalRequiredKb = selectedKb,
+            totalBackupsSizeKb = totalBackupsKb,
             availableSpaceKb = availableKb
         )
     }
@@ -1033,7 +1045,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun fetchAppsList(type: String, append: Boolean = false) {
-        _uiState.value = _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
+        _uiState.value =
+            _uiState.value.copy(isFetchingApps = true, currentAction = "Fetching apps list...")
 
         viewModelScope.launch(Dispatchers.IO) {
             val apps = MigratorManager.fetchAppsList(
@@ -1041,7 +1054,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _savedPath.value,
                 type,
                 append,
-                _appList.value
+                _appList.value,
+                isManage = _uiState.value.migratorMode == MigratorMode.MANAGE
             )
             withContext(Dispatchers.Main) {
                 _appList.value = apps
