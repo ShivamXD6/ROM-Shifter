@@ -154,7 +154,12 @@ fun MigratorMenu(viewModel: MainViewModel) {
             onDismissRequest = { showPermissionWarning = false },
             icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(28.dp)) },
             title = { Text("Permissions Required") },
-            text = { Text("ROM Shifter will automatically grant native Android permissions via root to access SMS, Call Logs, or Contacts. Do you want to continue?", style = MaterialTheme.typography.bodyLarge) },
+            text = {
+                Text(
+                    "ROM Shifter will automatically grant required native Android permissions via root to backup/restore SMS, Call Logs, or Contacts. Do you want to continue?",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            },
             confirmButton = { Button(onClick = { showPermissionWarning = false; pendingNativeAction?.let { (isBackup, flags) -> viewModel.runNativeDataOperation(context, isBackup, flags.first, flags.second, flags.third) } }) { Text("Yes, Start") } },
             dismissButton = { TextButton(onClick = { showPermissionWarning = false }) { Text("Cancel") } }
         )
