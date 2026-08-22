@@ -903,32 +903,46 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
 
-                        AnimatedContent(
-                            targetState = selectedCount,
-                            transitionSpec = {
-                                if (targetState > initialState) {
-                                    (slideInVertically { height -> height } + fadeIn()) togetherWith
-                                            (slideOutVertically { height -> -height } + fadeOut())
-                                } else {
-                                    (slideInVertically { height -> -height } + fadeIn()) togetherWith
-                                            (slideOutVertically { height -> height } + fadeOut())
-                                }
-                            },
-                            label = "CountAnimation",
-                                modifier = Modifier.weight(1f)
-                        ) { count ->
-                            Text(
-                                text = "$count Selected",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
+                        val isInsufficientSpace =
+                            appState.totalRequiredKb > appState.availableSpaceKb && (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS)
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            AnimatedContent(
+                                targetState = selectedCount,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                                (slideOutVertically { height -> -height } + fadeOut())
+                                    } else {
+                                        (slideInVertically { height -> -height } + fadeIn()) togetherWith
+                                                (slideOutVertically { height -> height } + fadeOut())
+                                    }
+                                },
+                                label = "CountAnimation"
+                            ) { count ->
+                                Text(
+                                    text = "$count Selected",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            if (selectedCount > 0 && (appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS)) {
+                                val reqSize =
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.totalRequiredKb.toString())
+                                val availSize =
+                                    build.bytes.romshifter.utils.MigratorManager.formatSize(appState.availableSpaceKb.toString())
+                                Text(
+                                    text = "Need: $reqSize | Free: $availSize",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Button(
                             onClick = { viewModel.runDynamicOperation() },
-                            enabled = selectedCount > 0,
+                            enabled = selectedCount > 0 && !isInsufficientSpace,
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (appState.migratorMode == MigratorMode.MANAGE || (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2) || (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 2)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary

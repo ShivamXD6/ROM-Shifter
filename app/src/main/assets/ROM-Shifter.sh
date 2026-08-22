@@ -399,12 +399,12 @@ do_backup() {
     if CHK 1; then
         pm list packages -f 2>/dev/null > "$AM_TMP/pm_list.txt"
     else
-        > "$AM_TMP/pm_list.txt"
+        echo "DUMMY" > "$AM_TMP/pm_list.txt"
     fi
 
     awk -v comps=" $APP_COMPS " '
     NR==FNR {
-        if ($0 == "") next
+        if ($0 == "DUMMY" || $0 == "") next
         pkg = $0; sub(/.*=/, "", pkg)
         path = $0; sub(/^package:/, "", path); sub(/=[^=]*$/, "", path)
         sub(/\/base\.apk$/, "", path)
@@ -413,7 +413,7 @@ do_backup() {
     }
     {
         split($0, a, "|"); pkg = a[1];
-        sub(/\r/, "", pkg)
+        gsub(/\r/, "", pkg)
         if(pkg == "") next
 
         if(comps ~ / 1 / && pkg in apk_dirs) print apk_dirs[pkg] "|" pkg "_app"
@@ -428,10 +428,15 @@ do_backup() {
     }' "$AM_TMP/pm_list.txt" "$TARGETS" > "$AM_TMP/paths.list"
 
     echo "INFO:STEP|MSG:Calculating total sizes..."
-    awk -F'|' '{print $1}' "$AM_TMP/paths.list" | tr '\n' '\0' | xargs -0 du -sk 2>/dev/null > "$AM_TMP/du.out"
+    if [ -s "$AM_TMP/paths.list" ]; then
+        awk -F'|' '{print $1}' "$AM_TMP/paths.list" | tr '\n' '\0' | xargs -0 du -sk 2>/dev/null > "$AM_TMP/du.out"
+    else
+        echo "0 DUMMY" > "$AM_TMP/du.out"
+    fi
 
     awk '
     NR==FNR {
+        if ($0 ~ /DUMMY$/ || $0 == "") next
         s=$1; sub(/^[0-9]+[ \t]+/, "", $0); size[$0]=s; next
     }
     {
@@ -441,10 +446,12 @@ do_backup() {
     }
     END {
         for (i in total) print i "=" total[i]
+        if (NR==0 || length(total)==0) print "DUMMY=0"
     }' "$AM_TMP/du.out" "$AM_TMP/paths.list" > "$AM_TMP/sizes.map"
 
     awk -F'|' '
     NR==FNR {
+        if ($0 ~ /^DUMMY/ || $0 == "") next
         split($0, a, "="); map[a[1]]=a[2]; next
     }
     {
@@ -470,7 +477,8 @@ do_backup() {
     while IFS='|' read -r size label pkg ver type s_app s_data s_ext s_med s_obb || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
         size=${size:-0}
-        local pct=$(( (CURRENT_APP - 1) * 100 / TOTAL_APPS ))
+        local pct=0
+        [ "$TOTAL_APPS" -gt 0 ] && pct=$(( (CURRENT_APP - 1) * 100 / TOTAL_APPS ))
 
         DO_BACKUP "$pkg" "$label" "$ver" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$pct" "$size" "$s_app" "$s_data" "$s_ext" "$s_med" "$s_obb"
     done < "$AM_TMP/selected_apps_sorted.txt"
@@ -517,7 +525,8 @@ do_restore() {
     while IFS='|' read -r size label type || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
         size=${size:-0}
-        local pct=$(( (CURRENT_APP - 1) * 100 / TOTAL_APPS ))
+        local pct=0
+        [ "$TOTAL_APPS" -gt 0 ] && pct=$(( (CURRENT_APP - 1) * 100 / TOTAL_APPS ))
 
         DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$pct" "$size"
     done < "$AM_TMP/selected_restores_sorted.txt"

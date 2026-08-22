@@ -37,15 +37,11 @@ object MigratorManager {
         uninstalledCache = null
     }
 
+    @SuppressLint("SimpleDateFormat")
     suspend fun fetchAppsList(
-        context: Context,
-        currentPath: String,
-        type: String,
-        append: Boolean,
-        currentList: List<AppInfo>,
-        isRestore: Boolean = false
+        context: Context, currentPath: String, type: String,
+        append: Boolean = false, currentList: List<AppInfo> = emptyList()
     ): List<AppInfo> = withContext(Dispatchers.IO) {
-
         if (!append) {
             when (type) {
                 "User" -> userAppsCache?.let { return@withContext it }
@@ -59,18 +55,34 @@ object MigratorManager {
         val sdf = java.text.SimpleDateFormat("hh:mm a • dd MMM, yyyy", Locale.getDefault())
 
         when (type) {
-            "User", "System", "AllInstalled" -> {
+            "User", "System", "AllInstalled", "Uninstalled" -> {
                 val sysModCmd =
                     "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/app 2>/dev/null"
                 val systemizedLabels = Shell.cmd(sysModCmd).exec().out.toSet()
 
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
-                val installedApps = pm.getInstalledApplications(0)
+                val (extDataSizes, mediaSizes) = fetchExternalSizes()
+
+                val installedApps = if (type == "Uninstalled") {
+                    pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
+                } else {
+                    pm.getInstalledApplications(0)
+                }
                 val fetchedApps = installedApps.map { app ->
                     async(Dispatchers.IO) {
                         val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        if (type == "AllInstalled" || (type == "System" && isSys) || (type == "User" && !isSys)) {
+                        val isInst = (app.flags and ApplicationInfo.FLAG_INSTALLED) != 0
+
+                        val shouldInclude = when (type) {
+                            "AllInstalled" -> isInst
+                            "System" -> isInst && isSys
+                            "User" -> isInst && !isSys
+                            "Uninstalled" -> !isInst
+                            else -> false
+                        }
+
+                        if (shouldInclude) {
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
                             val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
                             val version = try {
@@ -100,11 +112,17 @@ object MigratorManager {
                             val bTime = if (metaFile.exists()) {
                                 sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
+
+                            val stats = getDetailedPackageSizes(context, pkg)
+                            val appSizeKb = stats.first
+                            val dataSizeKb = stats.second + (extDataSizes[pkg] ?: 0L)
+                            val mediaSizeKb = mediaSizes[pkg] ?: 0L
+
+                            val totalSizeKb = appSizeKb + dataSizeKb + mediaSizeKb
+
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
 
-                            val appSize = getPackageSize(context, pkg)
-
                             AppInfo(
                                 label = label,
                                 packageName = pkg,
@@ -112,79 +130,12 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
-                                size = appSize,
-                                isSystemized = isSystemizedApp
-                            )
-                        } else {
-                            null
-                        }
-                    }
-                }.awaitAll().filterNotNull()
-                apps.addAll(fetchedApps)
-            }
-            "Uninstalled" -> {
-                val allApps = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
-                val activeApps = pm.getInstalledApplications(0).map { it.packageName }.toSet()
-                val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
-
-                val fetchedApps = allApps.map { app ->
-                    async(Dispatchers.IO) {
-                        if (!activeApps.contains(app.packageName)) {
-                            val apkExists = try {
-                                app.sourceDir != null && File(app.sourceDir).exists()
-                            } catch (_: Exception) {
-                                false
-                            }
-
-                            if (!apkExists) {
-                                return@async null
-                            }
-
-                            val isSys = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                            val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
-                            val pkg = app.packageName
-                            val version = try {
-                                val pi = pm.getPackageInfo(
-                                    app.packageName,
-                                    PackageManager.MATCH_UNINSTALLED_PACKAGES
-                                )
-                                PackageInfoCompat.getLongVersionCode(pi).toString()
-                            } catch (_: Exception) {
-                                ""
-                            }
-
-                            val iconFile = File(iconCacheDir, "${pkg}_icon.png")
-                            if (!iconFile.exists()) {
-                                try {
-                                    val rawIcon = app.loadIcon(pm)
-                                    val bitmap = getTinyBitmap(rawIcon)
-                                    if (bitmap != null) {
-                                        FileOutputStream(iconFile).use { out ->
-                                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                        }
-                                    }
-                                } catch (_: Exception) {
-                                }
-                            }
-                            val iconPath = if (iconFile.exists()) iconFile.absolutePath else null
-
-                            val metaFile =
-                                File("$currentPath/Apps/${if (isSys) "System" else "User"}/$label/Meta.txt")
-                            val bTime = if (metaFile.exists()) {
-                                sdf.format(java.util.Date(metaFile.lastModified()))
-                            } else "No backup on device"
-
-                            val appSize = getPackageSize(context, pkg)
-
-                            AppInfo(
-                                label = label,
-                                packageName = pkg,
-                                version = version,
-                                isSystem = isSys,
-                                iconPath = iconPath,
-                                backupTime = bTime,
-                                size = appSize,
-                                isInstalled = false
+                                size = formatSize(totalSizeKb.toString()),
+                                isSystemized = isSystemizedApp,
+                                appSizeKb = appSizeKb,
+                                dataSizeKb = dataSizeKb,
+                                mediaSizeKb = mediaSizeKb,
+                                isInstalled = isInst
                             )
                         } else {
                             null
@@ -197,7 +148,7 @@ object MigratorManager {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
                 val command =
-                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^TotalSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
+                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^AppSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -226,21 +177,6 @@ object MigratorManager {
                     Shell.cmd(iconScript.toString()).exec()
                 }
 
-                val backupSizes = mutableMapOf<String, String>()
-                if (appMap.isNotEmpty()) {
-                    val batchSize = 100
-                    appMap.keys.chunked(batchSize).forEach { batch ->
-                        val paths = batch.joinToString(" ") { "'$it'" }
-                        Shell.cmd("su -mm -c \"du -sk $paths 2>/dev/null\"")
-                            .exec().out.forEach { line ->
-                            val parts = line.trim().split(Regex("\\s+"), 2)
-                            if (parts.size == 2) {
-                                backupSizes[parts[1]] = formatSize(parts[0])
-                            }
-                        }
-                    }
-                }
-
                 val deferredBackups = appMap.map { (basePath, data) ->
                     async(Dispatchers.IO) {
                         val sysType = basePath.split("/").lastOrNull { it == "System" || it == "User" } ?: "User"
@@ -248,7 +184,16 @@ object MigratorManager {
                         val label = data["Name"] ?: ""
                         val pkg = data["Package"] ?: ""
                         val version = data["Version"] ?: ""
-                        val totalSizeMeta = data["TotalSize"] ?: ""
+
+                        val appSizeKb = data["AppSize"]?.toLongOrNull() ?: 0L
+                        val dataSizeKb = data["DataSize"]?.toLongOrNull() ?: 0L
+                        val extDataSizeKb = data["ExtDataSize"]?.toLongOrNull() ?: 0L
+                        val mediaSizeKb = data["MediaSize"]?.toLongOrNull() ?: 0L
+                        val obbSizeKb = data["ObbSize"]?.toLongOrNull() ?: 0L
+
+                        val totalDataKb = dataSizeKb + extDataSizeKb
+                        val totalMediaKb = mediaSizeKb + obbSizeKb
+                        val totalSizeKb = appSizeKb + totalDataKb + totalMediaKb
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")
@@ -259,12 +204,6 @@ object MigratorManager {
                             val bTime = if (metaFile.exists()) {
                                 sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
-
-                            val backupSize = if (isRestore && totalSizeMeta.isNotBlank()) {
-                                formatSize(totalSizeMeta)
-                            } else {
-                                backupSizes[basePath] ?: ""
-                            }
 
                             val isInst = try {
                                 pm.getPackageInfo(pkg, 0); true
@@ -279,8 +218,11 @@ object MigratorManager {
                                 isSystem = isSys,
                                 iconPath = iconPath,
                                 backupTime = bTime,
-                                size = backupSize,
-                                isInstalled = isInst
+                                size = formatSize(totalSizeKb.toString()),
+                                isInstalled = isInst,
+                                appSizeKb = appSizeKb,
+                                dataSizeKb = totalDataKb,
+                                mediaSizeKb = totalMediaKb
                             )
                         } else null
                     }
@@ -304,19 +246,6 @@ object MigratorManager {
         return@withContext finalApps
     }
 
-    private fun getAvailableSpaceKb(path: String): Long {
-        return try {
-            var file: File? = File(path)
-            while (file != null && !file.exists()) {
-                file = file.parentFile
-            }
-            val stat = android.os.StatFs(file?.absolutePath ?: "/")
-            (stat.availableBlocksLong * stat.blockSizeLong) / 1024
-        } catch (_: Exception) {
-            0L
-        }
-    }
-
     @SuppressLint("SdCardPath")
     suspend fun runDynamicOperation(
         context: Context, state: AppState, selectedApps: List<AppInfo>, currentPath: String,
@@ -331,82 +260,6 @@ object MigratorManager {
 
         try {
             val isRestore = state.migratorMode.name.contains("RESTORE")
-
-            updateProgress("", "Checking available storage...", -1)
-            val bufferKb = 51200L
-            try {
-                if (isRestore) {
-                    val paths = selectedApps.joinToString(" ") { app ->
-                        val sysType = if (app.isSystem) "System" else "User"
-                        "\"$currentPath/Apps/$sysType/${app.label}/Meta.txt\""
-                    }
-                    val sizeCmd =
-                        "su -mm -c \"grep \\\"^TotalSize=\\\" $paths 2>/dev/null | cut -d= -f2 | awk '{s+=$1} END {print s+0}'\""
-                    val totalRequiredKb =
-                        Shell.cmd(sizeCmd).exec().out.firstOrNull()?.toLongOrNull() ?: 0L
-
-                    val availableKb = getAvailableSpaceKb("/data")
-                    if (availableKb < (totalRequiredKb + bufferKb)) {
-                        withContext(Dispatchers.Main) {
-                            onComplete(
-                                "Insufficient Space",
-                                "Need: ${formatSize((totalRequiredKb + bufferKb).toString())} | Available: ${
-                                    formatSize(availableKb.toString())
-                                }"
-                            )
-                        }
-                        return@withContext
-                    }
-                } else if (state.migratorMode == MigratorMode.BACKUP_APPS) {
-                    val cApp = state.globalComponents.contains(1)
-                    val cData = state.globalComponents.contains(2)
-                    val cMedia = state.globalComponents.contains(4)
-
-                    val pathsToSize = mutableListOf<String>()
-                    selectedApps.forEach { app ->
-                        val pkg = app.packageName
-                        if (cApp) {
-                            val apkPath = Shell.cmd("pm path $pkg").exec().out.firstOrNull()
-                                ?.removePrefix("package:")
-                            if (!apkPath.isNullOrBlank()) pathsToSize.add(
-                                File(apkPath).parent ?: ""
-                            )
-                        }
-                        if (cData) {
-                            pathsToSize.add("/data/data/$pkg")
-                            pathsToSize.add("/data/user_de/0/$pkg")
-                            pathsToSize.add("/data/media/0/Android/data/$pkg")
-                        }
-                        if (cMedia) {
-                            pathsToSize.add("/data/media/0/Android/media/$pkg")
-                            pathsToSize.add("/data/media/0/Android/obb/$pkg")
-                        }
-                    }
-
-                    val sizeCmd = "su -mm -c \"du -sk ${
-                        pathsToSize.filter { it.isNotBlank() }.joinToString(" ")
-                    } 2>/dev/null | awk '{s+=$1} END {print s+0}'\""
-                    val totalSourceKb =
-                        Shell.cmd(sizeCmd).exec().out.firstOrNull()?.toLongOrNull() ?: 0L
-
-                    val estimatedCompressedKb = (totalSourceKb * 0.75).toLong()
-                    val availableKb = getAvailableSpaceKb(currentPath)
-
-                    if (availableKb < (estimatedCompressedKb + bufferKb)) {
-                        withContext(Dispatchers.Main) {
-                            onComplete(
-                                "Insufficient Space",
-                                "Need: ${formatSize((estimatedCompressedKb + bufferKb).toString())} | Available: ${
-                                    formatSize(availableKb.toString())
-                                }"
-                            )
-                        }
-                        return@withContext
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
 
             if (state.migratorMode == MigratorMode.MANAGE) {
                 val baseDir = File(currentPath)
@@ -459,7 +312,6 @@ object MigratorManager {
                     )
                     if (cId) {
                         try {
-                            val sysType = if (app.isSystem) "System" else "User"
                             val metaPath = "$currentPath/Apps/$sysType/${app.label}/Meta.txt"
                             val hasAndId = Shell.cmd("grep -q '^SSAID=' \"$metaPath\" && echo YES")
                                 .exec().out.joinToString("").trim() == "YES"
@@ -630,16 +482,20 @@ object MigratorManager {
         }
     }
 
-    private fun formatSize(kbString: String): String {
-        val kb = kbString.toLongOrNull() ?: return "$kbString KB"
-        return when {
-            kb >= 1048576 -> String.format(Locale.US, "%.2f GB", kb / 1048576.0)
-            kb >= 1024 -> String.format(Locale.US, "%.2f MB", kb / 1024.0)
-            else -> "$kb KB"
+    fun getAvailableSpaceKb(path: String): Long {
+        return try {
+            var file: File? = File(path)
+            while (file != null && !file.exists()) {
+                file = file.parentFile
+            }
+            val stat = android.os.StatFs(file?.absolutePath ?: "/")
+            (stat.availableBlocksLong * stat.blockSizeLong) / 1024
+        } catch (_: Exception) {
+            0L
         }
     }
 
-    private fun getPackageSize(context: Context, packageName: String): String {
+    private fun getDetailedPackageSizes(context: Context, packageName: String): Pair<Long, Long> {
         return try {
             val storageStatsManager =
                 context.getSystemService(Context.STORAGE_STATS_SERVICE) as StorageStatsManager
@@ -648,10 +504,51 @@ object MigratorManager {
                 packageName,
                 android.os.Process.myUserHandle()
             )
-            val totalBytes = stats.appBytes + stats.dataBytes + stats.cacheBytes
-            formatSize((totalBytes / 1024).toString())
+
+            val appSize = stats.appBytes / 1024
+            val dataSize = (stats.dataBytes + stats.cacheBytes) / 1024
+
+            appSize to dataSize
         } catch (_: Exception) {
-            ""
+            0L to 0L
+        }
+    }
+
+    private fun fetchExternalSizes(): Pair<Map<String, Long>, Map<String, Long>> {
+        val dataSizes = mutableMapOf<String, Long>()
+        val mediaSizes = mutableMapOf<String, Long>()
+
+        val outData =
+            Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/data/* 2>/dev/null\"").exec().out
+        outData.forEach { line ->
+            val parts = line.trim().split(Regex("\\s+"), 2)
+            if (parts.size == 2) {
+                val size = parts[0].toLongOrNull() ?: 0L
+                val pkg = parts[1].split("/").lastOrNull() ?: ""
+                if (pkg.isNotEmpty()) dataSizes[pkg] = size
+            }
+        }
+
+        val outMedia =
+            Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/media/* /data/media/0/Android/obb/* 2>/dev/null\"")
+                .exec().out
+        outMedia.forEach { line ->
+            val parts = line.trim().split(Regex("\\s+"), 2)
+            if (parts.size == 2) {
+                val size = parts[0].toLongOrNull() ?: 0L
+                val pkg = parts[1].split("/").lastOrNull() ?: ""
+                if (pkg.isNotEmpty()) mediaSizes[pkg] = (mediaSizes[pkg] ?: 0L) + size
+            }
+        }
+        return dataSizes to mediaSizes
+    }
+
+    fun formatSize(kbString: String): String {
+        val kb = kbString.toLongOrNull() ?: return "$kbString KB"
+        return when {
+            kb >= 1048576 -> String.format(Locale.US, "%.2f GB", kb / 1048576.0)
+            kb >= 1024 -> String.format(Locale.US, "%.2f MB", kb / 1024.0)
+            else -> "$kb KB"
         }
     }
 }

@@ -15,7 +15,10 @@ data class AppInfo(
     val backupTime: String = "",
     val size: String = "",
     val isInstalled: Boolean = true,
-    val isSystemized: Boolean = false
+    val isSystemized: Boolean = false,
+    val appSizeKb: Long = 0,
+    val dataSizeKb: Long = 0,
+    val mediaSizeKb: Long = 0
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)
@@ -53,5 +56,7 @@ data class AppState(
     val flashFormatData: Boolean = false,
     val isProcessingZips: Boolean = false,
     val hasLockscreen: Boolean = false,
-    val flashRebootOption: String = "system"
+    val flashRebootOption: String = "system",
+    val totalRequiredKb: Long = 0,
+    val availableSpaceKb: Long = 0
 )

@@ -690,6 +690,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .exec()
             _savedPath.value = newPath
             BackendInstaller.backupSelf(getApplication(), newPath)
+            updateStorageInfo()
             withContext(Dispatchers.Main) { onSuccess() }
         }
     }
@@ -857,8 +858,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "Uninstalled",
                             true,
-                            _appList.value,
-                            isRestore = false
+                            _appList.value
                         )
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
@@ -880,8 +880,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _savedPath.value,
                             "System",
                             true,
-                            _appList.value,
-                            isRestore = false
+                            _appList.value
                         )
                         _appList.value = sys
                         _uiState.value = _uiState.value.copy(
@@ -946,6 +945,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = _uiState.value.globalComponents.toMutableSet()
         if (current.contains(id)) current.remove(id) else current.add(id)
         _uiState.value = _uiState.value.copy(globalComponents = current)
+        updateStorageInfo()
     }
 
     fun toggleAppSelection(packageName: String) {
@@ -955,6 +955,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentList[index] =
                 currentList[index].copy(isSelected = !currentList[index].isSelected)
             _appList.value = currentList
+            updateStorageInfo()
         }
     }
 
@@ -981,6 +982,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else app
         }
         _appList.value = updatedList
+        updateStorageInfo()
     }
 
     fun selectAllVisibleApps(select: Boolean, visibleApps: List<AppInfo>) {
@@ -989,6 +991,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (visiblePackageNames.contains(it.packageName)) it.copy(isSelected = select) else it
         }
         _appList.value = updatedList
+        updateStorageInfo()
+    }
+
+    fun updateStorageInfo() {
+        val state = _uiState.value
+        val selectedApps = _appList.value.filter { it.isSelected }
+
+        val cApp = state.globalComponents.contains(1)
+        val cData = state.globalComponents.contains(2)
+        val cPerm = state.globalComponents.contains(3)
+        val cMedia = state.globalComponents.contains(4)
+        val cId = state.globalComponents.contains(5)
+
+        val count = selectedApps.size
+        var totalKb = count * 25L
+        if (cPerm) totalKb += count * 5L
+        if (cId) totalKb += count * 1L
+
+        selectedApps.forEach { app ->
+            if (cApp) totalKb += app.appSizeKb
+            if (cData) totalKb += app.dataSizeKb
+            if (cMedia) totalKb += app.mediaSizeKb
+        }
+
+        val targetPath =
+            if (state.migratorMode == MigratorMode.RESTORE_APPS) "/data" else _savedPath.value
+        val availableKb = MigratorManager.getAvailableSpaceKb(targetPath)
+
+        _uiState.value = _uiState.value.copy(
+            totalRequiredKb = totalKb,
+            availableSpaceKb = availableKb
+        )
     }
 
     fun clearLogs() {
@@ -1007,14 +1041,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _savedPath.value,
                 type,
                 append,
-                _appList.value,
-                isRestore = _uiState.value.migratorMode == MigratorMode.RESTORE_APPS
+                _appList.value
             )
             withContext(Dispatchers.Main) {
                 _appList.value = apps
                 _uiState.value = _uiState.value.copy(
                     isFetchingApps = false,
                 )
+                updateStorageInfo()
                 if (type == "System" || type == "RestoreSystem" || type == "AllBackups") {
                     _uiState.value = _uiState.value.copy(systemAppsFetched = true)
                 }
