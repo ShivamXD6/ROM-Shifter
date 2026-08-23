@@ -37,56 +37,34 @@ FORMAT_SIZE() {
 READID() { grep "package=\"$1\"" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null | sed -n 's/.*value="\([^"]*\)".*/\1/p'; }
 CHANID() { sed -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
 GETPERM() {
-    > "$2"
-    { dumpsys package "$1" 2>/dev/null; echo "---APPOPS---"; cmd appops get "$1" 2>/dev/null; } | awk '
-        BEGIN { mode = "pm" }
-        /^---APPOPS---$/ { mode = "appops"; next }
-
-        mode == "pm" {
-            if ($0 ~ /runtime permissions:/) { in_perms=1; next }
-            if ($0 ~ /^[ \t]*[A-Za-z0-9_]+:/ && !($0 ~ /runtime permissions:/)) { in_perms=0 }
-
-            if (in_perms && $1 ~ /^[A-Za-z0-9_]+\.[A-Za-z0-9_.]+:/) {
-                split($1, a, ":")
-                perm = a[1]
-                granted = "false"
-                if ($0 ~ /granted=true/) granted = "true"
-
-                print "PERM:" perm "=" granted
-
-                n = split(perm, b, ".")
-                seen_pm[b[n]] = 1
-            }
-        }
-
-        mode == "appops" {
-            if ($1 ~ /^[ \t]*[A-Za-z0-9_]+:/) {
-                split($0, parts, ":")
-                op = parts[1]; sub(/^[ \t]+/, "", op)
-
-                if (op == "Uid mode") next
-
-                val = parts[2]; sub(/^[ \t]+/, "", val); sub(/;.*$/, "", val); sub(/[ \t]+$/, "", val)
-
-                if (op != "" && !seen_op[op]++ && !seen_pm[op]) {
-                    print "APPOP:" op "=" val
+    local pkg="$1" out="$2"
+    {
+        dumpsys package "$pkg" 2>/dev/null | awk '
+            /runtime permissions:/,/(requested|install) permissions:/ {
+                if ($0 ~ /granted=true/) {
+                    split($1, a, ":")
+                    print "PERM:" a[1] "=true"
+                } else if ($0 ~ /granted=false/) {
+                    split($1, a, ":")
+                    print "PERM:" a[1] "=false"
                 }
             }
-        }
-    ' > "$2"
+        '
+        cmd appops get "$pkg" 2>/dev/null | awk -F': ' '
+            /:/ && !/Uid mode/ {
+                op = $1; sub(/^[ \t]+/, "", op)
+                val = $2; sub(/; .*/, "", val)
+                print "APPOP:" op "=" val
+            }
+        '
+    } > "$out" &
 }
 
 SETPERM() {
-    awk -v pkg="$1" -F':' '
-        /^PERM:/ {
-            split($2, p, "=")
-            if (p[2] == "true") print "cmd package grant " pkg " " p[1] " >/dev/null 2>&1"
-            else print "cmd package revoke " pkg " " p[1] " >/dev/null 2>&1"
-        }
-        /^APPOP:/ {
-            split($2, p, "=")
-            print "cmd appops set " pkg " " p[1] " " p[2] " >/dev/null 2>&1"
-        }
+    [ -f "$2" ] || return
+    awk -v pkg="$1" -F'[:=]' '
+        /^PERM:/ { print "cmd package " ($3=="true"?"grant ":"revoke ") pkg " " $2 " >/dev/null 2>&1" }
+        /^APPOP:/ { print "cmd appops set " pkg " " $2 " " $3 " >/dev/null 2>&1" }
     ' "$2" | sh &
 }
 
@@ -259,7 +237,7 @@ DO_RESTORE() {
         if ! PKG_INSTALLED "$PKG" "$VCODE"; then
             "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
             chmod -R 777 "$TMP_PKG" 2>/dev/null
-            local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort)
+            local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort | tr '\n' ' ')
             if [ -n "$apks_to_install" ]; then
                 local SESSION_ID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')
                 if [ -n "$SESSION_ID" ]; then
@@ -291,34 +269,27 @@ DO_RESTORE() {
             ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
             ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
         }
-        CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); CUR_DATA=${CUR_DATA:-0}; CUR_EXT=$(cat "$TMP_SIZES/ext" 2>/dev/null); CUR_EXT=${CUR_EXT:-0}; CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); CUR_MED=${CUR_MED:-0}; CUR_OBB=$(cat "$TMP_SIZES/obb" 2>/dev/null); CUR_OBB=${CUR_OBB:-0}
+        CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); s_ext=$(cat "$TMP_SIZES/ext" 2>/dev/null)
+        CUR_DATA=$(( ${CUR_DATA:-0} + ${s_ext:-0} ))
+
+        CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); s_obb=$(cat "$TMP_SIZES/obb" 2>/dev/null)
+        CUR_MED=$(( ${CUR_MED:-0} + ${s_obb:-0} ))
+
         rm -rf "$TMP_SIZES"
     fi
 
     if CHK 2; then
-        if { [ -f "$APP_DIR/Data.shift" ] || [ -f "$APP_DIR/UserDe.shift" ]; }; then
-            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-                [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
-                [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
-            fi
-        fi
-        if [ -f "$APP_DIR/ExtData.shift" ]; then
-            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_EXT" != "$OLD_EXT" ]; then
-                UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
-            fi
+        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
+            [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
+            [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
+            [ -f "$APP_DIR/ExtData.shift" ] && UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
         fi
     fi
 
     if CHK 4; then
-        if [ -f "$APP_DIR/Media.shift" ]; then
-            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
-                UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
-            fi
-        fi
-        if [ -f "$APP_DIR/Obb.shift" ]; then
-            if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_OBB" != "$OLD_OBB" ]; then
-                UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
-            fi
+        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
+            [ -f "$APP_DIR/Media.shift" ] && UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
+            [ -f "$APP_DIR/Obb.shift" ] && UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
         fi
     fi
 
