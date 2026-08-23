@@ -106,7 +106,7 @@
   * This results in backup sizes around 3% smaller for a single app and 15%+ smaller for bulk
     backups.
 * Use Auto Select to automatically select apps that have already backup.
-* Toggle between User Apps and System Apps to show or hide them.
+* Toggle System Apps to show or hide them.
 * Useful before a clean ROM installation or when moving to another ROM.
 
 </details>
@@ -141,7 +141,7 @@
 * Installs restored apps with Google Play Store as the installer source to prevent crashes in apps
   such as Airtel.
 * Use Auto Select to automatically select apps that have not been restored yet.
-* Toggle between User Apps and System Apps to show or hide them.
+* Toggle System Apps to show or hide them.
 
 </details>
 
@@ -170,7 +170,7 @@
 *Browse, manage, and delete existing app and native backups to keep your storage organized.*
 
 * Use Auto Select to automatically select apps that have already been restored.
-* Toggle between User Apps and System Apps to show or hide them.
+* Toggle System Apps to show or hide them.
 
 </details>
 
@@ -188,11 +188,8 @@
 * Select individual apps or multiple apps at once.
 * Choose between User Apps and System Apps.
 * Use Auto Select to automatically select apps that have already been backed up.
-* Toggle User Apps or System Apps to show or hide them.
+* Toggle System Apps to show or hide them.
 * Enable Restore to bring back previously debloated system apps.
-* Enable Force Delete to permanently remove an app from its system directory.
-
-  * ⚠️ This is destructive and cannot be restored through ROM Shifter.
 * Useful for removing vendor bloatware and unnecessary system packages after installing a ROM.
 
 </details>

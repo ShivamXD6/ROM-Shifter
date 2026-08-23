@@ -7,8 +7,7 @@ BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-JOBS=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || nproc 2>/dev/null || echo 4)
-CORES_TO_USE=$((JOBS > 2 ? JOBS - 2 : 1))
+JOBS=$(( $(nproc --all) > 6 ? 3 : 2 ))
 
 init_shifter() {
      mkdir -p "$BIN_DIR" "$AM_TMP"
@@ -110,12 +109,12 @@ PKG_INSTALLED() {
     return 0
 }
 BUNDAPP() {
-    COOLDOWN "$CORES_TO_USE"
+    COOLDOWN "$JOBS"
     tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
 }
 
 UNBUNDAPP() {
-    COOLDOWN "$CORES_TO_USE"
+    COOLDOWN "$JOBS"
     "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
 }
 
