@@ -80,8 +80,8 @@ SETPERM() {
     awk -v pkg="$1" -F':' '
         /^PERM:/ {
             split($2, p, "=")
-            if (p[2] == "true") print "pm grant " pkg " " p[1] " >/dev/null 2>&1"
-            else print "pm revoke " pkg " " p[1] " >/dev/null 2>&1"
+            if (p[2] == "true") print "cmd package grant " pkg " " p[1] " >/dev/null 2>&1"
+            else print "cmd package revoke " pkg " " p[1] " >/dev/null 2>&1"
         }
         /^APPOP:/ {
             split($2, p, "=")
@@ -100,9 +100,9 @@ FIND_BLOCK() {
 }
 
 PKG_INSTALLED() {
-    pm list packages | grep -q "^package:$1$" || return 1
+    cmd package list packages | grep -q "^package:$1$" || return 1
     [ -z "$2" ] && return 0
-    local apkpath="$(pm path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n 1 | tr -d '\r')"
+    local apkpath="$(cmd package path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n 1 | tr -d '\r')"
     [ -z "$apkpath" ] && return 1
     local inst_ver=$(dumpsys package "$1" | grep -m1 "versionCode=" | sed 's/.*versionCode=\([0-9]*\).*/\1/')
     [ "$inst_ver" = "$2" ] || return 1
@@ -154,7 +154,7 @@ DO_BACKUP() {
 
     if CHK 1; then
         if [ "$CUR_APP" != "$OLD_APP" ] || [ ! -f "$APP_DIR/App.shift" ]; then
-            apks="$(pm path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
+            apks="$(cmd package path "$PKG" 2>/dev/null | sed 's/^package://' | tr -d '\r')"
             [ -n "$apks" ] && echo "$apks" | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
             OLD_APP=$CUR_APP
         fi
@@ -288,7 +288,7 @@ DO_RESTORE() {
         fi
     fi
 
-    pm disable "$PKG" >/dev/null 2>&1
+    cmd package disable "$PKG" >/dev/null 2>&1
     NEW_UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
     [ -z "$NEW_UID" ] && NEW_UID=$(dumpsys package "$PKG" | grep -m1 "userId=" | cut -d= -f2 | awk '{print $1}')
 
@@ -387,7 +387,7 @@ DO_RESTORE() {
         fi
         DELGMS "$PKG"
     fi
-    pm enable "$PKG" >/dev/null 2>&1; rm -rf "$TMP_PKG"
+    cmd package enable "$PKG" >/dev/null 2>&1; rm -rf "$TMP_PKG"
     echo "ACTION:RESTORE_DONE|PKG:$PKG"
 }
 
@@ -515,7 +515,7 @@ do_restore() {
     TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores_sorted.txt")
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
 
-    pm disable com.android.vending >/dev/null 2>&1
+    cmd package disable com.android.vending >/dev/null 2>&1
     settings put global verifier_verify_adb_installs 0
     setprop pm.dexopt.install assume-verified
     setprop pm.dexopt.install-bulk assume-verified
@@ -530,7 +530,7 @@ do_restore() {
         DO_RESTORE "$label" "$type" "$CURRENT_APP" "$TOTAL_APPS" "$pct" "$size"
     done < "$AM_TMP/selected_restores_sorted.txt"
 
-    pm enable com.android.vending >/dev/null 2>&1
+    cmd package enable com.android.vending >/dev/null 2>&1
     settings put global verifier_verify_adb_installs 1
     setprop pm.dexopt.install speed-profile
     setprop pm.dexopt.install-bulk speed-profile
@@ -542,8 +542,8 @@ do_restore() {
 
 do_remove() {
     local PKG="$1"
-    pm uninstall "$PKG" >/dev/null 2>&1
-    pm uninstall --user 0 "$PKG" >/dev/null 2>&1
+    cmd package uninstall "$PKG" >/dev/null 2>&1
+    cmd package uninstall --user 0 "$PKG" >/dev/null 2>&1
 }
 
 do_restore_debloat() {
@@ -563,7 +563,7 @@ do_systemize() {
     mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
     mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
 
-    local APK_PATH=$(pm path "$PKG" | sed 's/^package://' | head -n 1 | tr -d '\r')
+    local APK_PATH=$(cmd package path "$PKG" | sed 's/^package://' | head -n 1 | tr -d '\r')
 
     if [ -n "$APK_PATH" ]; then
         local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
