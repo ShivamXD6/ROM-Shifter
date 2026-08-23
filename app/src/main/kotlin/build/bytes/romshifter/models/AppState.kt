@@ -19,7 +19,9 @@ data class AppInfo(
     val appSizeKb: Long = 0,
     val dataSizeKb: Long = 0,
     val mediaSizeKb: Long = 0,
-    val diskSizeKb: Long = 0
+    val diskSizeKb: Long = 0,
+    val versionCode: Long = 0,
+    val apkPath: String? = null
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)
@@ -59,5 +61,6 @@ data class AppState(
     val flashRebootOption: String = "system",
     val totalRequiredKb: Long = 0,
     val totalBackupsSizeKb: Long = 0,
-    val availableSpaceKb: Long = 0
+    val storageUsedKb: Long = 0,
+    val storageFreeKb: Long = 0
 )

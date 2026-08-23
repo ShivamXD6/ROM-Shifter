@@ -863,7 +863,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 (appState.migratorMode == MigratorMode.SYSTEMIZE && appState.actionFilterState == 2)
 
                         val isInsufficientSpace =
-                            appState.totalRequiredKb > appState.availableSpaceKb && isNeedFreeMode
+                            appState.totalRequiredKb > appState.storageFreeKb && isNeedFreeMode
 
                         Column(modifier = Modifier.weight(1f)) {
                             AnimatedContent(
@@ -890,21 +890,21 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     build.bytes.romshifter.utils.MigratorManager.formatSize(
                                         appState.totalRequiredKb.toString()
                                     )
-                                val availSize =
+                                val freeSize =
                                     build.bytes.romshifter.utils.MigratorManager.formatSize(
-                                        appState.availableSpaceKb.toString()
+                                        appState.storageFreeKb.toString()
                                     )
                                 Text(
                                     text = buildAnnotatedString {
                                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                            append("Now: ")
-                                        }
-                                        append(availSize)
-                                        append(" | ")
-                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                                             append("Need: ")
                                         }
                                         append(reqSize)
+                                        append(" | ")
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append("Free: ")
+                                        }
+                                        append(freeSize)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isInsufficientSpace) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
@@ -914,19 +914,19 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                     build.bytes.romshifter.utils.MigratorManager.formatSize(
                                         appState.totalRequiredKb.toString()
                                     )
-                                val freeSize =
+                                val usedSize =
                                     build.bytes.romshifter.utils.MigratorManager.formatSize(
-                                        appState.availableSpaceKb.toString()
+                                        appState.storageUsedKb.toString()
                                     )
                                 Text(
                                     text = buildAnnotatedString {
                                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                            append("Now: ")
+                                            append("Used: ")
                                         }
-                                        append(freeSize)
+                                        append(usedSize)
                                         append(" | ")
                                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                                            append("May Free: ")
+                                            append("Free Up: ")
                                         }
                                         append(selSize)
                                     },

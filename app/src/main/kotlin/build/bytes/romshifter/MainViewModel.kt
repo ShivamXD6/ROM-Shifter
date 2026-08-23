@@ -1034,12 +1034,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 state.migratorMode == MigratorMode.DEBLOAT ||
                 state.migratorMode == MigratorMode.SYSTEMIZE
             ) "/data" else _savedPath.value
-        val availableKb = MigratorManager.getAvailableSpaceKb(targetPath)
+
+        val freeKb = MigratorManager.getAvailableSpaceKb(targetPath)
+        val totalKb = MigratorManager.getTotalSpaceKb(targetPath)
+        val usedKb = if (totalKb > freeKb) totalKb - freeKb else 0L
 
         _uiState.value = _uiState.value.copy(
             totalRequiredKb = selectedKb,
             totalBackupsSizeKb = totalBackupsKb,
-            availableSpaceKb = availableKb
+            storageUsedKb = usedKb,
+            storageFreeKb = freeKb
         )
     }
 

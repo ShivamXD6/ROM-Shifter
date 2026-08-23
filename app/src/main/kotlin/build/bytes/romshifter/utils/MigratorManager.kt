@@ -86,11 +86,15 @@ object MigratorManager {
                         if (shouldInclude) {
                             val label = app.loadLabel(pm).toString().replace("|", "").replace("\n", "").trim()
                             val pkg = app.packageName.replace("|", "").replace("\n", "").trim()
-                            val version = try {
+                            var version = ""
+                            var vCode = 0L
+                            val aPath = app.sourceDir
+
+                            try {
                                 val pi = pm.getPackageInfo(app.packageName, 0)
-                                PackageInfoCompat.getLongVersionCode(pi).toString()
+                                version = pi.versionName ?: ""
+                                vCode = PackageInfoCompat.getLongVersionCode(pi)
                             } catch (_: Exception) {
-                                ""
                             }
 
                             val iconFile = File(iconCacheDir, "${pkg}_icon.png")
@@ -137,7 +141,9 @@ object MigratorManager {
                                 appSizeKb = appSizeKb,
                                 dataSizeKb = dataSizeKb,
                                 mediaSizeKb = mediaSizeKb,
-                                isInstalled = isInst
+                                isInstalled = isInst,
+                                versionCode = vCode,
+                                apkPath = aPath
                             )
                         } else {
                             null
@@ -150,7 +156,7 @@ object MigratorManager {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
                 val command =
-                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^AppSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
+                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^VersionCode=\" -e \"^AppSize=\" -e \"^DataExtSize=\" -e \"^MediaOBBSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -200,6 +206,7 @@ object MigratorManager {
                         val label = data["Name"] ?: ""
                         val pkg = data["Package"] ?: ""
                         val version = data["Version"] ?: ""
+                        val vCode = data["VersionCode"]?.toLongOrNull() ?: 0L
 
                         val appSizeKb: Long
                         val dataSizeKb: Long
@@ -211,14 +218,19 @@ object MigratorManager {
                             mediaSizeKb = 0
                         } else {
                             val aSize = data["AppSize"]?.toLongOrNull() ?: 0L
-                            val dSize = data["DataSize"]?.toLongOrNull() ?: 0L
-                            val eSize = data["ExtDataSize"]?.toLongOrNull() ?: 0L
-                            val mSize = data["MediaSize"]?.toLongOrNull() ?: 0L
-                            val oSize = data["ObbSize"]?.toLongOrNull() ?: 0L
+
+                            // Try new keys first, fallback to old keys
+                            val deSize = data["DataExtSize"]?.toLongOrNull()
+                                ?: ((data["DataSize"]?.toLongOrNull()
+                                    ?: 0L) + (data["ExtDataSize"]?.toLongOrNull() ?: 0L))
+
+                            val moSize = data["MediaOBBSize"]?.toLongOrNull()
+                                ?: ((data["MediaSize"]?.toLongOrNull()
+                                    ?: 0L) + (data["ObbSize"]?.toLongOrNull() ?: 0L))
 
                             appSizeKb = aSize
-                            dataSizeKb = dSize + eSize
-                            mediaSizeKb = mSize + oSize
+                            dataSizeKb = deSize
+                            mediaSizeKb = moSize
                         }
 
                         val displaySizeKb =
@@ -251,7 +263,8 @@ object MigratorManager {
                                 isInstalled = isInst,
                                 appSizeKb = appSizeKb,
                                 dataSizeKb = dataSizeKb,
-                                mediaSizeKb = mediaSizeKb
+                                mediaSizeKb = mediaSizeKb,
+                                versionCode = vCode
                             )
                         } else null
                     }
@@ -388,7 +401,7 @@ object MigratorManager {
 
             val targetData = selectedApps.joinToString("\n") { app ->
                 val sysType = if (app.isSystem) "System" else "User"
-                "${app.packageName}|${app.label}|${app.version}|$sysType"
+                "${app.packageName}|${app.label}|${app.version}|${app.versionCode}|$sysType|${app.apkPath ?: ""}|${app.appSizeKb}|${app.dataSizeKb}|${app.mediaSizeKb}"
             } + "\n"
 
             val targetFile = File(context.cacheDir, "shifter_targets.txt")
@@ -519,6 +532,19 @@ object MigratorManager {
             }
             val stat = android.os.StatFs(file?.absolutePath ?: "/")
             (stat.availableBlocksLong * stat.blockSizeLong) / 1024
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+    fun getTotalSpaceKb(path: String): Long {
+        return try {
+            var file: File? = File(path)
+            while (file != null && !file.exists()) {
+                file = file.parentFile
+            }
+            val stat = android.os.StatFs(file?.absolutePath ?: "/")
+            (stat.blockCountLong * stat.blockSizeLong) / 1024
         } catch (_: Exception) {
             0L
         }
