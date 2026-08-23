@@ -357,7 +357,7 @@ DO_RESTORE() {
     fi
 
     if CHK 3 && [ -f "$APP_DIR/Permissions.txt" ]; then
-        SETPERM "$PKG" "$APP_DIR/Permissions.txt"
+        SETPERM "$PKG" "$APP_DIR/Permissions.txt" &
     fi
 
     if [ -n "$NEW_UID" ]; then
