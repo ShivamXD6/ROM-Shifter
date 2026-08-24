@@ -118,6 +118,28 @@ object MigratorManager {
                                 sdf.format(java.util.Date(metaFile.lastModified()))
                             } else "No backup on device"
 
+                            val availInBackup = mutableSetOf<Int>()
+                            if (metaFile.exists()) {
+                                val appDir = metaFile.parentFile
+                                if (File(appDir, "App.shift").exists()) availInBackup.add(1)
+                                if (File(appDir, "Data.shift").exists() || File(
+                                        appDir,
+                                        "ExtData.shift"
+                                    ).exists() || File(appDir, "UserDe.shift").exists()
+                                ) availInBackup.add(2)
+                                if (File(appDir, "Permissions.txt").exists()) availInBackup.add(3)
+                                if (File(appDir, "Media.shift").exists() || File(
+                                        appDir,
+                                        "Obb.shift"
+                                    ).exists()
+                                ) availInBackup.add(4)
+
+                                val hasSsaid =
+                                    Shell.cmd("grep -q '^SSAID=' \"${metaFile.absolutePath}\" && echo YES")
+                                        .exec().out.joinToString("").trim() == "YES"
+                                if (hasSsaid) availInBackup.add(5)
+                            }
+
                             val stats = getDetailedPackageSizes(context, pkg)
                             val appSizeKb = stats.first
                             val dataSizeKb = stats.second + (extDataSizes[pkg] ?: 0L)
@@ -143,7 +165,8 @@ object MigratorManager {
                                 mediaSizeKb = mediaSizeKb,
                                 isInstalled = isInst,
                                 versionCode = vCode,
-                                apkPath = aPath
+                                apkPath = aPath,
+                                availableInBackup = availInBackup
                             )
                         } else {
                             null
@@ -156,7 +179,7 @@ object MigratorManager {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
                 val command =
-                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^VersionCode=\" -e \"^AppSize=\" -e \"^DataExtSize=\" -e \"^MediaOBBSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
+                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^VersionCode=\" -e \"^AppSize=\" -e \"^DataExtSize=\" -e \"^MediaOBBSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" -e \"^SSAID=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -252,6 +275,22 @@ object MigratorManager {
                                 false
                             }
 
+                            val availInBackup = mutableSetOf<Int>()
+                            val appDir = metaFile.parentFile
+                            if (File(appDir, "App.shift").exists()) availInBackup.add(1)
+                            if (File(appDir, "Data.shift").exists() || File(
+                                    appDir,
+                                    "ExtData.shift"
+                                ).exists() || File(appDir, "UserDe.shift").exists()
+                            ) availInBackup.add(2)
+                            if (File(appDir, "Permissions.txt").exists()) availInBackup.add(3)
+                            if (File(appDir, "Media.shift").exists() || File(
+                                    appDir,
+                                    "Obb.shift"
+                                ).exists()
+                            ) availInBackup.add(4)
+                            if (data.containsKey("SSAID")) availInBackup.add(5)
+
                             AppInfo(
                                 label = label,
                                 packageName = pkg,
@@ -264,7 +303,8 @@ object MigratorManager {
                                 appSizeKb = appSizeKb,
                                 dataSizeKb = dataSizeKb,
                                 mediaSizeKb = mediaSizeKb,
-                                versionCode = vCode
+                                versionCode = vCode,
+                                availableInBackup = availInBackup
                             )
                         } else null
                     }
@@ -326,11 +366,6 @@ object MigratorManager {
                 return@withContext
             }
 
-            val cApp = state.globalComponents.contains(1)
-            val cData = state.globalComponents.contains(2)
-            val cPerm = state.globalComponents.contains(3)
-            val cMedia = state.globalComponents.contains(4)
-            val cId = state.globalComponents.contains(5)
             val appPartsMap = mutableMapOf<String, String>()
 
             if (isRestore) {
@@ -343,16 +378,24 @@ object MigratorManager {
                     val sysType = if (app.isSystem) "System" else "User"
                     val basePath = "$currentPath/Apps/$sysType/${app.label}"
                     val parts = mutableListOf<String>()
-                    if (cApp && File("$basePath/App.shift").exists()) parts.add("App")
-                    if (cData && (File("$basePath/Data.shift").exists() || File("$basePath/UserDe.shift").exists() || File(
+
+                    val activeComps = app.activeComponents ?: state.globalComponents
+                    val curApp = activeComps.contains(1)
+                    val curData = activeComps.contains(2)
+                    val curPerm = activeComps.contains(3)
+                    val curMedia = activeComps.contains(4)
+                    val curId = activeComps.contains(5)
+
+                    if (curApp && File("$basePath/App.shift").exists()) parts.add("App")
+                    if (curData && (File("$basePath/Data.shift").exists() || File("$basePath/UserDe.shift").exists() || File(
                             "$basePath/ExtData.shift"
                         ).exists())
                     ) parts.add("Data")
-                    if (cPerm && File("$basePath/Permissions.txt").exists()) parts.add("Perm")
-                    if (cMedia && (File("$basePath/Media.shift").exists() || File("$basePath/Obb.shift").exists())) parts.add(
+                    if (curPerm && File("$basePath/Permissions.txt").exists()) parts.add("Perm")
+                    if (curMedia && (File("$basePath/Media.shift").exists() || File("$basePath/Obb.shift").exists())) parts.add(
                         "Media"
                     )
-                    if (cId) {
+                    if (curId) {
                         try {
                             val metaPath = "$currentPath/Apps/$sysType/${app.label}/Meta.txt"
                             val hasAndId = Shell.cmd("grep -q '^SSAID=' \"$metaPath\" && echo YES")
@@ -369,18 +412,25 @@ object MigratorManager {
                 val script = buildString {
                     selectedApps.forEach { app ->
                         val pkg = app.packageName
+                        val activeComps = app.activeComponents ?: state.globalComponents
+                        val curApp = activeComps.contains(1)
+                        val curData = activeComps.contains(2)
+                        val curPerm = activeComps.contains(3)
+                        val curMedia = activeComps.contains(4)
+                        val curId = activeComps.contains(5)
+
                         appendLine("res=\"\"")
-                        if (cApp) appendLine("res=\"${dlr}res|App\"")
-                        if (cData) {
+                        if (curApp) appendLine("res=\"${dlr}res|App\"")
+                        if (curData) {
                             appendLine("res=\"${dlr}res|Data\"")
                             appendLine("if [ -d \"$d/media/0/Android/data/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/data/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|ExtData\"; fi")
                         }
-                        if (cPerm) appendLine("res=\"${dlr}res|Perm\"")
-                        if (cMedia) {
+                        if (curPerm) appendLine("res=\"${dlr}res|Perm\"")
+                        if (curMedia) {
                             appendLine("if [ -d \"$d/media/0/Android/media/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/media/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Media\"; fi")
                             appendLine("if [ -d \"$d/media/0/Android/obb/$pkg\" ] && [ \"${dlr}(ls -A $d/media/0/Android/obb/$pkg 2>/dev/null)\" ]; then res=\"${dlr}res|Obb\"; fi")
                         }
-                        if (cId) appendLine("if grep -q 'package=\"$pkg\"' $d/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"${dlr}res|AndID\"; fi")
+                        if (curId) appendLine("if grep -q 'package=\"$pkg\"' $d/system/users/0/settings_ssaid.xml 2>/dev/null; then res=\"${dlr}res|AndID\"; fi")
                         appendLine("echo \"$pkg==${dlr}res\"")
                     }
                 }
@@ -401,7 +451,8 @@ object MigratorManager {
 
             val targetData = selectedApps.joinToString("\n") { app ->
                 val sysType = if (app.isSystem) "System" else "User"
-                "${app.packageName}|${app.label}|${app.version}|${app.versionCode}|$sysType|${app.apkPath ?: ""}|${app.appSizeKb}|${app.dataSizeKb}|${app.mediaSizeKb}"
+                val comps = app.activeComponents?.sorted()?.joinToString(" ") ?: ""
+                "${app.packageName}|${app.label}|${app.version}|${app.versionCode}|$sysType|${app.apkPath ?: ""}|${app.appSizeKb}|${app.dataSizeKb}|${app.mediaSizeKb}|$comps"
             } + "\n"
 
             val targetFile = File(context.cacheDir, "shifter_targets.txt")

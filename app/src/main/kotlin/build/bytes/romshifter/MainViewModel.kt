@@ -944,7 +944,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleGlobalComponent(id: Int) {
         val current = _uiState.value.globalComponents.toMutableSet()
         if (current.contains(id)) current.remove(id) else current.add(id)
-        _uiState.value = _uiState.value.copy(globalComponents = current)
+        val newState = _uiState.value.copy(globalComponents = current)
+        _uiState.value = newState
+
+        if (newState.migratorMode == MigratorMode.RESTORE_APPS) {
+            val updatedList = _appList.value.map { app ->
+                if (app.isSelected && app.activeComponents != null) {
+                    app.copy(activeComponents = app.availableInBackup intersect current)
+                } else app
+            }
+            _appList.value = updatedList
+        }
+        
         updateStorageInfo()
     }
 
@@ -952,8 +963,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentList = _appList.value.toMutableList()
         val index = currentList.indexOfFirst { it.packageName == packageName }
         if (index != -1) {
-            currentList[index] =
-                currentList[index].copy(isSelected = !currentList[index].isSelected)
+            val app = currentList[index]
+            currentList[index] = app.copy(
+                isSelected = !app.isSelected,
+                activeComponents = null
+            )
             _appList.value = currentList
             updateStorageInfo()
         }
@@ -965,10 +979,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         fun isSmartMatch(app: AppInfo): Boolean {
             return when (state.migratorMode) {
-                MigratorMode.BACKUP_APPS -> app.backupTime != "No backup on device"
+                MigratorMode.BACKUP_APPS -> app.availableInBackup.isNotEmpty()
                 MigratorMode.RESTORE_APPS -> !app.isInstalled
                 MigratorMode.MANAGE -> app.isInstalled
-                MigratorMode.DEBLOAT -> state.actionFilterState == 1 && app.backupTime != "No backup on device"
+                MigratorMode.DEBLOAT -> state.actionFilterState == 1 && app.availableInBackup.contains(
+                    1
+                )
                 else -> false
             }
         }
@@ -978,7 +994,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val updatedList = _appList.value.map { app ->
             if (visiblePackages.contains(app.packageName) && isSmartMatch(app)) {
-                app.copy(isSelected = !allMatchesSelected)
+                val shouldSelect = !allMatchesSelected
+                val comps = if (shouldSelect) {
+                    when (state.migratorMode) {
+                        MigratorMode.BACKUP_APPS -> app.availableInBackup
+                        MigratorMode.RESTORE_APPS -> app.availableInBackup intersect state.globalComponents
+                        MigratorMode.MANAGE, MigratorMode.DEBLOAT -> app.availableInBackup
+                        else -> null
+                    }
+                } else null
+
+                app.copy(
+                    isSelected = shouldSelect,
+                    activeComponents = comps
+                )
             } else app
         }
         _appList.value = updatedList
@@ -988,7 +1017,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectAllVisibleApps(select: Boolean, visibleApps: List<AppInfo>) {
         val visiblePackageNames = visibleApps.map { it.packageName }.toSet()
         val updatedList = _appList.value.map {
-            if (visiblePackageNames.contains(it.packageName)) it.copy(isSelected = select) else it
+            if (visiblePackageNames.contains(it.packageName)) it.copy(
+                isSelected = select,
+                activeComponents = null
+            ) else it
         }
         _appList.value = updatedList
         updateStorageInfo()
@@ -998,12 +1030,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val state = _uiState.value
         val allApps = _appList.value
         val selectedApps = allApps.filter { it.isSelected }
-
-        val cApp = state.globalComponents.contains(1)
-        val cData = state.globalComponents.contains(2)
-        val cPerm = state.globalComponents.contains(3)
-        val cMedia = state.globalComponents.contains(4)
-        val cId = state.globalComponents.contains(5)
 
         var totalBackupsKb = 0L
 
@@ -1016,15 +1042,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             selectedApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
         } else {
-            val count = selectedApps.size
-            var tempKb = count * 25L
-            if (cPerm) tempKb += count * 5L
-            if (cId) tempKb += count * 1L
-
+            var tempKb = 0L
             selectedApps.forEach { app ->
-                if (cApp) tempKb += app.appSizeKb
-                if (cData) tempKb += app.dataSizeKb
-                if (cMedia) tempKb += app.mediaSizeKb
+                val activeComps = app.activeComponents ?: state.globalComponents
+                tempKb += 25L
+                if (activeComps.contains(3)) tempKb += 5L
+                if (activeComps.contains(5)) tempKb += 1L
+                if (activeComps.contains(1)) tempKb += app.appSizeKb
+                if (activeComps.contains(2)) tempKb += app.dataSizeKb
+                if (activeComps.contains(4)) tempKb += app.mediaSizeKb
             }
             tempKb
         }

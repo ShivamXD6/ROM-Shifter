@@ -40,6 +40,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -304,7 +305,8 @@ fun MenuCard(title: String, icon: ImageVector, description: String, onClick: () 
 fun AppListItem(
     app: AppInfo,
     showBackupTime: Boolean = true,
-    isMonochrome: Boolean = false, 
+    isMonochrome: Boolean = false,
+    showSelectedComponents: Boolean = false,
     onToggleSelect: (String) -> Unit
 ) {
     val containerColor by animateColorAsState(
@@ -393,7 +395,29 @@ fun AppListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
-            if (showBackupTime && app.backupTime.isNotEmpty()) {
+
+            if (showSelectedComponents && app.isSelected && app.activeComponents != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val comps = app.activeComponents.sorted()
+                    val labels =
+                        mapOf(1 to "App", 2 to "Data", 3 to "Perm", 4 to "Media", 5 to "AndID")
+
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = comps.joinToString(" • ") { labels[it] ?: "" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else if (showBackupTime && app.backupTime.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = app.backupTime,

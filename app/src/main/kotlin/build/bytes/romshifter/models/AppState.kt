@@ -21,7 +21,9 @@ data class AppInfo(
     val mediaSizeKb: Long = 0,
     val diskSizeKb: Long = 0,
     val versionCode: Long = 0,
-    val apkPath: String? = null
+    val apkPath: String? = null,
+    val availableInBackup: Set<Int> = emptySet(),
+    val activeComponents: Set<Int>? = null
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)

@@ -355,10 +355,13 @@ do_backup() {
 
     echo "INFO:STEP|MSG:Preparing backup list..."
 
-    awk -F'|' -v comps=" $APP_COMPS " '
+    awk -F'|' -v global_comps="$APP_COMPS" '
     {
         pkg=$1; label=$2; ver=$3; vcode=$4; type=$5; apath=$6;
-        s_app=$7; s_data=$8; s_med=$9;
+        s_app=$7; s_data=$8; s_med=$9; app_comps=$10;
+
+        raw_comps = (app_comps != "" ? app_comps : global_comps)
+        comps = " " raw_comps " "
 
         total = 25
         if(comps ~ / 3 /) total += 5
@@ -367,7 +370,7 @@ do_backup() {
         if(comps ~ / 2 /) total += s_data
         if(comps ~ / 4 /) total += s_med
 
-        print total "|" label "|" pkg "|" ver "|" vcode "|" type "|" apath "|" s_app "|" s_data "|" s_med
+        print total "|" label "|" pkg "|" ver "|" vcode "|" type "|" apath "|" s_app "|" s_data "|" s_med "|" raw_comps
     }' "$TARGETS" > "$AM_TMP/selected_apps_sizes.txt"
 
     TOTAL_KB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_apps_sizes.txt")
@@ -375,12 +378,13 @@ do_backup() {
 
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_apps_sorted.txt"); CURRENT_APP=0
 
-    while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med || [ -n "$size" ]; do
+    while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
         size=${size:-0}
         local pct=0
         [ "$TOTAL_APPS" -gt 0 ] && pct=$(( (CURRENT_APP - 1) * 100 / TOTAL_APPS ))
 
+        export APP_COMPS="$app_comps"
         DO_BACKUP "$pkg" "$label" "$ver" "$vcode" "$type" "$apath" "$CURRENT_APP" "$TOTAL_APPS" "$pct" "$size" "$s_app" "$s_data" "$s_med"
     done < "$AM_TMP/selected_apps_sorted.txt"
     wait
@@ -393,7 +397,7 @@ do_restore() {
     rm -rf "$AM_TMP/selected_restores.txt" "$AM_TMP/selected_restores_sorted.txt" 2>/dev/null
     > "$AM_TMP/selected_restores.txt"
 
-    while IFS='|' read -r pkg label ver vcode type apath s_app s_data s_med || [ -n "$pkg" ]; do
+    while IFS='|' read -r pkg label ver vcode type apath s_app s_data s_med app_comps || [ -n "$pkg" ]; do
         [ -z "$pkg" ] && continue
         pkg=$(echo "$pkg" | tr -d '\r'); label=$(echo "$label" | tr -d '\r'); type=$(echo "$type" | tr -d '\r')
 

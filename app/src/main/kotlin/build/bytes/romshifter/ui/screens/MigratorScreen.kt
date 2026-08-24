@@ -568,13 +568,19 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
                 if (showSmartSelect) {
                     item {
-                        val allSmartMatchesSelected = remember(filteredApps) {
+                        val allSmartMatchesSelected = remember(
+                            filteredApps,
+                            appState.migratorMode,
+                            appState.actionFilterState
+                        ) {
                             val matches = filteredApps.filter { app ->
                                 when (appState.migratorMode) {
-                                    MigratorMode.BACKUP_APPS -> app.backupTime != "No backup on device"
+                                    MigratorMode.BACKUP_APPS -> app.availableInBackup.isNotEmpty()
                                     MigratorMode.RESTORE_APPS -> !app.isInstalled
                                     MigratorMode.MANAGE -> app.isInstalled
-                                    MigratorMode.DEBLOAT -> appState.actionFilterState == 1 && app.backupTime != "No backup on device"
+                                    MigratorMode.DEBLOAT -> appState.actionFilterState == 1 && app.availableInBackup.contains(
+                                        1
+                                    )
                                     else -> false
                                 }
                             }
@@ -583,7 +589,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
                         AnimatedFilterChip(
                             selected = allSmartMatchesSelected,
-                            onClick = { viewModel.smartSelect(filteredApps) },
+                            onClick = {
+                                viewModel.smartSelect(filteredApps)
+                            },
                             label = "Auto Select",
                             leadingIcon = Icons.Default.AutoAwesome,
                             showLabel = expandedChipLabel == "Auto Select",
@@ -603,6 +611,42 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             onExpand = { expandChip("System Apps") }
                         )
                     }
+                }
+            }
+        }
+
+        if (filteredApps.any { it.isSelected && it.activeComponents != null }) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = CircleShape,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    val msg = when (appState.migratorMode) {
+                        MigratorMode.BACKUP_APPS -> "Apps already backed up with previous components"
+                        MigratorMode.RESTORE_APPS -> "Apps not yet restored with available components"
+                        MigratorMode.MANAGE -> "Apps already restored"
+                        MigratorMode.DEBLOAT -> "Apps already backed up with App components"
+                        else -> "Auto Select Active"
+                    }
+                    Text(
+                        msg,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -653,11 +697,15 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         val showTime = appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE || appState.migratorMode == MigratorMode.DEBLOAT
                         val isMonochrome = (appState.migratorMode == MigratorMode.RESTORE_APPS || appState.migratorMode == MigratorMode.MANAGE) && !app.isInstalled
 
+                        val showComps =
+                            appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS
+
                         Box(modifier = Modifier.animateItem()) {
                             AppListItem(
                                 app = app,
                                 showBackupTime = showTime,
                                 isMonochrome = isMonochrome,
+                                showSelectedComponents = showComps,
                                 onToggleSelect = { pkgName -> viewModel.toggleAppSelection(pkgName) }
                             )
                         }
