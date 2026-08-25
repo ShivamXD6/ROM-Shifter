@@ -7,7 +7,6 @@ BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-JOBS=$(( $(nproc --all) > 6 ? 3 : 2 ))
 
 init_shifter() {
      mkdir -p "$BIN_DIR" "$AM_TMP"
@@ -87,12 +86,12 @@ PKG_INSTALLED() {
     return 0
 }
 BUNDAPP() {
-    COOLDOWN "$JOBS"
+    COOLDOWN 4
     tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
 }
 
 UNBUNDAPP() {
-    COOLDOWN "$JOBS"
+    COOLDOWN 3
     "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
 }
 
@@ -213,16 +212,13 @@ DO_RESTORE() {
     APP_DIR="$BACKUP_BASE/$TYPE/$LABEL"
     [ -f "$APP_DIR/Meta.txt" ] || return
 
-    PKG=""; VER=""; VCODE=""; OLD_APP=0; OLD_DATA=0; OLD_MED=0; OLD_SSAID=""
+    PKG=""; VER=""; VCODE=""; OLD_SSAID=""
 
     while IFS='=' read -r key value || [ -n "$key" ]; do
         case "$key" in
             Package) PKG=$value ;;
             Version) VER=$value ;;
             VersionCode) VCODE=$value ;;
-            AppSize) OLD_APP=$value ;;
-            DataExtSize) OLD_DATA=$value ;;
-            MediaOBBSize) OLD_MED=$value ;;
             SSAID) OLD_SSAID=$value ;;
         esac
     done < "$APP_DIR/Meta.txt"
@@ -232,7 +228,6 @@ DO_RESTORE() {
 
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$PCT|SIZE:$SIZE"
 
-    FORCE_DATA=0
     if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
         if ! PKG_INSTALLED "$PKG" "$VCODE"; then
             "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
@@ -249,7 +244,6 @@ DO_RESTORE() {
                     su 1000 -c "cmd package install-commit $SESSION_ID >/dev/null 2>&1"
                 fi
             fi
-            FORCE_DATA=1
         fi
     fi
 
@@ -257,40 +251,15 @@ DO_RESTORE() {
     NEW_UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
     [ -z "$NEW_UID" ] && NEW_UID=$(dumpsys package "$PKG" | grep -m1 "userId=" | cut -d= -f2 | awk '{print $1}')
 
-    CUR_DATA=0; CUR_EXT=0; CUR_MED=0; CUR_OBB=0
-
-    if [ "$FORCE_DATA" -eq 0 ]; then
-        TMP_SIZES="$AM_TMP/${PKG}_sizes"; mkdir -p "$TMP_SIZES"
-        CHK 2 && {
-            ( echo $(( $(RAW_SIZE "/data/data/$PKG") + $(RAW_SIZE "/data/user_de/0/$PKG") )) > "$TMP_SIZES/data" ) &
-            ( echo $(RAW_SIZE "/data/media/0/Android/data/$PKG") > "$TMP_SIZES/ext" ) &
-        }
-        CHK 4 && {
-            ( echo $(RAW_SIZE "/data/media/0/Android/media/$PKG") > "$TMP_SIZES/med" ) &
-            ( echo $(RAW_SIZE "/data/media/0/Android/obb/$PKG") > "$TMP_SIZES/obb" ) &
-        }
-        CUR_DATA=$(cat "$TMP_SIZES/data" 2>/dev/null); s_ext=$(cat "$TMP_SIZES/ext" 2>/dev/null)
-        CUR_DATA=$(( ${CUR_DATA:-0} + ${s_ext:-0} ))
-
-        CUR_MED=$(cat "$TMP_SIZES/med" 2>/dev/null); s_obb=$(cat "$TMP_SIZES/obb" 2>/dev/null)
-        CUR_MED=$(( ${CUR_MED:-0} + ${s_obb:-0} ))
-
-        rm -rf "$TMP_SIZES"
-    fi
-
     if CHK 2; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_DATA" != "$OLD_DATA" ]; then
-            [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
-            [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
-            [ -f "$APP_DIR/ExtData.shift" ] && UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
-        fi
+        [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
+        [ -f "$APP_DIR/UserDe.shift" ] && UNBUNDAPP "$APP_DIR/UserDe.shift" "/data/user_de/0"
+        [ -f "$APP_DIR/ExtData.shift" ] && UNBUNDAPP "$APP_DIR/ExtData.shift" "/data/media/0/Android/data"
     fi
 
     if CHK 4; then
-        if [ "$FORCE_DATA" -eq 1 ] || [ "$CUR_MED" != "$OLD_MED" ]; then
-            [ -f "$APP_DIR/Media.shift" ] && UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
-            [ -f "$APP_DIR/Obb.shift" ] && UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
-        fi
+        [ -f "$APP_DIR/Media.shift" ] && UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
+        [ -f "$APP_DIR/Obb.shift" ] && UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
     fi
 
     local BASE_PCT=$(( (CUR_IDX - 1) * 100 / TOT_IDX ))
