@@ -63,7 +63,7 @@ object MigratorManager {
 
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
-                val (extDataSizes, mediaSizes) = fetchExternalSizes()
+                val (mediaSizes, obbSizes) = fetchMediaAndObbSizes()
 
                 val installedApps = if (type == "Uninstalled") {
                     pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES)
@@ -141,9 +141,12 @@ object MigratorManager {
                             }
 
                             val stats = getDetailedPackageSizes(context, pkg)
-                            val appSizeKb = stats.first
-                            val dataSizeKb = stats.second + (extDataSizes[pkg] ?: 0L)
-                            val mediaSizeKb = mediaSizes[pkg] ?: 0L
+                            val duMedia = mediaSizes[pkg] ?: 0L
+                            val duObb = obbSizes[pkg] ?: 0L
+
+                            val appSizeKb = (stats.first - duObb).coerceAtLeast(0L)
+                            val dataSizeKb = (stats.second - duMedia).coerceAtLeast(0L)
+                            val mediaSizeKb = duMedia + duObb
 
                             val displaySizeKb =
                                 appSizeKb + dataSizeKb + mediaSizeKb + if (includeOverhead) 31 else 0
@@ -242,7 +245,6 @@ object MigratorManager {
                         } else {
                             val aSize = data["AppSize"]?.toLongOrNull() ?: 0L
 
-                            // Try new keys first, fallback to old keys
                             val deSize = data["DataExtSize"]?.toLongOrNull()
                                 ?: ((data["DataSize"]?.toLongOrNull()
                                     ?: 0L) + (data["ExtDataSize"]?.toLongOrNull() ?: 0L))
@@ -612,7 +614,7 @@ object MigratorManager {
             )
 
             val appSize = stats.appBytes / 1024
-            val dataSize = (stats.dataBytes + stats.cacheBytes) / 1024
+            val dataSize = (stats.dataBytes - stats.cacheBytes) / 1024
 
             return appSize to dataSize
         } catch (_: Exception) {
@@ -633,33 +635,31 @@ object MigratorManager {
         }
     }
 
-    private fun fetchExternalSizes(): Pair<Map<String, Long>, Map<String, Long>> {
-        val dataSizes = mutableMapOf<String, Long>()
+    private fun fetchMediaAndObbSizes(): Pair<Map<String, Long>, Map<String, Long>> {
         val mediaSizes = mutableMapOf<String, Long>()
+        val obbSizes = mutableMapOf<String, Long>()
 
-        val outData =
-            Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/data/* 2>/dev/null\"").exec().out
-        outData.forEach { line ->
+        Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/media/* 2>/dev/null\"")
+            .exec().out.forEach { line ->
             val parts = line.trim().split(Regex("\\s+"), 2)
             if (parts.size == 2) {
                 val size = parts[0].toLongOrNull() ?: 0L
                 val pkg = parts[1].split("/").lastOrNull() ?: ""
-                if (pkg.isNotEmpty()) dataSizes[pkg] = size
+                if (pkg.isNotEmpty()) mediaSizes[pkg] = size
             }
         }
 
-        val outMedia =
-            Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/media/* /data/media/0/Android/obb/* 2>/dev/null\"")
-                .exec().out
-        outMedia.forEach { line ->
+        Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/obb/* 2>/dev/null\"")
+            .exec().out.forEach { line ->
             val parts = line.trim().split(Regex("\\s+"), 2)
             if (parts.size == 2) {
                 val size = parts[0].toLongOrNull() ?: 0L
                 val pkg = parts[1].split("/").lastOrNull() ?: ""
-                if (pkg.isNotEmpty()) mediaSizes[pkg] = (mediaSizes[pkg] ?: 0L) + size
+                if (pkg.isNotEmpty()) obbSizes[pkg] = size
             }
         }
-        return dataSizes to mediaSizes
+
+        return mediaSizes to obbSizes
     }
 
     fun formatSize(kbString: String): String {
