@@ -31,6 +31,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
@@ -1131,14 +1132,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val updateProgress: (String, String, Int) -> Unit = { action, step, prog ->
-                viewModelScope.launch(Dispatchers.Main) {
-                    val safeAction = action.ifEmpty { "ROM Shifter" }
-                    updateProgressNotification(safeAction, step, prog)
+                val safeAction = action.ifEmpty { "ROM Shifter" }
+                updateProgressNotification(safeAction, step, prog)
 
-                    _uiState.value = _uiState.value.copy(
-                        currentAction = action.ifEmpty { _uiState.value.currentAction },
-                        currentStep = step.ifEmpty { _uiState.value.currentStep },
-                        progress = if (prog >= 0) prog else _uiState.value.progress
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        currentAction = action.ifEmpty { currentState.currentAction },
+                        currentStep = step.ifEmpty { currentState.currentStep },
+                        progress = prog
                     )
                 }
             }

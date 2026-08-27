@@ -30,7 +30,7 @@ object ShellEngine {
     }
 
     private fun parseLine(line: String): ShifterEvent {
-        if (!line.startsWith("ACTION:") && !line.contains("|INFO:STEP|")) return ShifterEvent.RawLog(
+        if (!line.startsWith("ACTION:") && !line.startsWith("INFO:")) return ShifterEvent.RawLog(
             line
         )
 

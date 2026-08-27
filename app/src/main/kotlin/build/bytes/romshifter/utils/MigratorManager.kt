@@ -344,6 +344,7 @@ object MigratorManager {
 
         try {
             val isRestore = state.migratorMode.name.contains("RESTORE")
+            val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
 
             if (state.migratorMode == MigratorMode.MANAGE) {
                 val baseDir = File(currentPath)
@@ -373,7 +374,7 @@ object MigratorManager {
             if (isRestore) {
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress(
-                        "",
+                        actText,
                         "Analyzing backups (${index + 1}/${selectedApps.size})...",
                         -1
                     )
@@ -408,7 +409,7 @@ object MigratorManager {
                     appPartsMap[app.packageName] = parts.joinToString(" • ")
                 }
             } else {
-                updateProgress("", "Checking app components...", -1)
+                updateProgress(actText, "Checking app components...", -1)
                 val d = "/data"
                 val dlr = "$"
                 val script = buildString {
@@ -467,13 +468,16 @@ object MigratorManager {
 
             val command =
                 "su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
-            val actText = if (isRestore) "Restoring Apps" else "Backing up Apps"
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons")
 
                 selectedApps.forEachIndexed { index, app ->
-                    updateProgress("", "Preparing icons (${index + 1}/${selectedApps.size})...", -1)
+                    updateProgress(
+                        actText,
+                        "Preparing icons (${index + 1}/${selectedApps.size})...",
+                        -1
+                    )
                     val sysType = if (app.isSystem) "System" else "User"
                     val destDir = "$currentPath/Apps/$sysType/${app.label}"
                     val destIcon = File(destDir, "Icon.png")
@@ -527,8 +531,6 @@ object MigratorManager {
                     scriptFile.delete()
                 }
             }
-            updateProgress("", "Calculating sizes...", -1)
-
             ShellEngine.executeShifterCommand(command).collect { event ->
                 when (event) {
                     is ShifterEvent.BackupProgress -> {
@@ -544,7 +546,7 @@ object MigratorManager {
                     }
 
                     is ShifterEvent.InfoStep -> {
-                        updateProgress("", event.msg, -1)
+                        updateProgress(actText, event.msg, -1)
                     }
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)

@@ -92,7 +92,7 @@ BUNDAPP() {
 }
 
 UNBUNDAPP() {
-    COOLDOWN 3
+    COOLDOWN 5
     "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
 }
 
@@ -227,7 +227,6 @@ DO_RESTORE() {
 
     if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
         if ! PKG_INSTALLED "$PKG" "$VCODE"; then
-            echo "INFO:STEP|MSG:Installing $LABEL..."
             "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
             chmod -R 777 "$TMP_PKG" 2>/dev/null
             local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort | tr '\n' ' ')
@@ -259,13 +258,9 @@ DO_RESTORE() {
         [ -f "$APP_DIR/Obb.shift" ] && UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
     fi
 
-    CHK 1 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_APP))
-    CHK 2 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_DATA))
-    CHK 4 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_MED))
-
-    local final_pct=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
-    [ "$final_pct" -gt 100 ] && final_pct=100
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
+    if [ -n "$NEW_UID" ]; then
+        echo "$PKG|$NEW_UID" >> "$AM_TMP/restore_queue.list"
+    fi
 
     if CHK 5 && [ -f "$APP_DIR/Meta.txt" ]; then
         OLD_SSAID=$(sed -n 's/^SSAID=//p' "$APP_DIR/Meta.txt" | tr -d '\r')
@@ -276,21 +271,14 @@ DO_RESTORE() {
         SETPERM "$PKG" "$APP_DIR/Permissions.txt"
     fi
 
-    if [ -n "$NEW_UID" ]; then
-        chown -hR "$NEW_UID:$NEW_UID" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
-        [ -n "$ADGID" ] && chown -hR "$NEW_UID:$ADGID" "/data/media/0/Android/data/$PKG" 2>/dev/null
-        [ -n "$AMGID" ] && chown -hR "$NEW_UID:$AMGID" "/data/media/0/Android/media/$PKG" 2>/dev/null
-        [ -n "$AOGID" ] && chown -hR "$NEW_UID:$AOGID" "/data/media/0/Android/obb/$PKG" 2>/dev/null
+    CHK 1 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_APP))
+    CHK 2 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_DATA))
+    CHK 4 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_MED))
+    local final_pct=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
+    [ "$final_pct" -gt 100 ] && final_pct=100
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
 
-        APP_CTX=$(ls -dZ "/data/data/$PKG" 2>/dev/null | awk '{print $1}')
-        if [ -n "$APP_CTX" ] && [ "$APP_CTX" != "?" ]; then
-            chcon -hR "$APP_CTX" "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
-        else
-            restorecon -R "/data/data/$PKG" "/data/user_de/0/$PKG" 2>/dev/null
-        fi
-        DELGMS "$PKG"
-    fi
-    pm enable "$PKG" >/dev/null 2>&1; rm -rf "$TMP_PKG"
+    rm -rf "$TMP_PKG" &
     echo "ACTION:RESTORE_DONE|PKG:$PKG"
 }
 
@@ -327,18 +315,18 @@ do_backup() {
     while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
         CURRENT_APP=$((CURRENT_APP + 1))
         size=${size:-0}
-
         export APP_COMPS="$app_comps"
         DO_BACKUP "$pkg" "$label" "$ver" "$vcode" "$type" "$apath" "$CURRENT_APP" "$TOTAL_APPS" "$size" "$s_app" "$s_data" "$s_med"
     done < "$AM_TMP/selected_apps_sorted.txt"
+    COOLDOWN 2
+    echo "INFO:STEP|MSG:Almost Done, Please Wait..."
     wait
-
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB_JOB|TIME:$((( $(date +%s) - START )))"
 }
 
 do_restore() {
     export APP_COMPS="$1"
-    rm -rf "$AM_TMP/selected_restores.txt" "$AM_TMP/selected_restores_sorted.txt" 2>/dev/null
+    rm -rf "$AM_TMP/selected_restores.txt" "$AM_TMP/selected_restores_sorted.txt" "$AM_TMP/restore_queue.list" 2>/dev/null
 
     echo "INFO:STEP|MSG:Preparing restore list..."
 
@@ -381,9 +369,34 @@ do_restore() {
         CURRENT_APP=$((CURRENT_APP + 1))
         size=${size:-0}
         export APP_COMPS="${app_comps:-$1}"
-
         DO_RESTORE "$pkg" "$label" "$ver" "$vcode" "$type" "$apath" "$CURRENT_APP" "$TOTAL_APPS" "$size" "$s_app" "$s_data" "$s_med"
     done < "$AM_TMP/selected_restores_sorted.txt"
+    COOLDOWN 2
+    echo "INFO:STEP|MSG:Almost Done, Please Wait..."
+    wait
+
+    if [ -f "$AM_TMP/restore_queue.list" ]; then
+        while IFS='|' read -r q_pkg q_uid; do
+            COOLDOWN 10
+            (
+                chown -hR "$q_uid:$q_uid" "/data/data/$q_pkg" "/data/user_de/0/$q_pkg" 2>/dev/null
+                [ -n "$ADGID" ] && chown -hR "$q_uid:$ADGID" "/data/media/0/Android/data/$q_pkg" 2>/dev/null
+                [ -n "$AMGID" ] && chown -hR "$q_uid:$AMGID" "/data/media/0/Android/media/$q_pkg" 2>/dev/null
+                [ -n "$AOGID" ] && chown -hR "$q_uid:$AOGID" "/data/media/0/Android/obb/$q_pkg" 2>/dev/null
+
+                local q_ctx=$(ls -dZ "/data/data/$q_pkg" 2>/dev/null | awk '{print $1}')
+                if [ -n "$q_ctx" ] && [ "$q_ctx" != "?" ]; then
+                    chcon -hR "$q_ctx" "/data/data/$q_pkg" "/data/user_de/0/$q_pkg" 2>/dev/null
+                else
+                    restorecon -R "/data/data/$q_pkg" "/data/user_de/0/$q_pkg" 2>/dev/null
+                fi
+                DELGMS "$q_pkg"
+                cmd package enable "$q_pkg" >/dev/null 2>&1
+            ) &
+        done < "$AM_TMP/restore_queue.list"
+    fi
+
+    wait
 
     cmd package enable com.android.vending >/dev/null 2>&1
     settings put global verifier_verify_adb_installs 1
@@ -391,7 +404,6 @@ do_restore() {
     setprop pm.dexopt.install-bulk speed-profile
     setprop pm.dexopt.install-bulk-downgraded verify
 
-    wait
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB_JOB|TIME:$((( $(date +%s) - START )))"
 }
 
