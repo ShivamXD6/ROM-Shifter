@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -88,6 +89,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
 
     var inputPath by remember { mutableStateOf(savedPath) }
     var isMoving by remember { mutableStateOf(false) }
+    var showMoveWarning by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(savedPath) { if (!isMoving) inputPath = savedPath }
     val isEditing = inputPath != savedPath
@@ -105,9 +107,45 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
             val path = if ("primary".equals(split[0], true)) "$basePath/${split.getOrNull(1) ?: ""}" else "/storage/${split[0]}/${split.getOrNull(1) ?: ""}"
             val finalPath = if (path.endsWith("Shifter")) path else "$path/Shifter"
             inputPath = finalPath
-            isMoving = true
-            viewModel.migrateFolder(finalPath) { isMoving = false }
+
+            val oldIsInternal =
+                savedPath.startsWith(basePath) || savedPath.startsWith("/storage/emulated")
+            val newIsInternal = "primary".equals(split[0], true)
+
+            if (oldIsInternal != newIsInternal) {
+                showMoveWarning = finalPath
+            } else {
+                isMoving = true
+                viewModel.migrateFolder(finalPath) { isMoving = false }
+            }
         }
+    }
+
+    if (showMoveWarning != null) {
+        AlertDialog(
+            onDismissRequest = { showMoveWarning = null },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val path = showMoveWarning!!
+                        showMoveWarning = null
+                        isMoving = true
+                        viewModel.migrateFolder(path) { isMoving = false }
+                    }
+                ) {
+                    Text("Proceed")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showMoveWarning = null }) {
+                    Text("Cancel")
+                }
+            },
+            title = { Text("Moving Backups") },
+            text = { Text("Moving your existing Shifter files between Internal Storage and MicroSD will take time. Please don't close the app or don't go back during this process.") },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
     }
 
     if (showUpdateSheet) {
@@ -662,7 +700,21 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                                 }
                             } else {
                                 Button(
-                                    onClick = { isMoving = true; viewModel.migrateFolder(inputPath) { isMoving = false } },
+                                    onClick = {
+                                        val basePath =
+                                            android.os.Environment.getExternalStorageDirectory().absolutePath
+                                        val oldIsInternal =
+                                            savedPath.startsWith(basePath) || savedPath.startsWith("/storage/emulated")
+                                        val newIsInternal =
+                                            inputPath.startsWith(basePath) || inputPath.startsWith("/storage/emulated")
+
+                                        if (oldIsInternal != newIsInternal) {
+                                            showMoveWarning = inputPath
+                                        } else {
+                                            isMoving = true
+                                            viewModel.migrateFolder(inputPath) { isMoving = false }
+                                        }
+                                    },
                                     shape = CircleShape,
                                     modifier = Modifier.height(52.dp)
                                 ) { Text("Apply Path", style = MaterialTheme.typography.titleMedium) }
