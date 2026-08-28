@@ -223,29 +223,9 @@ DO_RESTORE() {
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE"
 
     [ -z "$PKG" ] && return
-    TMP_PKG="$AM_TMP/$PKG"; mkdir -p "$TMP_PKG"; chmod 777 "$TMP_PKG"
-
-    if CHK 1 && [ -f "$APP_DIR/App.shift" ]; then
-        if ! PKG_INSTALLED "$PKG" "$VCODE"; then
-            "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$TMP_PKG" 2>/dev/null
-            chmod -R 777 "$TMP_PKG" 2>/dev/null
-            local apks_to_install=$(find "$TMP_PKG" -type f -name "*.apk" | sort | tr '\n' ' ')
-            if [ -n "$apks_to_install" ]; then
-                local SESSION_ID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')
-                if [ -n "$SESSION_ID" ]; then
-                    local apk_count=0
-                    for apk in $apks_to_install; do
-                        apk_count=$((apk_count + 1))
-                        su 1000 -c "cmd package install-write $SESSION_ID split_${apk_count} '$apk' >/dev/null 2>&1"
-                    done
-                    su 1000 -c "cmd package install-commit $SESSION_ID >/dev/null 2>&1"
-                fi
-            fi
-        fi
-    fi
-
-    cmd package disable "$PKG" >/dev/null 2>&1
-    NEW_UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
+    UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
+    rm -rf "/data/data/$PKG/cache" "/data/data/$PKG/code_cache" "/data/user_de/0/$PKG/cache" "/data/user_de/0/$PKG/code_cache"
+    echo "$PKG|$UID" >> "$AM_TMP/restore_queue.list"
 
     if CHK 2; then
         [ -f "$APP_DIR/Data.shift" ] && UNBUNDAPP "$APP_DIR/Data.shift" "/data/data"
@@ -256,10 +236,6 @@ DO_RESTORE() {
     if CHK 4; then
         [ -f "$APP_DIR/Media.shift" ] && UNBUNDAPP "$APP_DIR/Media.shift" "/data/media/0/Android/media"
         [ -f "$APP_DIR/Obb.shift" ] && UNBUNDAPP "$APP_DIR/Obb.shift" "/data/media/0/Android/obb"
-    fi
-
-    if [ -n "$NEW_UID" ]; then
-        echo "$PKG|$NEW_UID" >> "$AM_TMP/restore_queue.list"
     fi
 
     if CHK 5 && [ -f "$APP_DIR/Meta.txt" ]; then
@@ -354,16 +330,38 @@ do_restore() {
 
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
 
-    cmd package disable com.android.vending >/dev/null 2>&1
-    settings put global verifier_verify_adb_installs 0
-    setprop pm.dexopt.install assume-verified
-    setprop pm.dexopt.install-bulk assume-verified
-    setprop pm.dexopt.install-bulk-downgraded skip
+    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0; setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
 
-    ADGID=$(stat -c '%g' "/data/media/0/Android/data" 2>/dev/null)
-    AMGID=$(stat -c '%g' "/data/media/0/Android/media" 2>/dev/null);
-    AOGID=$(stat -c '%g' "/data/media/0/Android/obb" 2>/dev/null);
+    while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
+        [ -z "$pkg" ] && continue
+        export APP_COMPS="${app_comps:-$1}"
+        APP_DIR="$BACKUP_BASE/$type/$label"
+        if CHK 1 && [ -f "$APP_DIR/App.shift" ] && ! PKG_INSTALLED "$pkg" "$vcode"; then
+             COOLDOWN 3
+             (
+                 echo "INFO:STEP|MSG:Installing $label..."
+                 local T_PKG="$AM_TMP/$pkg"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
+                 "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$T_PKG" 2>/dev/null
+                 chmod -R 777 "$T_PKG" 2>/dev/null
+                 local apks=$(find "$T_PKG" -type f -name "*.apk" | sort)
+                 if [ -n "$apks" ]; then
+                     local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')
+                     if [ -n "$SID" ]; then
+                         local c=0
+                         for a in $apks; do
+                             c=$((c + 1))
+                             su 1000 -c "cmd package install-write $SID split_${c} '$a' >/dev/null 2>&1"
+                         done
+                         su 1000 -c "cmd package install-commit $SID >/dev/null 2>&1"
+                     fi
+                 fi
+                 rm -rf "$T_PKG"; cmd package disable "$PKG" >/dev/null 2>&1
+             ) &
+        fi
+    done < "$AM_TMP/selected_restores_sorted.txt"
+    wait
 
+    ADGID=$(stat -c '%g' "/data/media/0/Android/data" 2>/dev/null); AMGID=$(stat -c '%g' "/data/media/0/Android/media" 2>/dev/null); AOGID=$(stat -c '%g' "/data/media/0/Android/obb" 2>/dev/null)
     while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
         [ -z "$pkg" ] && continue
         CURRENT_APP=$((CURRENT_APP + 1))
@@ -398,12 +396,7 @@ do_restore() {
 
     wait
 
-    cmd package enable com.android.vending >/dev/null 2>&1
-    settings put global verifier_verify_adb_installs 1
-    setprop pm.dexopt.install speed-profile
-    setprop pm.dexopt.install-bulk speed-profile
-    setprop pm.dexopt.install-bulk-downgraded verify
-
+    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1; setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB_JOB|TIME:$((( $(date +%s) - START )))"
 }
 
