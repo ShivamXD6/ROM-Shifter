@@ -3,14 +3,28 @@
 # ROM Shifter - APP BACKEND ENGINE
 # ==========================================
 
+export PATH="/system/bin:/vendor/bin:/system/xbin:/sbin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH"
 BIN_DIR="/data/adb/Shifter"
 ZAPDOS="$BIN_DIR/zapdos"
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
-TOTAL_KB_JOB=0
-TOTAL_KB_DONE=0
+TOTAL_KB_JOB=0; TOTAL_KB_DONE=0
+AWK_BIN="awk"; TAR_BIN="tar"; SED_BIN="sed"; GREP_BIN="grep"; STAT_BIN="stat"
+
+find_tool() {
+    local tool="$1"
+    if command -v "$tool" >/dev/null 2>&1; then
+        echo "$tool"
+        return 0
+    else
+        echo "busybox $tool"
+        return 0
+    fi
+    return 1
+}
 
 init_shifter() {
+     AWK_BIN=$(find_tool awk); TAR_BIN=$(find_tool tar); SED_BIN=$(find_tool sed); GREP_BIN=$(find_tool grep); STAT_BIN=$(find_tool stat)
      mkdir -p "$BIN_DIR" "$AM_TMP"
      [ -n "$BACKUP_BASE" ] && mkdir -p "$BACKUP_BASE"
      [ -n "$LP_DIR" ] && mkdir -p "$LP_DIR"
@@ -18,29 +32,29 @@ init_shifter() {
 }
 
 COOLDOWN() { while [ $(jobs | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
-SANITIZE() { echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'; }
+SANITIZE() { echo "$1" | $SED_BIN 's/[^a-zA-Z0-9]/_/g'; }
 
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
 
 RAW_SIZE() {
-    du -sk "$@" 2>/dev/null | awk '{sum+=$1} END{print sum+0}'
+    du -sk "$@" 2>/dev/null | $AWK_BIN '{sum+=$1} END{print sum+0}'
 }
 
 FORMAT_SIZE() {
     local raw=$(echo "$1" | tr -d '\r\n ')
-    awk -v n="${raw:-0}" 'BEGIN{
+    $AWK_BIN -v n="${raw:-0}" 'BEGIN{
         n = n + 0
         if(n >= 1048576) printf "%.2f GB", n/1048576
         else if(n >= 1024) printf "%.2f MB", n/1024
         else printf "%d KB", n
     }'
 }
-READID() { sed -n "/package=\"$1\"/s/.*value=\"\([^\"]*\)\".*/\1/p" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null; }
-CHANID() { sed -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
+READID() { $SED_BIN -n "/package=\"$1\"/s/.*value=\"\([^\"]*\)\".*/\1/p" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null; }
+CHANID() { $SED_BIN -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
 GETPERM() {
     local pkg="$1" out="$2"
     {
-        dumpsys package "$pkg" 2>/dev/null | awk '
+        dumpsys package "$pkg" 2>/dev/null | $AWK_BIN '
             /runtime permissions:/,/(requested|install) permissions:/ {
                 if ($0 ~ /granted=true/) {
                     split($1, a, ":")
@@ -51,7 +65,7 @@ GETPERM() {
                 }
             }
         '
-        cmd appops get "$pkg" 2>/dev/null | awk -F': ' '
+        cmd appops get "$pkg" 2>/dev/null | $AWK_BIN -F': ' '
             /:/ && !/Uid mode/ {
                 op = $1; sub(/^[ \t]+/, "", op)
                 val = $2; sub(/; .*/, "", val)
@@ -63,7 +77,7 @@ GETPERM() {
 
 SETPERM() {
     [ -f "$2" ] || return
-    awk -v pkg="$1" -F'[:=]' '
+    $AWK_BIN -v pkg="$1" -F'[:=]' '
         /^PERM:/ { print "cmd package " ($3=="true"?"grant ":"revoke ") pkg " " $2 " >/dev/null 2>&1" }
         /^APPOP:/ { print "cmd appops set " pkg " " $2 " " $3 " >/dev/null 2>&1" }
     ' "$2" | sh &
@@ -79,21 +93,22 @@ FIND_BLOCK() {
 }
 
 PKG_INSTALLED() {
-    cmd package path "$1" >/dev/null 2>&1 || return 1
-    [ -z "$2" ] && return 0
-    local inst_ver=$(dumpsys package "$1" | sed -n '/versionCode=/ {s/.*versionCode=\([0-9]*\).*/\1/p; q}')
-    [ "$inst_ver" = "$2" ] || return 1
-    return 0
-}
+     local p_path=$(cmd package path "$1" 2>/dev/null || pm path "$1" 2>/dev/null)
+     [ -z "$p_path" ] && return 1
+     [ -z "$2" ] && return 0
+     local inst_ver=$(dumpsys package "$1" 2>/dev/null | $SED_BIN -n '/versionCode=/ {s/.*versionCode=\([0-9]*\).*/\1/p; q}')
+     [ "$inst_ver" = "$2" ] && return 0
+     return 1
+ }
 
 BUNDAPP() {
     COOLDOWN 4
-    tar --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
+    $TAR_BIN --exclude="$2/cache" --exclude="$2/code_cache" -cpf - -C "$1" "$2" 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$3/$4.shift" &
 }
 
 UNBUNDAPP() {
     COOLDOWN 5
-    "$ZAPDOS" -d -q -c "$1" | tar -pxf - -C "$2" 2>/dev/null &
+    "$ZAPDOS" -d -q -c "$1" | $TAR_BIN -pxf - -C "$2" 2>/dev/null &
 }
 
 do_live_backup() {
@@ -142,7 +157,7 @@ DO_BACKUP() {
         if [ "$S_APP" != "$OLD_APP" ] || [ ! -f "$APP_DIR/App.shift" ]; then
             if [ -n "$APK_PATH" ]; then
                 local apk_dir=$(dirname "$APK_PATH")
-                find "$apk_dir" -maxdepth 1 -name "*.apk" 2>/dev/null | sed 's|^/||' | tar -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
+                find "$apk_dir" -maxdepth 1 -name "*.apk" 2>/dev/null | $SED_BIN 's|^/||' | $TAR_BIN -cf - -C / -T - 2>/dev/null | "$ZAPDOS" -1 -f -q -o "$APP_DIR/App.shift" &
             fi
             OLD_APP=$S_APP
         fi
@@ -191,7 +206,7 @@ DO_BACKUP() {
     [ "$final_pct" -gt 100 ] && final_pct=100
     echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
 
-    SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | awk -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
+    SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | $AWK_BIN -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
 
     cat <<EOF > "$APP_DIR/Meta.txt"
 Name=$LABEL
@@ -223,7 +238,7 @@ DO_RESTORE() {
     echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE"
 
     [ -z "$PKG" ] && return
-    UID=$(stat -c '%u' "/data/data/$PKG" 2>/dev/null)
+    UID=$($STAT_BIN -c '%u' "/data/data/$PKG" 2>/dev/null)
     rm -rf "/data/data/$PKG/cache" "/data/data/$PKG/code_cache" "/data/user_de/0/$PKG/cache" "/data/user_de/0/$PKG/code_cache"
     echo "$PKG|$UID" >> "$AM_TMP/restore_queue.list"
 
@@ -239,7 +254,7 @@ DO_RESTORE() {
     fi
 
     if CHK 5 && [ -f "$APP_DIR/Meta.txt" ]; then
-        OLD_SSAID=$(sed -n 's/^SSAID=//p' "$APP_DIR/Meta.txt" | tr -d '\r')
+        OLD_SSAID=$($SED_BIN -n 's/^SSAID=//p' "$APP_DIR/Meta.txt" | tr -d '\r')
         [ -n "$OLD_SSAID" ] && CHANID "$PKG" "$OLD_SSAID"
     fi
 
@@ -264,7 +279,12 @@ do_backup() {
 
     echo "INFO:STEP|MSG:Preparing backup list..."
 
-    awk -F'|' -v global_comps="$APP_COMPS" '
+    if [ ! -f "$TARGETS" ]; then
+        echo "ACTION:ERROR|MSG:Targets file not found at $TARGETS"
+        return 1
+    fi
+
+    $AWK_BIN -F'|' -v global_comps="$APP_COMPS" '
     {
         pkg=$1; label=$2; ver=$3; vcode=$4; type=$5; apath=$6;
         s_app=$7; s_data=$8; s_med=$9; app_comps=$10;
@@ -282,7 +302,7 @@ do_backup() {
         print total "|" label "|" pkg "|" ver "|" vcode "|" type "|" apath "|" s_app "|" s_data "|" s_med "|" raw_comps
     }' "$TARGETS" | tr -d '\r' > "$AM_TMP/selected_apps_sizes.txt"
 
-    TOTAL_KB_JOB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_apps_sizes.txt")
+    TOTAL_KB_JOB=$($AWK_BIN -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_apps_sizes.txt")
     TOTAL_KB_DONE=0
     sort -t'|' -k1 -n -r "$AM_TMP/selected_apps_sizes.txt" > "$AM_TMP/selected_apps_sorted.txt"
 
@@ -306,7 +326,12 @@ do_restore() {
 
     echo "INFO:STEP|MSG:Preparing restore list..."
 
-    awk -F'|' -v global_comps="$APP_COMPS" '
+    if [ ! -f "$TARGETS" ]; then
+        echo "ACTION:ERROR|MSG:Targets file not found at $TARGETS"
+        return 1
+    fi
+
+    $AWK_BIN -F'|' -v global_comps="$APP_COMPS" '
     {
         pkg=$1; label=$2; ver=$3; vcode=$4; type=$5; apath=$6;
         s_app=$7; s_data=$8; s_med=$9; app_comps=$10;
@@ -324,7 +349,7 @@ do_restore() {
         print total "|" label "|" pkg "|" ver "|" vcode "|" type "|" apath "|" s_app "|" s_data "|" s_med "|" raw_comps
     }' "$TARGETS" | tr -d '\r' > "$AM_TMP/selected_restores.txt"
 
-    TOTAL_KB_JOB=$(awk -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores.txt")
+    TOTAL_KB_JOB=$($AWK_BIN -F'|' '{s+=$1} END{print s+0}' "$AM_TMP/selected_restores.txt")
     TOTAL_KB_DONE=0
     sort -t'|' -k1 -n -r "$AM_TMP/selected_restores.txt" > "$AM_TMP/selected_restores_sorted.txt"
 
@@ -341,7 +366,7 @@ do_restore() {
              (
                  echo "INFO:STEP|MSG:Installing $label..."
                  local T_PKG="$AM_TMP/$pkg"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
-                 "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | tar -xf - -C "$T_PKG" 2>/dev/null
+                 "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | $TAR_BIN -xf - -C "$T_PKG" 2>/dev/null
                  chmod -R 777 "$T_PKG" 2>/dev/null
                  local apks=$(find "$T_PKG" -type f -name "*.apk" | sort)
                  if [ -n "$apks" ]; then
@@ -353,6 +378,10 @@ do_restore() {
                              su 1000 -c "cmd package install-write $SID split_${c} '$a' >/dev/null 2>&1"
                          done
                          su 1000 -c "cmd package install-commit $SID >/dev/null 2>&1"
+                     else
+                        for a in $apks; do
+                              pm install -r "$a" >/dev/null 2>&1
+                        done
                      fi
                  fi
                  rm -rf "$T_PKG"; cmd package disable "$PKG" >/dev/null 2>&1
@@ -361,7 +390,7 @@ do_restore() {
     done < "$AM_TMP/selected_restores_sorted.txt"
     wait
 
-    ADGID=$(stat -c '%g' "/data/media/0/Android/data" 2>/dev/null); AMGID=$(stat -c '%g' "/data/media/0/Android/media" 2>/dev/null); AOGID=$(stat -c '%g' "/data/media/0/Android/obb" 2>/dev/null)
+    ADGID=$($STAT_BIN -c '%g' "/data/media/0/Android/data" 2>/dev/null); AMGID=$($STAT_BIN -c '%g' "/data/media/0/Android/media" 2>/dev/null); AOGID=$($STAT_BIN -c '%g' "/data/media/0/Android/obb" 2>/dev/null)
     while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
         [ -z "$pkg" ] && continue
         CURRENT_APP=$((CURRENT_APP + 1))
@@ -382,7 +411,7 @@ do_restore() {
                 [ -n "$AMGID" ] && chown -hR "$q_uid:$AMGID" "/data/media/0/Android/media/$q_pkg" 2>/dev/null
                 [ -n "$AOGID" ] && chown -hR "$q_uid:$AOGID" "/data/media/0/Android/obb/$q_pkg" 2>/dev/null
 
-                local q_ctx=$(ls -dZ "/data/data/$q_pkg" 2>/dev/null | awk '{print $1}')
+                local q_ctx=$(ls -dZ "/data/data/$q_pkg" 2>/dev/null | $AWK_BIN '{print $1}')
                 if [ -n "$q_ctx" ] && [ "$q_ctx" != "?" ]; then
                     chcon -hR "$q_ctx" "/data/data/$q_pkg" "/data/user_de/0/$q_pkg" 2>/dev/null
                 else
@@ -423,7 +452,7 @@ do_systemize() {
     mkdir -p "$MOD_DIR" && printf "$PROP\n" > "$MOD_DIR/module.prop" && chmod 644 "$MOD_DIR/module.prop"
     mkdir -p "$UP_DIR" && printf "$PROP\n" > "$UP_DIR/module.prop" && chmod 644 "$UP_DIR/module.prop"
 
-    local APK_PATH=$(cmd package path "$PKG" | sed -n 's/^package://p; q')
+    local APK_PATH=$(cmd package path "$PKG" | $SED_BIN -n 's/^package://p; q')
 
     if [ -n "$APK_PATH" ]; then
         local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
@@ -456,7 +485,7 @@ do_restore_msgs() {
         chown -R radio:radio /data/user_de/0/com.android.providers.telephony/databases/ 2>/dev/null
         restorecon -R /data/user_de/0/com.android.providers.telephony/ 2>/dev/null
 
-        local MSG_UID=$(stat -c "%u" /data/data/com.google.android.apps.messaging 2>/dev/null)
+        local MSG_UID=$($STAT_BIN -c "%u" /data/data/com.google.android.apps.messaging 2>/dev/null)
         if [ -n "$MSG_UID" ]; then
             cp -a "$SRC/Messages/"* /data/data/com.google.android.apps.messaging/databases/ 2>/dev/null
             chown -R "$MSG_UID:$MSG_UID" /data/data/com.google.android.apps.messaging/databases/ 2>/dev/null
@@ -485,7 +514,7 @@ get_partitions() {
     local blocked="system system_ext super vendor product odm userdata metadata persist control"
     for p in $paths; do
         [ -d "$p" ] || continue
-        ls -1p "$p" 2>/dev/null | awk -v b="$blocked" '
+        ls -1p "$p" 2>/dev/null | $AWK_BIN -v b="$blocked" '
             BEGIN { split(b, a, " "); for(x in a) bl[a[x]]=1 }
             !/\/$/ {
                 skip=0
@@ -499,7 +528,7 @@ get_partitions() {
 }
 
 get_images() {
-    ls -1 "$1/Partitions/" 2>/dev/null | sed -n '/\.img$/p'
+    ls -1 "$1/Partitions/" 2>/dev/null | $SED_BIN -n '/\.img$/p'
 }
 
 delete_image() {

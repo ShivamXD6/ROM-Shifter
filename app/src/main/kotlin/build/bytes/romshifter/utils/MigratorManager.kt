@@ -182,7 +182,7 @@ object MigratorManager {
                 val pathType = when (type) { "RestoreUser" -> "User"; "RestoreSystem" -> "System"; else -> "*" }
 
                 val command =
-                    "su -mm -c 'grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^VersionCode=\" -e \"^AppSize=\" -e \"^DataExtSize=\" -e \"^MediaOBBSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" -e \"^SSAID=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null'"
+                    "grep -H -e \"^Name=\" -e \"^Package=\" -e \"^Version=\" -e \"^VersionCode=\" -e \"^AppSize=\" -e \"^DataExtSize=\" -e \"^MediaOBBSize=\" -e \"^DataSize=\" -e \"^ExtDataSize=\" -e \"^MediaSize=\" -e \"^ObbSize=\" -e \"^SSAID=\" \"$currentPath\"/Apps/$pathType/*/Meta.txt 2>/dev/null"
                 val result = Shell.cmd(command).exec()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }
 
@@ -203,7 +203,7 @@ object MigratorManager {
                 if (isManage && appMap.isNotEmpty()) {
                     appMap.keys.chunked(100).forEach { batch ->
                         val paths = batch.joinToString(" ") { "'$it'" }
-                        Shell.cmd("su -mm -c \"du -sk $paths 2>/dev/null\"")
+                        Shell.cmd("du -sk $paths 2>/dev/null")
                             .exec().out.forEach { line ->
                                 val parts = line.trim().split(Regex("\\s+"), 2)
                                 if (parts.size == 2) {
@@ -349,13 +349,13 @@ object MigratorManager {
             if (state.migratorMode == MigratorMode.MANAGE) {
                 val baseDir = File(currentPath)
                 if (!baseDir.exists()) {
-                    Shell.cmd("su -c \"mkdir -p '$currentPath/Apps' '$currentPath/Partitions' && touch '$currentPath/.shifter_dir'\"")
+                    Shell.cmd("mkdir -p '$currentPath/Apps' '$currentPath/Partitions' && touch '$currentPath/.shifter_dir'")
                         .exec()
                 }
                 val appPaths =
                     selectedApps.joinToString(" ") { "'$currentPath/Apps/${if (it.isSystem) "System" else "User"}/${it.label}'" }
 
-                val sizeCmd = "su -mm -c \"du -sk $appPaths 2>/dev/null\""
+                val sizeCmd = "du -sk $appPaths 2>/dev/null"
                 val sizeOut = Shell.cmd(sizeCmd).exec().out
                 val totalFreedKb = sizeOut.sumOf {
                     it.trim().split("\\s+".toRegex()).firstOrNull()?.toLongOrNull() ?: 0L
@@ -440,7 +440,7 @@ object MigratorManager {
 
                 val scriptFile = File(context.cacheDir, "check_comps.sh")
                 scriptFile.writeText(script)
-                val out = Shell.cmd("su -mm -c 'sh \"${scriptFile.absolutePath}\"'").exec().out
+                val out = Shell.cmd("sh \"${scriptFile.absolutePath}\"").exec().out
                 scriptFile.delete()
 
                 out.forEach { line ->
@@ -467,7 +467,7 @@ object MigratorManager {
             val compsString = state.globalComponents.sorted().joinToString(" ")
 
             val command =
-                "su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'\""
+                "sh /data/adb/Shifter/ROM-Shifter.sh $operation '$compsString' '$currentPath'"
             if (state.migratorMode == MigratorMode.BACKUP_APPS) {
                 val iconScript = java.lang.StringBuilder()
                 val iconCacheDir = File(context.cacheDir, "shifter_icons")
@@ -527,7 +527,7 @@ object MigratorManager {
                 if (iconScript.isNotEmpty()) {
                     val scriptFile = File(context.cacheDir, "copy_icons.sh")
                     scriptFile.writeText(iconScript.toString())
-                    Shell.cmd("su -c 'sh \"${scriptFile.absolutePath}\"'").exec()
+                    Shell.cmd("sh \"${scriptFile.absolutePath}\"").exec()
                     scriptFile.delete()
                 }
             }
@@ -548,6 +548,11 @@ object MigratorManager {
                     is ShifterEvent.InfoStep -> {
                         updateProgress(actText, event.msg, -1)
                     }
+
+                    is ShifterEvent.Error -> {
+                        onComplete("Operation Failed!", event.msg)
+                    }
+
                     is ShifterEvent.GlobalDone -> {
                         val smartSize = formatSize(event.totalKb)
                         val actDone = if (isRestore) "Restore Complete!" else "Backup Complete!"
@@ -641,7 +646,7 @@ object MigratorManager {
         val mediaSizes = mutableMapOf<String, Long>()
         val obbSizes = mutableMapOf<String, Long>()
 
-        Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/media/* 2>/dev/null\"")
+        Shell.cmd("du -sk /data/media/0/Android/media/* 2>/dev/null")
             .exec().out.forEach { line ->
             val parts = line.trim().split(Regex("\\s+"), 2)
             if (parts.size == 2) {
@@ -651,7 +656,7 @@ object MigratorManager {
             }
         }
 
-        Shell.cmd("su -mm -c \"du -sk /data/media/0/Android/obb/* 2>/dev/null\"")
+        Shell.cmd("du -sk /data/media/0/Android/obb/* 2>/dev/null")
             .exec().out.forEach { line ->
             val parts = line.trim().split(Regex("\\s+"), 2)
             if (parts.size == 2) {

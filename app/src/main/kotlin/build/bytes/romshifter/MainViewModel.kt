@@ -387,6 +387,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        Shell.setDefaultBuilder(
+            Shell.Builder.create()
+                .setFlags(Shell.FLAG_MOUNT_MASTER)
+                .setTimeout(10)
+        )
         createNotificationChannel()
 
         viewModelScope.launch(Dispatchers.IO) {

@@ -16,5 +16,7 @@ sealed class ShifterEvent {
 
     data class FetchDone(val file: String) : ShifterEvent()
 
+    data class Error(val msg: String) : ShifterEvent()
+
     data class RawLog(val line: String) : ShifterEvent()
 }

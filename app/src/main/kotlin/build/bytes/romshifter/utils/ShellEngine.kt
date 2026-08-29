@@ -1,5 +1,6 @@
 package build.bytes.romshifter.utils
 
+import android.util.Log
 import build.bytes.romshifter.models.ShifterEvent
 import com.topjohnwu.superuser.CallbackList
 import com.topjohnwu.superuser.Shell
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.callbackFlow
 
 object ShellEngine {
 
+    private const val TAG = "ShifterShell"
+
     /**
      * Executes a root shell command and emits parsed ShifterEvents in real-time.
      */
@@ -16,13 +19,19 @@ object ShellEngine {
 
         val outputList = object : CallbackList<String>() {
             override fun onAddElement(line: String) {
+                Log.d(TAG, line)
                 trySend(parseLine(line))
             }
         }
 
         Shell.cmd(command)
             .to(outputList, outputList)
-            .submit {
+            .submit { result ->
+                if (!result.isSuccess) {
+                    val errorMsg = "Shell command failed with exit code: ${result.code}"
+                    Log.e(TAG, errorMsg)
+                    trySend(ShifterEvent.Error(errorMsg))
+                }
                 close()
             }
 
@@ -66,6 +75,10 @@ object ShellEngine {
             action == "GLOBAL_DONE" -> ShifterEvent.GlobalDone(
                 totalKb = partsMap["TOTAL"] ?: "0",
                 timeSec = partsMap["TIME"] ?: "0"
+            )
+
+            action == "ERROR" -> ShifterEvent.Error(
+                msg = partsMap["MSG"] ?: "Unknown Error"
             )
             action == "FETCH_DONE" -> ShifterEvent.FetchDone(
                 file = partsMap["FILE"] ?: ""
