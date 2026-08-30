@@ -494,6 +494,125 @@ do_restore_msgs() {
     fi
 }
 
+do_backup_wifi() {
+    local DEST="$1"
+    mkdir -p "$DEST"
+    local WIFI_DIR=""
+    [ -d /data/misc/apexdata/com.android.wifi ] && WIFI_DIR="/data/misc/apexdata/com.android.wifi"
+    [ -z "$WIFI_DIR" ] && [ -d /data/misc/wifi ] && WIFI_DIR="/data/misc/wifi"
+
+    if [ -n "$WIFI_DIR" ]; then
+        cp -a "$WIFI_DIR"/WifiConfigStore*.xml "$DEST/" 2>/dev/null
+        cp -a "$WIFI_DIR"/ipconfig.txt "$DEST/" 2>/dev/null
+    fi
+}
+
+do_restore_wifi() {
+    local SRC="$1"
+    [ -f "$SRC/WifiConfigStore.xml" ] || return
+
+    echo "INFO:STEP|MSG:Enabling Wifi for Restore..."
+    svc wifi enable 2>/dev/null
+    cmd wifi set-wifi-enabled enabled >/dev/null 2>&1
+    sleep 3
+
+    echo "INFO:STEP|MSG:Restoring Networks via API..."
+
+    $AWK_BIN '
+    /<Network>/ { ssid=""; psk=""; sec="open"; in_net=1 }
+    /<\/Network>/ {
+        if (ssid != "") {
+            gsub(/^&quot;|&quot;$/, "", ssid)
+            gsub(/^&quot;|&quot;$/, "", psk)
+            gsub(/^\"|\"$/, "", ssid)
+            gsub(/^\"|\"$/, "", psk)
+
+            gsub(/'\''/, "'\'\\\\\'\''", ssid)
+            gsub(/'\''/, "'\'\\\\\'\''", psk)
+
+            print ssid "|" sec "|" psk
+        }
+        in_net=0
+        ssid=""; psk=""; sec="open"
+    }
+    in_net && /name="SSID"/ {
+        if (match($0, />.*</)) {
+            ssid = substr($0, RSTART+1, RLENGTH-2)
+        }
+    }
+    in_net && /name="PreSharedKey"/ {
+        if (match($0, />.*</)) {
+            psk = substr($0, RSTART+1, RLENGTH-2)
+        }
+    }
+    in_net && /name="AllowedKeyMgmt"/ {
+        if ($0 ~ /02/) sec="wpa2"
+        else if ($0 ~ /0100/ || $0 ~ /0001/) sec="wpa3"
+    }
+    ' "$SRC/WifiConfigStore.xml" | while IFS='|' read -r ssid sec psk; do
+        if [ -n "$ssid" ]; then
+            echo "INFO:STEP|MSG:Adding: $ssid"
+            if [ "$sec" = "open" ]; then
+                cmd wifi add-network "$ssid" open >/dev/null 2>&1
+            else
+                cmd wifi add-network "$ssid" "$sec" "$psk" >/dev/null 2>&1
+            fi
+            ( sleep 1; cmd wifi connect-network "$ssid" >/dev/null 2>&1 ) &
+        fi
+    done
+
+    echo "INFO:STEP|MSG:Wifi Restore Done"
+}
+
+do_backup_wallpaper() {
+    local DEST="$1"
+    mkdir -p "$DEST"
+    cp -a /data/system/users/0/wallpaper* "$DEST/" 2>/dev/null
+}
+
+do_restore_wallpaper() {
+    local SRC="$1"
+    cp -af "$SRC/"wallpaper* /data/system/users/0/ 2>/dev/null
+    chown system:system /data/system/users/0/wallpaper* 2>/dev/null
+    chmod 600 /data/system/users/0/wallpaper* 2>/dev/null
+    restorecon /data/system/users/0/wallpaper* 2>/dev/null
+}
+
+do_backup_bt() {
+    local DEST="$1"
+    mkdir -p "$DEST"
+    local BT_PATH=""
+    [ -f /data/misc/bluedroid/bt_config.conf ] && BT_PATH="/data/misc/bluedroid/bt_config.conf"
+    [ -z "$BT_PATH" ] && [ -f /data/misc/bluetooth/bt_config.conf ] && BT_PATH="/data/misc/bluetooth/bt_config.conf"
+
+    if [ -n "$BT_PATH" ]; then
+        cp -a "$BT_PATH" "$DEST/" 2>/dev/null
+    fi
+}
+
+do_restore_bt() {
+    local SRC="$1"
+    [ -f "$SRC/bt_config.conf" ] || return
+    local TARGET=""
+    [ -d /data/misc/bluedroid ] && TARGET="/data/misc/bluedroid/bt_config.conf"
+    [ -z "$TARGET" ] && [ -d /data/misc/bluetooth ] && TARGET="/data/misc/bluetooth/bt_config.conf"
+
+    if [ -n "$TARGET" ]; then
+        echo "INFO:STEP|MSG:Stopping Bluetooth..."
+        svc bluetooth disable 2>/dev/null
+        cmd bluetooth_manager disable >/dev/null 2>&1
+        sleep 1
+        cp -f "$SRC/bt_config.conf" "$TARGET"
+        chown bluetooth:bluetooth "$TARGET" 2>/dev/null
+        chmod 660 "$TARGET" 2>/dev/null
+        restorecon "$TARGET" 2>/dev/null
+        sleep 1
+        echo "INFO:STEP|MSG:Starting Bluetooth..."
+        svc bluetooth enable 2>/dev/null
+        cmd bluetooth_manager enable >/dev/null 2>&1
+    fi
+}
+
 do_ors() {
     local SCRIPT_CONTENT="$1"
     local REBOOT_OPT="$2"
@@ -567,6 +686,12 @@ shifter_main() {
         --systemize) init_shifter; do_systemize "$2" "$3" "$4" "$5" ;;
         --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
         --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
+        --backup-wifi) init_shifter; do_backup_wifi "$2" ;;
+        --restore-wifi) init_shifter; do_restore_wifi "$2" ;;
+        --backup-wallpaper) init_shifter; do_backup_wallpaper "$2" ;;
+        --restore-wallpaper) init_shifter; do_restore_wallpaper "$2" ;;
+        --backup-bt) init_shifter; do_backup_bt "$2" ;;
+        --restore-bt) init_shifter; do_restore_bt "$2" ;;
         --ors) do_ors "$2" "$3" ;;
         --get-partitions) get_partitions ;;
         --get-images) get_images "$2" ;;

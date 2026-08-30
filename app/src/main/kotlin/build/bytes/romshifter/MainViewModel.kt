@@ -54,6 +54,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ?: SettingsManager.getDefaultPath()
     )
     val savedPath: StateFlow<String> = _savedPath.asStateFlow()
+
+    private val _availableNativeBackups = MutableStateFlow<Set<String>>(emptySet())
+    val availableNativeBackups: StateFlow<Set<String>> = _availableNativeBackups.asStateFlow()
+
+    fun refreshNativeBackups() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val backups = NativeManager.getAvailableBackups(_savedPath.value)
+            _availableNativeBackups.value = backups
+        }
+    }
     val isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
 
     private val _themeMode = MutableStateFlow(prefs.getInt("theme_mode", 0))
@@ -375,6 +385,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val notificationManager = NotificationManagerCompat.from(application)
+    private var lastNotificationUpdateTime = 0L
 
     companion object {
         private const val CHANNEL_PROGRESS_ID = "rom_shifter_progress_v2"
@@ -464,6 +475,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         progress: Int = -1,
         max: Int = 100
     ) {
+        val currentTime = System.currentTimeMillis()
+        if (progress != 100 && progress != -1 && currentTime - lastNotificationUpdateTime < 250) {
+            return
+        }
+        lastNotificationUpdateTime = currentTime
+
         if (ContextCompat.checkSelfPermission(
                 getApplication(),
                 "android.permission.POST_NOTIFICATIONS"
@@ -751,7 +768,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isBackup: Boolean,
         doSms: Boolean,
         doCall: Boolean,
-        doContacts: Boolean
+        doContacts: Boolean,
+        doWifi: Boolean,
+        doWallpaper: Boolean,
+        doBluetooth: Boolean
     ) {
         val title = if (isBackup) "Backing up Native Data" else "Restoring Native Data"
         _uiState.value = _uiState.value.copy(
@@ -766,6 +786,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (doSms) selectedItems.add("SMS")
         if (doCall) selectedItems.add("Call Logs")
         if (doContacts) selectedItems.add("Contacts")
+        if (doWifi) selectedItems.add("Wifi")
+        if (doWallpaper) selectedItems.add("Wallpaper")
+        if (doBluetooth) selectedItems.add("Bluetooth")
         val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -776,6 +799,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     doSms,
                     doCall,
                     doContacts,
+                    doWifi,
+                    doWallpaper,
+                    doBluetooth,
                     _savedPath.value
                 ) { step, prog ->
                     _uiState.value = _uiState.value.copy(currentStep = step, progress = prog)
@@ -784,6 +810,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.Main) {
                     val finalMsg = if (isBackup) "Backup Complete!" else "Restore Complete!"
 
+                    refreshNativeBackups()
                     showCompletionNotification(finalMsg, itemsProcessed)
                     _uiState.value = _uiState.value.copy(
                         isRunning = false,

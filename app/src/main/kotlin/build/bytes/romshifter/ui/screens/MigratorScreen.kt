@@ -80,6 +80,8 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,14 +143,41 @@ fun MigratorTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewM
 @Composable
 fun MigratorMenu(viewModel: MainViewModel) {
     val context = LocalContext.current
+    val availableBackups by viewModel.availableNativeBackups.collectAsState()
+
     var showNativeBackupDialog by remember { mutableStateOf(false) }
     var showNativeRestoreDialog by remember { mutableStateOf(false) }
     var showPermissionWarning by remember { mutableStateOf(false) }
-    var pendingNativeAction by remember { mutableStateOf<Pair<Boolean, Triple<Boolean, Boolean, Boolean>>?>(null) }
+    var pendingNativeAction by remember { mutableStateOf<Pair<Boolean, List<Boolean>>?>(null) }
 
     var doSms by remember { mutableStateOf(true) }
     var doCall by remember { mutableStateOf(true) }
     var doContacts by remember { mutableStateOf(false) }
+    var doWifi by remember { mutableStateOf(false) }
+    var doWallpaper by remember { mutableStateOf(false) }
+    var doBluetooth by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showNativeRestoreDialog, showNativeBackupDialog) {
+        if (showNativeRestoreDialog) {
+            viewModel.refreshNativeBackups()
+            doSms = false; doCall = false; doContacts = false
+            doWifi = false; doWallpaper = false; doBluetooth = false
+        } else if (showNativeBackupDialog) {
+            doSms = true; doCall = true; doContacts = false
+            doWifi = false; doWallpaper = false; doBluetooth = false
+        }
+    }
+
+    LaunchedEffect(availableBackups, showNativeRestoreDialog) {
+        if (showNativeRestoreDialog) {
+            if (availableBackups.contains("Messages.shift")) doSms = true
+            if (availableBackups.contains("CallLogs.shift")) doCall = true
+            if (availableBackups.contains("Contacts.shift")) doContacts = true
+            if (availableBackups.contains("Wifi.shift")) doWifi = true
+            if (availableBackups.contains("Wallpaper.shift")) doWallpaper = true
+            if (availableBackups.contains("Bluetooth.shift")) doBluetooth = true
+        }
+    }
 
     if (showPermissionWarning) {
         AlertDialog(
@@ -162,7 +191,22 @@ fun MigratorMenu(viewModel: MainViewModel) {
                     style = MaterialTheme.typography.bodyLarge
                 )
             },
-            confirmButton = { Button(onClick = { showPermissionWarning = false; pendingNativeAction?.let { (isBackup, flags) -> viewModel.runNativeDataOperation(context, isBackup, flags.first, flags.second, flags.third) } }) { Text("Yes, Start") } },
+            confirmButton = {
+                Button(onClick = {
+                    showPermissionWarning = false; pendingNativeAction?.let { (isBackup, flags) ->
+                    viewModel.runNativeDataOperation(
+                        context,
+                        isBackup,
+                        flags[0],
+                        flags[1],
+                        flags[2],
+                        flags[3],
+                        flags[4],
+                        flags[5]
+                    )
+                }
+                }) { Text("Yes, Start") }
+            },
             dismissButton = { TextButton(onClick = { showPermissionWarning = false }) { Text("Cancel") } }
         )
     }
@@ -175,7 +219,38 @@ fun MigratorMenu(viewModel: MainViewModel) {
             icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null, modifier = Modifier.size(28.dp)) },
             title = { Text(if (isBackup) "Backup Native Data" else "Restore Native Data") },            text = {
                 Column {
-                    val options = listOf("SMS Messages" to doSms, "Call Logs" to doCall, "Contacts (vCard)" to doContacts)
+                    val options = mutableListOf(
+                        "Messages" to doSms,
+                        "Call Logs" to doCall,
+                        "Contacts" to doContacts,
+                        "WiFi" to doWifi,
+                        "Wallpaper" to doWallpaper,
+                        "Bluetooth" to doBluetooth
+                    )
+
+                    if (!isBackup) {
+                        options.retainAll { (label, _) ->
+                            val fileName = when (label) {
+                                "Messages" -> "Messages.shift"
+                                "Call Logs" -> "CallLogs.shift"
+                                "Contacts" -> "Contacts.shift"
+                                "WiFi" -> "Wifi.shift"
+                                "Wallpaper" -> "Wallpaper.shift"
+                                "Bluetooth" -> "Bluetooth.shift"
+                                else -> ""
+                            }
+                            availableBackups.contains(fileName)
+                        }
+                    }
+
+                    if (options.isEmpty()) {
+                        Text(
+                            "No native backups found in this folder.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
                     options.forEach { (label, state) ->
                         Row(
                             modifier = Modifier
@@ -192,6 +267,9 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                         "SMS Messages" -> doSms = !doSms
                                         "Call Logs" -> doCall = !doCall
                                         "Contacts (vCard)" -> doContacts = !doContacts
+                                        "Wifi Configs" -> doWifi = !doWifi
+                                        "Wallpaper" -> doWallpaper = !doWallpaper
+                                        "Bluetooth Pairings" -> doBluetooth = !doBluetooth
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -210,18 +288,30 @@ fun MigratorMenu(viewModel: MainViewModel) {
             },
             confirmButton = {
                 Button(onClick = {
-                    if (doSms || doCall || doContacts) {
+                    if (doSms || doCall || doContacts || doWifi || doWallpaper || doBluetooth) {
 
                         val needsSms = doSms && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED
                         val needsCall = doCall && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED
                         val needsContacts = doContacts && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
 
                         if (needsSms || needsCall || needsContacts) {
-                            pendingNativeAction = Pair(isBackup, Triple(doSms, doCall, doContacts))
+                            pendingNativeAction = Pair(
+                                isBackup,
+                                listOf(doSms, doCall, doContacts, doWifi, doWallpaper, doBluetooth)
+                            )
                             showPermissionWarning = true
                         } else {
 
-                            viewModel.runNativeDataOperation(context, isBackup, doSms, doCall, doContacts)
+                            viewModel.runNativeDataOperation(
+                                context,
+                                isBackup,
+                                doSms,
+                                doCall,
+                                doContacts,
+                                doWifi,
+                                doWallpaper,
+                                doBluetooth
+                            )
                             showNativeBackupDialog = false
                             showNativeRestoreDialog = false
                         }

@@ -1,5 +1,6 @@
 package build.bytes.romshifter.utils
 
+import android.app.WallpaperManager
 import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.content.Context
@@ -8,6 +9,7 @@ import android.provider.ContactsContract
 import android.util.JsonReader
 import android.util.JsonToken
 import android.util.JsonWriter
+import android.util.Log
 import androidx.core.net.toUri
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +21,10 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 
 object NativeManager {
+    fun getAvailableBackups(savedPath: String): Set<String> {
+        val nativeDir = "$savedPath/Native"
+        return Shell.cmd("ls \"$nativeDir\"").exec().out.toSet()
+    }
 
     private fun decodeQuotedPrintable(input: String): String {
         return try {
@@ -44,13 +50,12 @@ object NativeManager {
     private fun importVcf(
         context: Context,
         vcfFile: File,
-        updateState: (step: String, progress: Int) -> Unit
+        updateProgress: (Int) -> Unit
     ) {
         try {
             val ops = ArrayList<ContentProviderOperation>()
             val unfoldedLines = mutableListOf<String>()
             var currentUnfoldedLine: StringBuilder? = null
-
             vcfFile.forEachLine { line ->
                 if (line.startsWith(" ") || line.startsWith("\t")) {
                     currentUnfoldedLine?.append(line.substring(1))
@@ -60,11 +65,9 @@ object NativeManager {
                 }
             }
             currentUnfoldedLine?.let { unfoldedLines.add(it.toString()) }
-
             var contactName: String? = null
             val phoneNumbers = mutableListOf<String>()
             var photoBytes: ByteArray? = null
-
             val totalLines = unfoldedLines.size
             unfoldedLines.forEachIndexed { index, line ->
                 when {
@@ -73,7 +76,6 @@ object NativeManager {
                         phoneNumbers.clear()
                         photoBytes = null
                     }
-
                     (line.startsWith("FN:", ignoreCase = true) || line.startsWith(
                         "FN;",
                         ignoreCase = true
@@ -86,7 +88,6 @@ object NativeManager {
                                 value
                             }
                     }
-
                     (line.startsWith("N:", ignoreCase = true) || line.startsWith(
                         "N;",
                         ignoreCase = true
@@ -101,12 +102,10 @@ object NativeManager {
                         contactName =
                             decoded.split(";").filter { it.isNotBlank() }.joinToString(" ")
                     }
-
                     line.startsWith("TEL", ignoreCase = true) -> {
                         val number = line.substringAfter(":").trim()
                         if (number.isNotEmpty()) phoneNumbers.add(number)
                     }
-
                     line.startsWith("PHOTO", ignoreCase = true) -> {
                         val base64Data = line.substringAfter(":").trim()
                         try {
@@ -125,7 +124,6 @@ object NativeManager {
                                     .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
                                     .build()
                             )
-
                             ops.add(
                                 ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
                                     .withValueBackReference(
@@ -142,7 +140,6 @@ object NativeManager {
                                     )
                                     .build()
                             )
-
                             for (number in phoneNumbers) {
                                 ops.add(
                                     ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
@@ -165,7 +162,6 @@ object NativeManager {
                                         .build()
                                 )
                             }
-
                             photoBytes?.let {
                                 ops.add(
                                     ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
@@ -182,17 +178,13 @@ object NativeManager {
                                 )
                             }
                         }
-
                         if (ops.size > 100) {
                             context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
                             ops.clear()
                         }
                     }
                 }
-                if (index % 50 == 0 && totalLines > 0) updateState(
-                    "Importing contacts...",
-                    90 + (index * 10 / totalLines).coerceAtMost(9)
-                )
+                if (index % 50 == 0 && totalLines > 0) updateProgress(index * 100 / totalLines)
             }
             if (ops.isNotEmpty()) context.contentResolver.applyBatch(
                 ContactsContract.AUTHORITY,
@@ -209,6 +201,9 @@ object NativeManager {
         doSms: Boolean,
         doCall: Boolean,
         doContacts: Boolean,
+        doWifi: Boolean,
+        doWallpaper: Boolean,
+        doBluetooth: Boolean,
         savedPath: String,
         updateState: (step: String, progress: Int) -> Unit
     ) = withContext(Dispatchers.IO) {
@@ -219,17 +214,34 @@ object NativeManager {
 
         Shell.cmd("mkdir -p \"$backupDir\"").exec()
 
+        val selectedItems = mutableListOf<String>()
+        if (doSms) selectedItems.add("SMS")
+        if (doCall) selectedItems.add("Calls")
+        if (doContacts) selectedItems.add("Contacts")
+        if (doWifi) selectedItems.add("Wifi")
+        if (doWallpaper) selectedItems.add("Wallpaper")
+        if (doBluetooth) selectedItems.add("Bluetooth")
+
+        val totalItems = selectedItems.size
+        if (totalItems == 0) return@withContext
+        var currentItemIndex = 0
+        val slice = 100f / totalItems
+
+        fun notify(step: String, internalProgress: Int) {
+            val totalProgress = (currentItemIndex * slice) + (internalProgress * slice / 100f)
+            updateState(step, totalProgress.toInt().coerceIn(0, 99))
+        }
+
         val permsToGrant = mutableListOf<String>()
         if (doSms) permsToGrant.addAll(listOf("READ_SMS", "WRITE_SMS"))
         if (doCall) permsToGrant.addAll(listOf("READ_CALL_LOG", "WRITE_CALL_LOG"))
         if (doContacts) permsToGrant.addAll(listOf("READ_CONTACTS", "WRITE_CONTACTS"))
-
         val grantCmds = permsToGrant.map { "pm grant $pkg android.permission.$it" }.toTypedArray()
         if (grantCmds.isNotEmpty()) Shell.cmd(*grantCmds).exec()
 
         if (isBackup) {
             if (doSms) {
-                updateState("Backing up SMS, MMS & RCS...", 0)
+                notify("Backing up SMS, MMS & RCS...", 0)
                 val smsFile = File(context.cacheDir, "SMS_DB.json")
                 val writer = JsonWriter(OutputStreamWriter(FileOutputStream(smsFile), "UTF-8"))
                 writer.beginArray()
@@ -244,24 +256,24 @@ object NativeManager {
                             if (value != null) writer.name(name).value(value)
                         }
                         writer.endObject()
-                        if (i++ % 100 == 0) updateState("Backing up basic SMS...", (i * 20) / count)
+                        if (i++ % 100 == 0) notify(
+                            "Backing up SMS ($i/$count)...",
+                            (i * 50) / count.coerceAtLeast(1)
+                        )
                     }
                 }
                 writer.endArray()
                 writer.close()
-
-                updateState("Backing up Advanced MMS & RCS...", 30)
-                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"")
-                    .exec()
-
-                updateState("Compressing Messages...", 40)
+                notify("Backing up Advanced MMS & RCS...", 60)
+                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --backup-msgs \"$cacheDir\"").exec()
+                notify("Compressing Messages...", 80)
                 Shell.cmd("cd \"$cacheDir\" && tar -cf - SMS_DB.json Advanced_Msgs 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"")
                     .exec()
-                Shell.cmd("rm -rf \"$cacheDir/SMS_DB.json\" \"$cacheDir/Advanced_Msgs\"")
-                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/SMS_DB.json\" \"$cacheDir/Advanced_Msgs\"").exec()
+                currentItemIndex++
             }
             if (doCall) {
-                updateState("Backing up Call Logs...", 50)
+                notify("Backing up Call Logs...", 0)
                 val callFile = File(context.cacheDir, "CallLog_DB.json")
                 val writer = JsonWriter(OutputStreamWriter(FileOutputStream(callFile), "UTF-8"))
                 writer.beginArray()
@@ -276,19 +288,22 @@ object NativeManager {
                             if (value != null) writer.name(name).value(value)
                         }
                         writer.endObject()
-                        if (i++ % 100 == 0) updateState("Backing up Call Logs...", 50 + ((i * 30) / count))
+                        if (i++ % 100 == 0) notify(
+                            "Backing up Call Logs ($i/$count)...",
+                            (i * 80) / count.coerceAtLeast(1)
+                        )
                     }
                 }
                 writer.endArray()
                 writer.close()
-
-                updateState("Compressing Call Logs...", 80)
+                notify("Compressing Call Logs...", 90)
                 Shell.cmd("cd \"$cacheDir\" && tar -cf - CallLog_DB.json 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/CallLogs.shift\"")
                     .exec()
                 callFile.delete()
+                currentItemIndex++
             }
             if (doContacts) {
-                updateState("Backing up Contacts (vCard)...", 90)
+                notify("Backing up Contacts (vCard)...", 0)
                 val vcfFile = File(context.cacheDir, "Contacts.vcf")
                 context.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null)?.use { cursor ->
                     if (cursor.count > 0) {
@@ -305,37 +320,63 @@ object NativeManager {
                     }
                 }
                 if (vcfFile.exists()) {
-                    updateState("Compressing Contacts...", 95)
+                    notify("Compressing Contacts...", 80)
                     Shell.cmd("cd \"$cacheDir\" && tar -cf - Contacts.vcf 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Contacts.shift\"")
                         .exec()
                     vcfFile.delete()
                 }
+                currentItemIndex++
+            }
+            if (doWifi) {
+                notify("Backing up Wifi Configs...", 0)
+                Shell.cmd("mkdir -p \"$cacheDir/Wifi\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wifi \"$cacheDir/Wifi\"")
+                    .exec()
+                notify("Compressing Wifi...", 50)
+                Shell.cmd("cd \"$cacheDir\" && tar -cf - Wifi 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wifi.shift\"")
+                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Wifi\"").exec()
+                currentItemIndex++
+            }
+            if (doWallpaper) {
+                notify("Backing up Wallpaper...", 0)
+                Shell.cmd("mkdir -p \"$cacheDir/Wallpaper\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wallpaper \"$cacheDir/Wallpaper\"")
+                    .exec()
+                notify("Compressing Wallpaper...", 50)
+                Shell.cmd("cd \"$cacheDir\" && tar -cf - Wallpaper 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wallpaper.shift\"")
+                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Wallpaper\"").exec()
+                currentItemIndex++
+            }
+            if (doBluetooth) {
+                notify("Backing up Bluetooth Pairings...", 0)
+                Shell.cmd("mkdir -p \"$cacheDir/Bluetooth\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-bt \"$cacheDir/Bluetooth\"")
+                    .exec()
+                notify("Compressing Bluetooth...", 50)
+                Shell.cmd("cd \"$cacheDir\" && tar -cf - Bluetooth 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Bluetooth.shift\"")
+                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Bluetooth\"").exec()
+                currentItemIndex++
             }
         } else {
             if (doSms) {
-                updateState("Extracting Messages...", 0)
+                notify("Extracting Messages...", 0)
                 Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Messages.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
                     .exec()
-
                 val hasRawDbs =
                     Shell.cmd("[ -d \"$cacheDir/Advanced_Msgs/Telephony\" ] && echo YES")
                         .exec().out.joinToString("").trim() == "YES"
-
                 if (hasRawDbs) {
-                    updateState("Injecting Raw MMS & RCS Databases...", 10)
+                    notify("Injecting Raw MMS & RCS Databases...", 30)
                     Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-msgs \"$cacheDir\"")
                         .exec()
                 } else {
-                    updateState("Restoring SMS from JSON...", 10)
-                    val currentSmsApp =
-                        Shell.cmd("cmd role get-role-holders android.app.role.SMS")
+                    notify("Restoring SMS from JSON...", 30)
+                    val currentSmsApp = Shell.cmd("cmd role get-role-holders android.app.role.SMS")
                         .exec().out.joinToString("").trim()
                     Shell.cmd("cmd role add-role-holder android.app.role.SMS $pkg").exec()
                     Shell.cmd("appops set $pkg WRITE_SMS allow").exec()
-
                     val tempSms = File(context.cacheDir, "SMS_DB.json")
                     Shell.cmd("chmod 666 \"${tempSms.absolutePath}\"").exec()
-
                     if (tempSms.exists()) {
                         val reader = JsonReader(InputStreamReader(FileInputStream(tempSms), "UTF-8"))
                         reader.beginArray()
@@ -350,30 +391,30 @@ object NativeManager {
                             }
                             reader.endObject()
                             try { context.contentResolver.insert("content://sms".toUri(), values) } catch (_: Exception) {}
-                            if (i++ % 100 == 0) updateState("Restoring SMS...", (i * 40) / 1000)
+                            if (i++ % 100 == 0) notify(
+                                "Restoring SMS ($i/1000+)...",
+                                30 + (i * 60 / 2000).coerceAtMost(60)
+                            )
                         }
                         reader.endArray()
                         reader.close()
                         tempSms.delete()
                     }
-
                     if (currentSmsApp.isNotEmpty()) {
                         Shell.cmd("cmd role add-role-holder android.app.role.SMS $currentSmsApp")
                             .exec()
                     }
                 }
-                Shell.cmd("rm -rf \"$cacheDir/Advanced_Msgs\" \"$cacheDir/SMS_DB.json\"")
-                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Advanced_Msgs\" \"$cacheDir/SMS_DB.json\"").exec()
+                currentItemIndex++
             }
             if (doCall) {
-                updateState("Extracting Call Logs...", 50)
+                notify("Extracting Call Logs...", 0)
                 Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/CallLogs.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
                     .exec()
-
                 Shell.cmd("appops set $pkg WRITE_CALL_LOG allow").exec()
                 val tempCall = File(context.cacheDir, "CallLog_DB.json")
                 Shell.cmd("chmod 666 \"${tempCall.absolutePath}\"").exec()
-
                 if (tempCall.exists()) {
                     val reader = JsonReader(InputStreamReader(FileInputStream(tempCall), "UTF-8"))
                     reader.beginArray()
@@ -388,25 +429,91 @@ object NativeManager {
                         }
                         reader.endObject()
                         try { context.contentResolver.insert(android.provider.CallLog.Calls.CONTENT_URI, values) } catch (_: Exception) {}
-                        if (i++ % 100 == 0) updateState("Restoring Call Logs...", 50 + ((i * 40) / 1000))
+                        if (i++ % 100 == 0) notify(
+                            "Restoring Call Logs ($i/1000+)...",
+                            20 + (i * 70 / 2000).coerceAtMost(70)
+                        )
                     }
                     reader.endArray()
                     reader.close()
                     tempCall.delete()
                 }
+                currentItemIndex++
             }
             if (doContacts) {
-                updateState("Extracting Contacts (vCard)...", 90)
+                notify("Extracting Contacts (vCard)...", 0)
                 Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Contacts.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
                     .exec()
-
                 val tempVcf = File(context.cacheDir, "Contacts.vcf")
                 Shell.cmd("chmod 666 \"${tempVcf.absolutePath}\"").exec()
-
                 if (tempVcf.exists()) {
-                    importVcf(context, tempVcf, updateState)
+                    importVcf(context, tempVcf) { prog -> notify("Importing Contacts...", prog) }
                     tempVcf.delete()
                 }
+                currentItemIndex++
+            }
+            if (doWifi) {
+                notify("Extracting Wifi Configs...", 0)
+                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wifi.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                    .exec()
+                notify("Applying Wifi Configs...", 50)
+                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wifi \"$cacheDir/Wifi\"")
+                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Wifi\"").exec()
+                currentItemIndex++
+            }
+            if (doWallpaper) {
+                notify("Extracting Wallpaper...", 0)
+                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wallpaper.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                    .exec()
+                notify("Applying Wallpaper Files...", 40)
+                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wallpaper \"$cacheDir/Wallpaper\"")
+                    .exec()
+                notify("Applying Wallpaper UI...", 80)
+                try {
+                    val wm = WallpaperManager.getInstance(context)
+                    val wpFile = File(cacheDir, "Wallpaper/wallpaper")
+                    if (wpFile.exists()) {
+                        Shell.cmd("chmod 666 \"${wpFile.absolutePath}\"").exec()
+                        FileInputStream(wpFile).use {
+                            wm.setStream(
+                                it,
+                                null,
+                                true,
+                                WallpaperManager.FLAG_SYSTEM
+                            )
+                        }
+                    }
+                    val lockFile = File(cacheDir, "Wallpaper/wallpaper_lock")
+                    val lockFileOrig = File(cacheDir, "Wallpaper/wallpaper_lock_orig")
+                    val finalLock =
+                        if (lockFile.exists()) lockFile else if (lockFileOrig.exists()) lockFileOrig else null
+                    if (finalLock != null) {
+                        Shell.cmd("chmod 666 \"${finalLock.absolutePath}\"").exec()
+                        FileInputStream(finalLock).use {
+                            wm.setStream(
+                                it,
+                                null,
+                                true,
+                                WallpaperManager.FLAG_LOCK
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("NativeManager", "Failed to apply wallpaper via API", e)
+                }
+                Shell.cmd("rm -rf \"$cacheDir/Wallpaper\"").exec()
+                currentItemIndex++
+            }
+            if (doBluetooth) {
+                notify("Extracting Bluetooth Pairings...", 0)
+                Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Bluetooth.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
+                    .exec()
+                notify("Applying Bluetooth Pairings...", 50)
+                Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-bt \"$cacheDir/Bluetooth\"")
+                    .exec()
+                Shell.cmd("rm -rf \"$cacheDir/Bluetooth\"").exec()
+                currentItemIndex++
             }
         }
     }
