@@ -264,12 +264,12 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                 )
                                 .clickable {
                                     when (label) {
-                                        "SMS Messages" -> doSms = !doSms
+                                        "Messages" -> doSms = !doSms
                                         "Call Logs" -> doCall = !doCall
-                                        "Contacts (vCard)" -> doContacts = !doContacts
-                                        "Wifi Configs" -> doWifi = !doWifi
+                                        "Contacts" -> doContacts = !doContacts
+                                        "WiFi" -> doWifi = !doWifi
                                         "Wallpaper" -> doWallpaper = !doWallpaper
-                                        "Bluetooth Pairings" -> doBluetooth = !doBluetooth
+                                        "Bluetooth" -> doBluetooth = !doBluetooth
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -346,6 +346,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
 @Composable
 fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
     val context = LocalContext.current
+    val availableBackups by viewModel.availableNativeBackups.collectAsState()
 
 
     val filteredApps by remember(
@@ -396,9 +397,21 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     }
 
     var showNativeDeleteDialog by remember { mutableStateOf(false) }
+
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
+    var delWifi by remember { mutableStateOf(true) }
+    var delWallpaper by remember { mutableStateOf(true) }
+    var delBluetooth by remember { mutableStateOf(true) }
+
+    LaunchedEffect(showNativeDeleteDialog) {
+        if (showNativeDeleteDialog) {
+            viewModel.refreshNativeBackups()
+            delSms = true; delCall = true; delContacts = true
+            delWifi = true; delWallpaper = true; delBluetooth = true
+        }
+    }
 
     val compIcons = mapOf(
         1 to Icons.Default.Android,
@@ -424,11 +437,36 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             title = { Text("Erase Native Backups") },
             text = {
                 Column {
-                    val options = listOf(
-                        "SMS Messages" to delSms,
+                    val options = mutableListOf(
+                        "Messages" to delSms,
                         "Call Logs" to delCall,
-                        "Contacts (vCard)" to delContacts
+                        "Contacts" to delContacts,
+                        "WiFi" to delWifi,
+                        "Wallpaper" to delWallpaper,
+                        "Bluetooth" to delBluetooth
                     )
+
+                    options.retainAll { (label, _) ->
+                        val fileName = when (label) {
+                            "Messages" -> "Messages.shift"
+                            "Call Logs" -> "CallLogs.shift"
+                            "Contacts" -> "Contacts.shift"
+                            "WiFi" -> "Wifi.shift"
+                            "Wallpaper" -> "Wallpaper.shift"
+                            "Bluetooth" -> "Bluetooth.shift"
+                            else -> ""
+                        }
+                        availableBackups.contains(fileName)
+                    }
+
+                    if (options.isEmpty()) {
+                        Text(
+                            "No native backups found to erase.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
                     options.forEach { (label, state) ->
                         Row(
                             modifier = Modifier
@@ -437,9 +475,12 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 .clip(MaterialTheme.shapes.medium)
                                 .clickable {
                                     when (label) {
-                                        "SMS Messages" -> delSms = !delSms
+                                        "Messages" -> delSms = !delSms
                                         "Call Logs" -> delCall = !delCall
-                                        "Contacts (vCard)" -> delContacts = !delContacts
+                                        "Contacts" -> delContacts = !delContacts
+                                        "WiFi" -> delWifi = !delWifi
+                                        "Wallpaper" -> delWallpaper = !delWallpaper
+                                        "Bluetooth" -> delBluetooth = !delBluetooth
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -465,11 +506,14 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             confirmButton = {
                 Button(
                     onClick = {
-                        if (delSms || delCall || delContacts) viewModel.deleteNativeBackups(
+                        if (delSms || delCall || delContacts || delWifi || delWallpaper || delBluetooth) viewModel.deleteNativeBackups(
                             context,
                             delSms,
                             delCall,
-                            delContacts
+                            delContacts,
+                            delWifi,
+                            delWallpaper,
+                            delBluetooth
                         ); showNativeDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

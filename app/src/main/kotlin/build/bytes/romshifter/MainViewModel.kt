@@ -836,7 +836,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         context: Context,
         doSms: Boolean,
         doCall: Boolean,
-        doContacts: Boolean
+        doContacts: Boolean,
+        doWifi: Boolean,
+        doWallpaper: Boolean,
+        doBluetooth: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = _savedPath.value
@@ -844,8 +847,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/Messages.shift'\"").exec()
             if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/CallLogs.shift'\"").exec()
             if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/Contacts.shift'\"").exec()
+            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Native/Wifi.shift'\"").exec()
+            if (doWallpaper) Shell.cmd("su -c \"rm -f '$path/Native/Wallpaper.shift'\"").exec()
+            if (doBluetooth) Shell.cmd("su -c \"rm -f '$path/Native/Bluetooth.shift'\"").exec()
 
             withContext(Dispatchers.Main) {
+                refreshNativeBackups()
                 Toast.makeText(
                     context,
                     "Selected Native Backups Deleted",
