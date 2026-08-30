@@ -101,6 +101,8 @@
   * ~15.60 GB in 1m 1s (Internal Storage, UFS 4.0, 5 Apps) - Poco X6 Pro
   * ~811.42 MB in 10s (Internal Storage, eMMC 5.1, 1 App) - realme 3 Pro
   * ~509 MB in 34s (SD Card, 2 Apps) - Redmi 10C
+* Updated Benchmarks are 15% much better than mentioned one, because of improved parallel
+  processing.
 * Fully compresses base APKs and split APKs along with other backup components.
 
   * This results in backup sizes around 3% smaller for a single app and 15%+ smaller for bulk
@@ -136,6 +138,7 @@
   * ~52.77 GB in 7m 28s (Internal Storage, UFS 4.0, 312 Apps) - Poco X6 Pro
   * ~16.33 GB in 1m 41s (Internal Storage, UFS 3.1, 1 App) - realme GT NEO 3T
   * ~1.31 GB in 32s (Internal Storage, eMMC 5.1, 5 Apps) - realme 3 Pro
+* Updated Benchmarks are 15% much better than mentioned one, due to parallel Apps Installation.
 * Removes GMS transport files to prevent notification delays after restoration.
 * Restores SELinux contexts to ensure apps such as Termux work correctly after restoration.
 * Installs restored apps with Google Play Store as the installer source to prevent crashes in apps
@@ -158,7 +161,10 @@
 
   * SMS (including RCS)
   * Call Logs
-  * Contacts
+  * Contacts (vCard)
+  * WiFi (Saved Devices)
+  * Wallpaper (Lock and Home Screen)
+  * Bluetooth (Paired Devices and Name)
 * Unlike other solutions, you do not need to set ROM Shifter as the default app to restore SMS, Call
   Logs, or Contacts.
 
