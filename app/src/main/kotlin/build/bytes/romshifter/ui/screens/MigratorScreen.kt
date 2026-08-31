@@ -267,7 +267,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                         "Messages" -> doSms = !doSms
                                         "Call Logs" -> doCall = !doCall
                                         "Contacts" -> doContacts = !doContacts
-                                        "Wifi" -> doWifi = !doWifi
+                                        "WiFi" -> doWifi = !doWifi
                                         "Wallpaper" -> doWallpaper = !doWallpaper
                                         "Bluetooth" -> doBluetooth = !doBluetooth
                                     }

@@ -1179,7 +1179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (doSms) selectedItems.add("SMS")
         if (doCall) selectedItems.add("Call Logs")
         if (doContacts) selectedItems.add("Contacts")
-        if (doWifi) selectedItems.add("Wifi")
+        if (doWifi) selectedItems.add("WiFi")
         if (doWallpaper) selectedItems.add("Wallpaper")
         if (doBluetooth) selectedItems.add("Bluetooth")
         val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"

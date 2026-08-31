@@ -218,7 +218,7 @@ object NativeManager {
         if (doSms) selectedItems.add("SMS")
         if (doCall) selectedItems.add("Calls")
         if (doContacts) selectedItems.add("Contacts")
-        if (doWifi) selectedItems.add("Wifi")
+        if (doWifi) selectedItems.add("WiFi")
         if (doWallpaper) selectedItems.add("Wallpaper")
         if (doBluetooth) selectedItems.add("Bluetooth")
 
@@ -328,10 +328,10 @@ object NativeManager {
                 currentItemIndex++
             }
             if (doWifi) {
-                notify("Backing up Wifi Configs...", 0)
+                notify("Backing up WiFi Configs...", 0)
                 Shell.cmd("mkdir -p \"$cacheDir/Wifi\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wifi \"$cacheDir/Wifi\"")
                     .exec()
-                notify("Compressing Wifi...", 50)
+                notify("Compressing WiFi...", 50)
                 Shell.cmd("cd \"$cacheDir\" && tar -cf - Wifi 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wifi.shift\"")
                     .exec()
                 Shell.cmd("rm -rf \"$cacheDir/Wifi\"").exec()
@@ -453,10 +453,10 @@ object NativeManager {
                 currentItemIndex++
             }
             if (doWifi) {
-                notify("Extracting Wifi Configs...", 0)
+                notify("Extracting WiFi Configs...", 0)
                 Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wifi.shift\" | tar -xf - -C \"$cacheDir\" 2>/dev/null")
                     .exec()
-                notify("Applying Wifi Configs...", 50)
+                notify("Applying WiFi Configs...", 50)
                 Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wifi \"$cacheDir/Wifi\"")
                     .exec()
                 Shell.cmd("rm -rf \"$cacheDir/Wifi\"").exec()
