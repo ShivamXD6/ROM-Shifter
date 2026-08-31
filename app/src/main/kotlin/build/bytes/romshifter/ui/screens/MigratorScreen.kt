@@ -264,12 +264,12 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                 )
                                 .clickable {
                                     when (label) {
-                                        "SMS Messages" -> doSms = !doSms
+                                        "Messages" -> doSms = !doSms
                                         "Call Logs" -> doCall = !doCall
-                                        "Contacts (vCard)" -> doContacts = !doContacts
-                                        "Wifi Configs" -> doWifi = !doWifi
+                                        "Contacts" -> doContacts = !doContacts
+                                        "Wifi" -> doWifi = !doWifi
                                         "Wallpaper" -> doWallpaper = !doWallpaper
-                                        "Bluetooth Pairings" -> doBluetooth = !doBluetooth
+                                        "Bluetooth" -> doBluetooth = !doBluetooth
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -399,6 +399,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
+    var delWifi by remember { mutableStateOf(true) }
+    var delWallpaper by remember { mutableStateOf(true) }
+    var delBluetooth by remember { mutableStateOf(true) }
 
     val compIcons = mapOf(
         1 to Icons.Default.Android,
@@ -425,9 +428,12 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             text = {
                 Column {
                     val options = listOf(
-                        "SMS Messages" to delSms,
+                        "Messages" to delSms,
                         "Call Logs" to delCall,
-                        "Contacts (vCard)" to delContacts
+                        "Contacts" to delContacts,
+                        "WiFi" to delWifi,
+                        "Wallpaper" to delWallpaper,
+                        "Bluetooth" to delBluetooth
                     )
                     options.forEach { (label, state) ->
                         Row(
@@ -437,9 +443,12 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 .clip(MaterialTheme.shapes.medium)
                                 .clickable {
                                     when (label) {
-                                        "SMS Messages" -> delSms = !delSms
+                                        "Messages" -> delSms = !delSms
                                         "Call Logs" -> delCall = !delCall
-                                        "Contacts (vCard)" -> delContacts = !delContacts
+                                        "Contacts" -> delContacts = !delContacts
+                                        "WiFi" -> delWifi = !delWifi
+                                        "Wallpaper" -> delWallpaper = !delWallpaper
+                                        "Bluetooth" -> delBluetooth = !delBluetooth
                                     }
                                 }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -465,11 +474,14 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             confirmButton = {
                 Button(
                     onClick = {
-                        if (delSms || delCall || delContacts) viewModel.deleteNativeBackups(
+                        if (delSms || delCall || delContacts || delWifi || delWallpaper || delBluetooth) viewModel.deleteNativeBackups(
                             context,
                             delSms,
                             delCall,
-                            delContacts
+                            delContacts,
+                            delWifi,
+                            delWallpaper,
+                            delBluetooth
                         ); showNativeDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

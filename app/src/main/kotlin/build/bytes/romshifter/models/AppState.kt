@@ -26,6 +26,28 @@ data class AppInfo(
     val activeComponents: Set<Int>? = null
 )
 
+data class AppInstallInfo(
+    val label: String = "Analyzing...",
+    val packageName: String = "",
+    val version: String = "",
+    val versionCode: Long = 0,
+    val size: String = "",
+    val path: String = "",
+    val uriString: String? = null,
+    val installedVersion: String? = null,
+    val installedVersionCode: Long? = null,
+    val installedSize: String? = null,
+    val isInstalled: Boolean = false,
+    val status: String = "Analyzing",
+    val iconPath: String? = null,
+    val isAnalysisComplete: Boolean = false,
+    val isSelected: Boolean = true,
+    val minSdk: String = "",
+    val targetSdk: String = "",
+    val architecture: String = "",
+    val signature: String = ""
+)
+
 data class FlashZip(val name: String, val path: String, val category: String)
 
 sealed class FlashAction {
@@ -64,5 +86,11 @@ data class AppState(
     val totalRequiredKb: Long = 0,
     val totalBackupsSizeKb: Long = 0,
     val storageUsedKb: Long = 0,
-    val storageFreeKb: Long = 0
+    val storageFreeKb: Long = 0,
+    val batchInstallApps: List<AppInstallInfo> = emptyList(),
+    val showAppInstaller: Boolean = false,
+    val isAnalyzingApps: Boolean = false,
+    val isInstallerIntent: Boolean = false,
+    val installStartTime: Long = 0,
+    val totalInstallTimeSeconds: Long = 0
 )

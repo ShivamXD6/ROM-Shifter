@@ -52,6 +52,24 @@
 </details>
 
 <details>
+<summary><b>Install Batch Apps (Click to Expand)</b></summary>
+
+*Install apps with multiple extensions simultaneously*
+
+* Supports Apk, Apks, XApk and Apkm for Installation (Single or Batch)
+* Much Faster than traditional apps installers. (Tested on Instagram 30 seconds on normal installer
+  vs 9 seconds with ROM Shifter Installer)
+* No Irritating Play Protect Detection While Installation.
+* Spoofs Installer source as Play Store (no more unknown apps installed detection on root)
+* Batch Installation (parallel up to 3 Apps to avoid throttling and get best Installation speed)
+* Good UI to show whether you're installing first time, Reinstalling the same, upgrading or
+  downgrading.
+* With support for displaying Target Android, Size, Selected and Current versions.
+* Icons indicator for the batch installations to Determine the Re-install, Downgrade or Upgrade.
+
+</details>
+
+<details>
 <summary><b>Backup Partitions (Click to Expand)</b></summary>
 
 *Create raw `.img` backups of selected device partitions.*

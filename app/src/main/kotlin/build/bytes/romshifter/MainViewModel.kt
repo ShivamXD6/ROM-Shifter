@@ -6,6 +6,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -13,9 +16,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import build.bytes.romshifter.models.AppInfo
+import build.bytes.romshifter.models.AppInstallInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
@@ -28,12 +34,17 @@ import build.bytes.romshifter.utils.ToolsManager
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.math.log10
+import kotlin.math.pow
 import kotlin.time.Duration.Companion.milliseconds
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -398,11 +409,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        Shell.setDefaultBuilder(
-            Shell.Builder.create()
-                .setFlags(Shell.FLAG_MOUNT_MASTER)
-                .setTimeout(10)
-        )
         createNotificationChannel()
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -568,6 +574,393 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(flashWizardStep = 0)
     }
 
+    fun analyzeApps(uris: List<Uri>, showInstaller: Boolean = false, isIntent: Boolean = false) {
+        val context = getApplication<Application>()
+        val initialApps = uris.mapIndexed { index, uri ->
+            val resolvedPath = FlashManager.getPathFromUri(context, uri) ?: ""
+            AppInstallInfo(
+                path = resolvedPath,
+                uriString = uri.toString(),
+                status = "Analyzing",
+                label = "Analyzing app ${index + 1}..."
+            )
+        }
+
+        _uiState.update {
+            it.copy(
+                isAnalyzingApps = true,
+                showAppInstaller = if (showInstaller) true else it.showAppInstaller,
+                isInstallerIntent = isIntent,
+                batchInstallApps = if (isIntent) initialApps else it.batchInstallApps + initialApps,
+                totalInstallTimeSeconds = 0L
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val pm = context.packageManager
+            val tempDir = File(context.cacheDir, "app_analysis")
+            tempDir.mkdirs()
+
+            coroutineScope {
+                initialApps.forEach { initialApp ->
+                    launch(Dispatchers.IO) {
+                        val uri = Uri.parse(initialApp.uriString)
+                        val originalPath = initialApp.path
+
+                        val analysisDir = File(
+                            tempDir,
+                            "analysis_${System.currentTimeMillis()}_${(0..100000).random()}"
+                        )
+                        analysisDir.mkdirs()
+
+                        val inputFile = File(analysisDir, "input_app")
+                        var success = false
+
+                        try {
+                            if (originalPath.isNotEmpty()) {
+                                Shell.cmd("cp '$originalPath' '${inputFile.absolutePath}'").exec()
+                                if (inputFile.exists() && inputFile.length() > 0) success = true
+                            }
+
+                            if (!success) {
+                                context.contentResolver.openInputStream(uri)?.use { input ->
+                                    FileOutputStream(inputFile).use { output -> input.copyTo(output) }
+                                }
+                                if (inputFile.exists() && inputFile.length() > 0) success = true
+                            }
+
+                            if (success) {
+                                var analysisPath = inputFile.absolutePath
+                                val ext = FlashManager.getPathFromUri(context, uri)
+                                    ?.substringAfterLast(".", "")?.lowercase() ?: ""
+
+                                if (ext != "apk" && ext.isNotEmpty()) {
+                                    val unzipDir = File(analysisDir, "unzipped")
+                                    unzipDir.mkdirs()
+                                    Shell.cmd("unzip -q '${inputFile.absolutePath}' *.apk -d '${unzipDir.absolutePath}'")
+                                        .exec()
+                                    val bestApk =
+                                        unzipDir.walk().filter { it.name.endsWith(".apk") }
+                                            .maxByOrNull { it.length() }
+                                    if (bestApk != null) analysisPath = bestApk.absolutePath
+                                }
+
+                                val info = pm.getPackageArchiveInfo(analysisPath, 0)
+                                if (info != null && info.applicationInfo != null) {
+                                    val appInfo = info.applicationInfo!!
+                                    appInfo.sourceDir = analysisPath
+                                    appInfo.publicSourceDir = analysisPath
+
+                                    val label = appInfo.loadLabel(pm).toString()
+                                    val pkgName = info.packageName
+                                    val version = info.versionName ?: "Unknown"
+                                    val vCode = PackageInfoCompat.getLongVersionCode(info)
+                                    val size = formatPreciseSize(inputFile.length())
+
+                                    val targetSdkInt = appInfo.targetSdkVersion
+                                    val verName = getAndroidVersion(targetSdkInt)
+                                    val targetSdk =
+                                        if (verName.startsWith("API")) verName else "Android $verName"
+
+                                    val arch = getArchitecture(analysisPath)
+
+                                    var installedVer: String? = null
+                                    var installedVCode: Long? = null
+                                    var isInst = false
+                                    try {
+                                        val instInfo = pm.getPackageInfo(pkgName, 0)
+                                        installedVer = instInfo.versionName
+                                        installedVCode =
+                                            PackageInfoCompat.getLongVersionCode(instInfo)
+                                        isInst = true
+                                    } catch (_: PackageManager.NameNotFoundException) {
+                                    }
+
+                                    val iconPath = getIconPath(pm, appInfo, pkgName)
+
+                                    val updatedApp = initialApp.copy(
+                                        label = label,
+                                        packageName = pkgName,
+                                        version = version,
+                                        versionCode = vCode,
+                                        size = size,
+                                        installedVersion = installedVer,
+                                        installedVersionCode = installedVCode,
+                                        isInstalled = isInst,
+                                        iconPath = iconPath,
+                                        status = "Pending",
+                                        isAnalysisComplete = true,
+                                        targetSdk = targetSdk,
+                                        architecture = arch
+                                    )
+
+                                    withContext(Dispatchers.Main) {
+                                        _uiState.update { state ->
+                                            val existing =
+                                                state.batchInstallApps.find { it.packageName == pkgName && it.isAnalysisComplete }
+                                            if (existing != null) {
+                                                if (vCode > existing.versionCode) {
+                                                    state.copy(batchInstallApps = state.batchInstallApps.filterNot { it.path == existing.path }
+                                                        .map {
+                                                            if (it.uriString == initialApp.uriString) updatedApp else it
+                                                        })
+                                                } else {
+                                                    state.copy(batchInstallApps = state.batchInstallApps.filterNot { it.uriString == initialApp.uriString })
+                                                }
+                                            } else {
+                                                state.copy(batchInstallApps = state.batchInstallApps.map {
+                                                    if (it.uriString == initialApp.uriString) updatedApp else it
+                                                })
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    throw Exception("Failed to parse package info")
+                                }
+                            } else {
+                                throw Exception("Failed to access file data")
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                _uiState.update { state ->
+                                    state.copy(batchInstallApps = state.batchInstallApps.map {
+                                        if (it.uriString == initialApp.uriString) it.copy(
+                                            status = "Error",
+                                            label = "Error: ${e.message}",
+                                            isAnalysisComplete = true
+                                        ) else it
+                                    })
+                                }
+                            }
+                        } finally {
+                            Shell.cmd("rm -rf '${analysisDir.absolutePath}'").exec()
+                        }
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(isAnalyzingApps = false) }
+            }
+        }
+    }
+
+    private fun formatPreciseSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (log10(bytes.toDouble()) / log10(1024.0)).toInt()
+        return String.format(
+            java.util.Locale.US,
+            "%.2f %s",
+            bytes / 1024.0.pow(digitGroups.toDouble()),
+            units[digitGroups]
+        )
+    }
+
+    private fun getAndroidVersion(api: Int): String {
+        return when (api) {
+            37 -> "17"; 36 -> "16"; 35 -> "15"; 34 -> "14"; 33 -> "13"; 32 -> "12.1"; 31 -> "12"
+            30 -> "11"; 29 -> "10"; 28 -> "9.0"; 27 -> "8.1"; 26 -> "8.0"
+            else -> "API $api"
+        }
+    }
+
+    private fun getArchitecture(path: String): String {
+        return try {
+            val out = Shell.cmd("su -mm -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
+            when {
+                out.contains("lib/arm64-v8a/") -> "arm64-v8a"
+                out.contains("lib/armeabi-v7a/") -> "armeabi-v7a"
+                out.contains("lib/x86_64/") -> "x86_64"
+                out.contains("lib/x86/") -> "x86"
+                else -> "Universal"
+            }
+        } catch (_: Exception) {
+            "Universal"
+        }
+    }
+
+    private fun getIconPath(
+        pm: PackageManager,
+        appInfo: android.content.pm.ApplicationInfo,
+        pkgName: String
+    ): String? {
+        val icon = appInfo.loadIcon(pm)
+        val iconDir = File(getApplication<Application>().cacheDir, "icons")
+        iconDir.mkdirs()
+        val iconFile = File(iconDir, "$pkgName.png")
+
+        try {
+            val bitmap = if (icon is BitmapDrawable) {
+                icon.bitmap
+            } else {
+                val b = createBitmap(
+                    icon.intrinsicWidth.coerceAtLeast(1),
+                    icon.intrinsicHeight.coerceAtLeast(1),
+                    Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(b)
+                icon.setBounds(0, 0, canvas.width, canvas.height)
+                icon.draw(canvas)
+                b
+            }
+            FileOutputStream(iconFile).use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            return iconFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    fun executeBatchInstall() {
+        val allApps = _uiState.value.batchInstallApps
+        val apps = allApps.filter { it.isSelected && it.isAnalysisComplete }
+        if (apps.isEmpty()) return
+
+        val startTime = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                isRunning = true,
+                currentAction = "Installing Apps...",
+                progress = -1,
+                installStartTime = startTime
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val targetFile = File(context.cacheDir, "install_targets.txt")
+            targetFile.writeText(apps.joinToString("\n") { "${it.path}|${it.packageName}|${it.label}" })
+
+            Shell.cmd("chmod 666 ${targetFile.absolutePath}").exec()
+
+            val activeLabels = mutableListOf<String>()
+
+            Shell.cmd("su -mm -c 'sh /data/adb/Shifter/ROM-Shifter.sh --install-apps ${targetFile.absolutePath}'")
+                .to(object : java.util.ArrayList<String>() {
+                    override fun add(element: String): Boolean {
+                        if (element.startsWith("INFO:STEP|MSG:INSTALLING|")) {
+                            val pkg = element.substringAfter("PKG:").substringBefore("|")
+                            val label = element.substringAfter("LABEL:")
+                            viewModelScope.launch(Dispatchers.Main) {
+                                synchronized(activeLabels) {
+                                    if (!activeLabels.contains(label)) activeLabels.add(label)
+                                }
+                                _uiState.update { state ->
+                                    val currentText = synchronized(activeLabels) {
+                                        activeLabels.take(3).joinToString(", ")
+                                    }
+                                    state.copy(
+                                        currentStep = "Installing $currentText...",
+                                        batchInstallApps = state.batchInstallApps.map {
+                                            if (it.packageName == pkg) it.copy(status = "Installing") else it
+                                        }
+                                    )
+                                }
+                            }
+                        } else if (element.startsWith("ACTION:INSTALL_DONE|PKG:")) {
+                            val pkg = element.substringAfter("PKG:")
+                            viewModelScope.launch(Dispatchers.Main) {
+                                _uiState.update { state ->
+                                    val labelToRemove =
+                                        state.batchInstallApps.find { it.packageName == pkg }?.label
+                                    synchronized(activeLabels) {
+                                        activeLabels.remove(labelToRemove)
+                                    }
+                                    val currentText = synchronized(activeLabels) {
+                                        activeLabels.take(3).joinToString(", ")
+                                    }
+                                    state.copy(
+                                        currentStep = if (currentText.isNotEmpty()) "Installing $currentText..." else "Finishing up...",
+                                        batchInstallApps = state.batchInstallApps.map {
+                                            if (it.packageName == pkg) it.copy(status = "Done") else it
+                                        }
+                                    )
+                                }
+                            }
+                        } else if (element.startsWith("ACTION:INSTALL_ERROR|PKG:")) {
+                            val pkg = element.substringAfter("PKG:").substringBefore("|")
+                            viewModelScope.launch(Dispatchers.Main) {
+                                _uiState.update { state ->
+                                    val labelToRemove =
+                                        state.batchInstallApps.find { it.packageName == pkg }?.label
+                                    synchronized(activeLabels) {
+                                        activeLabels.remove(labelToRemove)
+                                    }
+                                    val currentText = synchronized(activeLabels) {
+                                        activeLabels.take(3).joinToString(", ")
+                                    }
+                                    state.copy(
+                                        currentStep = if (currentText.isNotEmpty()) "Installing $currentText..." else "Error occurred during some installs.",
+                                        batchInstallApps = state.batchInstallApps.map {
+                                            if (it.packageName == pkg) it.copy(status = "Error") else it
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        return super.add(element)
+                    }
+                }).exec()
+
+            val endTime = System.currentTimeMillis()
+            val totalSeconds = (endTime - startTime) / 1000
+
+            withContext(Dispatchers.Main) {
+                val finalApps =
+                    _uiState.value.batchInstallApps.filter { it.isSelected && it.isAnalysisComplete }
+                val successCount = finalApps.count { it.status == "Done" }
+                val errorCount = finalApps.count { it.status == "Error" }
+
+                val title =
+                    if (errorCount > 0) "Installation Finished with Errors" else "Installation Complete"
+                val content =
+                    if (errorCount > 0) "Installed $successCount, Failed $errorCount apps in ${totalSeconds}s."
+                    else "Installed $successCount apps in ${totalSeconds}s."
+
+                showCompletionNotification(title, content)
+                _uiState.update {
+                    it.copy(
+                        isRunning = false,
+                        currentAction = title,
+                        currentStep = content,
+                        progress = 100,
+                        totalInstallTimeSeconds = totalSeconds
+                    )
+                }
+                targetFile.delete()
+            }
+        }
+    }
+
+    fun closeAppInstaller(onFinish: (() -> Unit)? = null) {
+        val wasIntent = _uiState.value.isInstallerIntent
+        _uiState.update {
+            it.copy(
+                showAppInstaller = false,
+                batchInstallApps = emptyList(),
+                isInstallerIntent = false,
+                totalInstallTimeSeconds = 0L
+            )
+        }
+        if (wasIntent) {
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(100.milliseconds)
+                onFinish?.invoke()
+            }
+        }
+    }
+
+    fun toggleAppInstallSelection(path: String) {
+        _uiState.update { state ->
+            state.copy(batchInstallApps = state.batchInstallApps.map {
+                if (it.path == path) it.copy(isSelected = !it.isSelected) else it
+            })
+        }
+    }
+
     fun removeAction(index: Int) {
         val l = _flashActions.value.toMutableList()
         if (index in l.indices) {
@@ -660,7 +1053,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value.flashRebootOption
             )
             withContext(Dispatchers.Main) {
-                _uiState.value = _uiState.value.copy(flashWizardStep = 4)
+                _uiState.update { it.copy(flashWizardStep = 4) }
             }
         }
     }
@@ -836,7 +1229,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         context: Context,
         doSms: Boolean,
         doCall: Boolean,
-        doContacts: Boolean
+        doContacts: Boolean,
+        doWifi: Boolean,
+        doWallpaper: Boolean,
+        doBluetooth: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = _savedPath.value
@@ -844,7 +1240,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/Messages.shift'\"").exec()
             if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/CallLogs.shift'\"").exec()
             if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/Contacts.shift'\"").exec()
+            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Native/Wifi.shift'\"").exec()
+            if (doWallpaper) Shell.cmd("su -c \"rm -f '$path/Native/Wallpaper.shift'\"").exec()
+            if (doBluetooth) Shell.cmd("su -c \"rm -f '$path/Native/Bluetooth.shift'\"").exec()
 
+            refreshNativeBackups()
             withContext(Dispatchers.Main) {
                 Toast.makeText(
                     context,

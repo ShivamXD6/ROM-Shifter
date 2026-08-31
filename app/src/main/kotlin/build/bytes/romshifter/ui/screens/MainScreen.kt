@@ -113,6 +113,8 @@ import build.bytes.romshifter.models.AppInfo
 import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
+import build.bytes.romshifter.ui.components.AppInstallerDialog
+import build.bytes.romshifter.ui.components.BatchInstallerDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -136,6 +138,27 @@ fun MainScreen(viewModel: MainViewModel) {
     val showUpdateDialog by viewModel.showUpdateDialog.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
     val context = LocalContext.current
+
+    if (appState.showAppInstaller && appState.batchInstallApps.isNotEmpty()) {
+        if (appState.batchInstallApps.size == 1 && !appState.isRunning && appState.totalInstallTimeSeconds == 0L) {
+            AppInstallerDialog(
+                app = appState.batchInstallApps[0],
+                onDismiss = { viewModel.closeAppInstaller { (context as? android.app.Activity)?.finish() } },
+                onInstall = { viewModel.executeBatchInstall() }
+            )
+        } else {
+            BatchInstallerDialog(
+                apps = appState.batchInstallApps,
+                isRunning = appState.isRunning,
+                isAnalyzing = appState.isAnalyzingApps,
+                currentStep = appState.currentStep,
+                totalTime = appState.totalInstallTimeSeconds,
+                onInstall = { viewModel.executeBatchInstall() },
+                onCancel = { viewModel.closeAppInstaller { (context as? android.app.Activity)?.finish() } },
+                onToggleSelect = { viewModel.toggleAppInstallSelection(it) }
+            )
+        }
+    }
 
     if (showUpdateDialog && updateInfo != null) {
         AlertDialog(

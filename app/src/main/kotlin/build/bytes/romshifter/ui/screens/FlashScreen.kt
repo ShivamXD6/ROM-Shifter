@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
@@ -137,6 +138,11 @@ fun FlashTab(
                 }
             }
         }
+    }
+
+    val appLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) viewModel.analyzeApps(uris, showInstaller = true)
     }
 
     if (showBackupDialog) {
@@ -890,7 +896,22 @@ fun FlashTab(
                     .weight(1f)
                     .verticalScroll(rememberScrollState())) {
                     Spacer(modifier = Modifier.height(16.dp))
+
                     MenuCard("Start Auto Flash Wizard", Icons.Default.FlashOn, "Auto Flash zip files in recovery, ideal for broken recovery touch") { viewModel.openFlashWizard() }
+                    MenuCard(
+                        "Install Batch Apps",
+                        Icons.Default.Download,
+                        "Install multiple APK/APKS/XAPK/APKM files in parallel"
+                    ) {
+                        appLauncher.launch(
+                            arrayOf(
+                                "application/vnd.android.package-archive",
+                                "application/octet-stream",
+                                "application/zip",
+                                "application/x-zip-compressed"
+                            )
+                        )
+                    }
                     MenuCard("Backup Partitions", Icons.Default.Save, "Extract partition images to local storage") { showBackupDialog = true }
                     MenuCard("Flash Partitions", Icons.Default.SystemUpdateAlt, "Flash images directly to active slot") { backedUpImages = viewModel.getBackedUpImages(); selectedPartition = ""; customImgPath = ""; restoreMode = "backup"; showRestoreDialog = true }
                     Spacer(modifier = Modifier.height(120.dp))

@@ -31,7 +31,7 @@ init_shifter() {
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
-COOLDOWN() { while [ $(jobs | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
+COOLDOWN() { while [ $(jobs -r | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
 SANITIZE() { echo "$1" | $SED_BIN 's/[^a-zA-Z0-9]/_/g'; }
 
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
@@ -271,6 +271,76 @@ DO_RESTORE() {
 
     rm -rf "$TMP_PKG" &
     echo "ACTION:RESTORE_DONE|PKG:$PKG"
+}
+
+INSTALL_APP_FILE() {
+    local FILE="$1"
+    local PKG="$2"
+    local LABEL="$3"
+    local EXT="${FILE##*.}"
+    local T_PKG="$AM_TMP/install_$PKG"
+    rm -rf "$T_PKG"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
+
+    echo "INFO:STEP|MSG:INSTALLING|PKG:$PKG|LABEL:$LABEL"
+
+    case "$EXT" in
+        apk|APK)
+            cp "$FILE" "$T_PKG/base.apk"
+            ;;
+        *)
+            unzip -q "$FILE" -d "$T_PKG" 2>/dev/null
+            ;;
+    esac
+
+    chmod -R 777 "$T_PKG" 2>/dev/null
+    local apks=$(find "$T_PKG" -type f -name "*.apk" | sort)
+
+    if [ -n "$apks" ]; then
+        local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d 2>/dev/null" | tr -dc '0-9')
+        [ -z "$SID" ] && SID=$(cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d 2>/dev/null | tr -dc '0-9')
+
+        if [ -n "$SID" ]; then
+            local c=0
+            for a in $apks; do
+                c=$((c + 1))
+                su 1000 -c "cmd package install-write $SID split_${c} '$a' >/dev/null 2>&1" || cmd package install-write $SID split_${c} '$a' >/dev/null 2>&1
+            done
+            local RES=$(su 1000 -c "cmd package install-commit $SID 2>&1" || cmd package install-commit $SID 2>&1)
+            rm -rf "$T_PKG"
+            if echo "$RES" | grep -iq "Success"; then
+                echo "ACTION:INSTALL_DONE|PKG:$PKG"
+            else
+                echo "ACTION:INSTALL_ERROR|PKG:$PKG|MSG:$RES"
+            fi
+         else
+            local err=0
+            for a in $apks; do
+                pm install -r -d "$a" >/dev/null 2>&1 || err=1
+            done
+            rm -rf "$T_PKG"
+            [ "$err" -eq 0 ] && echo "ACTION:INSTALL_DONE|PKG:$PKG" || echo "ACTION:INSTALL_ERROR|PKG:$PKG"
+        fi
+    else
+        rm -rf "$T_PKG"
+        echo "ACTION:INSTALL_ERROR|PKG:$PKG"
+    fi
+}
+
+do_install_apps() {
+    local TARGET_FILE="$1"
+    [ ! -f "$TARGET_FILE" ] && return
+
+    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0; setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
+
+    while IFS='|' read -r file pkg label || [ -n "$file" ]; do
+        [ -z "$file" ] && continue
+        COOLDOWN 3
+        INSTALL_APP_FILE "$file" "$pkg" "$label" &
+    done < "$TARGET_FILE"
+    wait
+
+    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1; setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
+    echo "ACTION:GLOBAL_DONE"
 }
 
 do_backup() {
@@ -692,6 +762,7 @@ shifter_main() {
         --restore-wallpaper) init_shifter; do_restore_wallpaper "$2" ;;
         --backup-bt) init_shifter; do_backup_bt "$2" ;;
         --restore-bt) init_shifter; do_restore_bt "$2" ;;
+        --install-apps) init_shifter; do_install_apps "$2" ;;
         --ors) do_ors "$2" "$3" ;;
         --get-partitions) get_partitions ;;
         --get-images) get_images "$2" ;;

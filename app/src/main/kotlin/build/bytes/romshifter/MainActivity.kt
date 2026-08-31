@@ -55,10 +55,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (intent?.action == Intent.ACTION_VIEW && intent.type == "application/zip") {
-            intent.data?.let { uri ->
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val data = intent.data ?: return
+        val type = intent.type
+
+        if (action == Intent.ACTION_VIEW) {
+            val path = data.path?.lowercase() ?: ""
+            if (path.endsWith(".zip") || type == "application/zip") {
+                viewModel.setTab(1)
                 viewModel.openFlashWizard()
-                viewModel.processSelectedZips(listOf(uri), append = true)
+                viewModel.processSelectedZips(listOf(data), append = true)
             }
         }
     }
