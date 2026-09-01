@@ -31,7 +31,7 @@ init_shifter() {
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
-COOLDOWN() { while [ $(jobs -r | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
+COOLDOWN() { while [ $(jobs | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
 SANITIZE() { echo "$1" | $SED_BIN 's/[^a-zA-Z0-9]/_/g'; }
 
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
@@ -384,7 +384,7 @@ do_backup() {
         export APP_COMPS="$app_comps"
         DO_BACKUP "$pkg" "$label" "$ver" "$vcode" "$type" "$apath" "$CURRENT_APP" "$TOTAL_APPS" "$size" "$s_app" "$s_data" "$s_med"
     done < "$AM_TMP/selected_apps_sorted.txt"
-    COOLDOWN 2
+    COOLDOWN 1
     echo "INFO:STEP|MSG:Almost Done, Please Wait..."
     wait
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB_JOB|TIME:$((( $(date +%s) - START )))"
@@ -468,7 +468,7 @@ do_restore() {
         export APP_COMPS="${app_comps:-$1}"
         DO_RESTORE "$pkg" "$label" "$ver" "$vcode" "$type" "$apath" "$CURRENT_APP" "$TOTAL_APPS" "$size" "$s_app" "$s_data" "$s_med"
     done < "$AM_TMP/selected_restores_sorted.txt"
-    COOLDOWN 2
+    COOLDOWN 1
     echo "INFO:STEP|MSG:Almost Done, Please Wait..."
     wait
 
@@ -492,7 +492,6 @@ do_restore() {
             ) &
         done < "$AM_TMP/restore_queue.list"
     fi
-
     wait
 
     cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1; setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
