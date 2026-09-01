@@ -542,11 +542,19 @@ object MigratorManager {
                         val formattedSize = if (rawKb > 0) formatSize(rawKb.toString()) else ""
                         val sizeInfo = if (formattedSize.isNotEmpty()) " [Size: $formattedSize]" else ""
 
-                        updateProgress(actText, "${event.label}$sizeInfo (${event.current}/${event.total})$partsString", event.percent)
+                        val title =
+                            if (event.jobs > 0) "$actText (+${event.jobs} more)" else actText
+                        updateProgress(
+                            title,
+                            "${event.label}$sizeInfo (${event.current}/${event.total})$partsString",
+                            event.percent
+                        )
                     }
 
                     is ShifterEvent.InfoStep -> {
-                        updateProgress(actText, event.msg, -1)
+                        val title =
+                            if (event.jobs > 0) "$actText (+${event.jobs} more)" else actText
+                        updateProgress(title, event.msg, -1)
                     }
 
                     is ShifterEvent.Error -> {

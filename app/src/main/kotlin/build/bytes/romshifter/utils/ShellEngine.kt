@@ -68,9 +68,11 @@ object ShellEngine {
                 total = partsMap["TOT"]?.toIntOrNull() ?: 0,
                 percent = partsMap["PCT"]?.toIntOrNull() ?: 0,
                 size = partsMap["SIZE"] ?: "",
+                jobs = partsMap["JOBS"]?.toIntOrNull() ?: 0,
             )
             info == "STEP" -> ShifterEvent.InfoStep(
-                msg = partsMap["MSG"] ?: ""
+                msg = partsMap["MSG"] ?: "",
+                jobs = partsMap["JOBS"]?.toIntOrNull() ?: 0
             )
             action == "GLOBAL_DONE" -> ShifterEvent.GlobalDone(
                 totalKb = partsMap["TOTAL"] ?: "0",

@@ -8,9 +8,10 @@ sealed class ShifterEvent {
         val total: Int,
         val percent: Int,
         val size: String,
+        val jobs: Int = 0,
     ) : ShifterEvent()
 
-    data class InfoStep(val msg: String) : ShifterEvent()
+    data class InfoStep(val msg: String, val jobs: Int = 0) : ShifterEvent()
 
     data class GlobalDone(val totalKb: String, val timeSec: String) : ShifterEvent()
 

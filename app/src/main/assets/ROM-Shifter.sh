@@ -139,7 +139,7 @@ DO_BACKUP() {
 
     [ "${TOTAL_KB_JOB:-0}" -eq 0 ] && TOTAL_KB_JOB=1
     START_PCT=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
-    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE"
+    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE|JOBS:$(jobs | wc -l)"
 
     OLD_APP=0; OLD_DATA=0; OLD_MED=0; OLD_SSAID=""
     if [ -f "$APP_DIR/Meta.txt" ]; then
@@ -204,7 +204,7 @@ DO_BACKUP() {
 
     local final_pct=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
     [ "$final_pct" -gt 100 ] && final_pct=100
-    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
+    echo "ACTION:BACKUP_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE|JOBS:$(jobs | wc -l)"
 
     SYS_PATH=""; [ "$TYPE" = "System" ] && SYS_PATH=$(dumpsys package "$PKG" 2>/dev/null | $AWK_BIN -F= '/codePath=\/(system|product|vendor|oem|odm)/{print $2; exit}')
 
@@ -235,7 +235,7 @@ DO_RESTORE() {
 
     [ "${TOTAL_KB_JOB:-0}" -eq 0 ] && TOTAL_KB_JOB=1
     START_PCT=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE"
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$START_PCT|SIZE:$SIZE|JOBS:$(jobs | wc -l)"
 
     [ -z "$PKG" ] && return
     UID=$($STAT_BIN -c '%u' "/data/data/$PKG" 2>/dev/null)
@@ -267,7 +267,7 @@ DO_RESTORE() {
     CHK 4 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_MED))
     local final_pct=$(( TOTAL_KB_DONE * 100 / TOTAL_KB_JOB ))
     [ "$final_pct" -gt 100 ] && final_pct=100
-    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE"
+    echo "ACTION:RESTORE_START|PKG:$PKG|LABEL:$LABEL|VER:$VER|CUR:$CUR_IDX|TOT:$TOT_IDX|PCT:$final_pct|SIZE:$SIZE|JOBS:$(jobs | wc -l)"
 
     rm -rf "$TMP_PKG" &
     echo "ACTION:RESTORE_DONE|PKG:$PKG"
@@ -281,7 +281,7 @@ INSTALL_APP_FILE() {
     local T_PKG="$AM_TMP/install_$PKG"
     rm -rf "$T_PKG"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
 
-    echo "INFO:STEP|MSG:INSTALLING|PKG:$PKG|LABEL:$LABEL"
+    echo "INFO:STEP|MSG:INSTALLING|PKG:$PKG|LABEL:$LABEL|JOBS:$(jobs | wc -l)"
 
     case "$EXT" in
         apk|APK)
@@ -434,7 +434,7 @@ do_restore() {
         if CHK 1 && [ -f "$APP_DIR/App.shift" ] && ! PKG_INSTALLED "$pkg" "$vcode"; then
              COOLDOWN 3
              (
-                 echo "INFO:STEP|MSG:Installing $label..."
+                 echo "INFO:STEP|MSG:Installing $label...|JOBS:$(jobs | wc -l)"
                  local T_PKG="$AM_TMP/$pkg"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
                  "$ZAPDOS" -d -q -c "$APP_DIR/App.shift" | $TAR_BIN -xf - -C "$T_PKG" 2>/dev/null
                  chmod -R 777 "$T_PKG" 2>/dev/null
@@ -500,12 +500,14 @@ do_restore() {
 
 do_remove() {
     local PKG="$1"
-    cmd package uninstall "$PKG" >/dev/null 2>&1
-    cmd package uninstall --user 0 "$PKG" >/dev/null 2>&1
+    COOLDOWN 5
+    cmd package uninstall "$PKG" >/dev/null 2>&1 &
+    cmd package uninstall --user 0 "$PKG" >/dev/null 2>&1 &
 }
 
 do_restore_debloat() {
-    cmd package install-existing "$1" >/dev/null 2>&1
+    COOLDOWN 5
+    cmd package install-existing "$1" >/dev/null 2>&1 &
 }
 
 do_systemize() {
