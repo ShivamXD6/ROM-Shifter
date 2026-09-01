@@ -195,6 +195,61 @@ object NativeManager {
         }
     }
 
+    private fun restoreFromJson(
+        context: Context,
+        jsonFile: File,
+        contentUri: Uri,
+        stepName: String,
+        startProgress: Int,
+        progressWeight: Int,
+        notify: (String, Int) -> Unit
+    ) {
+        if (!jsonFile.exists()) return
+        var total = 0
+        try {
+            val countReader = JsonReader(InputStreamReader(FileInputStream(jsonFile), "UTF-8"))
+            countReader.beginArray()
+            while (countReader.hasNext()) {
+                countReader.skipValue()
+                total++
+            }
+            countReader.close()
+        } catch (_: Exception) {
+        }
+
+        val reader = JsonReader(InputStreamReader(FileInputStream(jsonFile), "UTF-8"))
+        reader.beginArray()
+        var i = 0
+        while (reader.hasNext()) {
+            val values = ContentValues()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val name = reader.nextName()
+                if (reader.peek() == JsonToken.NULL) {
+                    reader.nextNull()
+                } else {
+                    val value = reader.nextString()
+                    if (name != "_id") values.put(name, value)
+                }
+            }
+            reader.endObject()
+            try {
+                context.contentResolver.insert(contentUri, values)
+            } catch (_: Exception) {
+            }
+            if (i++ % 100 == 0) {
+                val currentProgress =
+                    if (total > 0) (i * progressWeight / total) else (i * progressWeight / 2000)
+                notify(
+                    "Restoring $stepName...",
+                    startProgress + currentProgress.coerceAtMost(progressWeight)
+                )
+            }
+        }
+        reader.endArray()
+        reader.close()
+    }
+
     suspend fun runOperation(
         context: Context,
         isBackup: Boolean,
@@ -377,29 +432,16 @@ object NativeManager {
                     Shell.cmd("appops set $pkg WRITE_SMS allow").exec()
                     val tempSms = File(context.cacheDir, "SMS_DB.json")
                     Shell.cmd("chmod 666 \"${tempSms.absolutePath}\"").exec()
-                    if (tempSms.exists()) {
-                        val reader = JsonReader(InputStreamReader(FileInputStream(tempSms), "UTF-8"))
-                        reader.beginArray()
-                        var i = 0
-                        while (reader.hasNext()) {
-                            val values = ContentValues()
-                            reader.beginObject()
-                            while (reader.hasNext()) {
-                                val name = reader.nextName()
-                                if (reader.peek() == JsonToken.NULL) { reader.nextNull() }
-                                else { val value = reader.nextString(); if (name != "_id") values.put(name, value) }
-                            }
-                            reader.endObject()
-                            try { context.contentResolver.insert("content://sms".toUri(), values) } catch (_: Exception) {}
-                            if (i++ % 100 == 0) notify(
-                                "Restoring SMS ($i/1000+)...",
-                                30 + (i * 60 / 2000).coerceAtMost(60)
-                            )
-                        }
-                        reader.endArray()
-                        reader.close()
-                        tempSms.delete()
-                    }
+                    restoreFromJson(
+                        context,
+                        tempSms,
+                        "content://sms".toUri(),
+                        "SMS",
+                        30,
+                        60,
+                        ::notify
+                    )
+                    tempSms.delete()
                     if (currentSmsApp.isNotEmpty()) {
                         Shell.cmd("cmd role add-role-holder android.app.role.SMS $currentSmsApp")
                             .exec()
@@ -415,29 +457,16 @@ object NativeManager {
                 Shell.cmd("appops set $pkg WRITE_CALL_LOG allow").exec()
                 val tempCall = File(context.cacheDir, "CallLog_DB.json")
                 Shell.cmd("chmod 666 \"${tempCall.absolutePath}\"").exec()
-                if (tempCall.exists()) {
-                    val reader = JsonReader(InputStreamReader(FileInputStream(tempCall), "UTF-8"))
-                    reader.beginArray()
-                    var i = 0
-                    while (reader.hasNext()) {
-                        val values = ContentValues()
-                        reader.beginObject()
-                        while (reader.hasNext()) {
-                            val name = reader.nextName()
-                            if (reader.peek() == JsonToken.NULL) { reader.nextNull() }
-                            else { val value = reader.nextString(); if (name != "_id") values.put(name, value) }
-                        }
-                        reader.endObject()
-                        try { context.contentResolver.insert(android.provider.CallLog.Calls.CONTENT_URI, values) } catch (_: Exception) {}
-                        if (i++ % 100 == 0) notify(
-                            "Restoring Call Logs ($i/1000+)...",
-                            20 + (i * 70 / 2000).coerceAtMost(70)
-                        )
-                    }
-                    reader.endArray()
-                    reader.close()
-                    tempCall.delete()
-                }
+                restoreFromJson(
+                    context,
+                    tempCall,
+                    android.provider.CallLog.Calls.CONTENT_URI,
+                    "Call Logs",
+                    20,
+                    70,
+                    ::notify
+                )
+                tempCall.delete()
                 currentItemIndex++
             }
             if (doContacts) {
