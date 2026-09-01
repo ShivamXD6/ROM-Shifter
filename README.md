@@ -210,7 +210,7 @@
 > possible I/O performance across UFS, eMMC, and SD cards.
 
 <details>
-<summary><b>Native Data Backup & Restore (Click to Expand)</b></summary>
+<summary><b>Device Data Backup & Restore (Click to Expand)</b></summary>
 
 *Back up and restore important Android data that is not tied to individual apps.*
 
@@ -226,9 +226,9 @@
   Logs, or Contacts.
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/ba6a2032-6874-4b2d-8445-521d5b31c6a4" width="30%" alt="Backup Native Data"/>
+  <img src="https://github.com/user-attachments/assets/ba6a2032-6874-4b2d-8445-521d5b31c6a4" width="30%" alt="Backup Device Data"/>
   <img src="https://github.com/user-attachments/assets/541b6d45-363a-436a-a6ba-7244bbd767bc" width="30%" alt="Notifications showing the Native Backup"/>
-  <img src="https://github.com/user-attachments/assets/385386ec-22a4-4533-8520-987207235cbd" width="30%" alt="Restore Native Data"/>
+  <img src="https://github.com/user-attachments/assets/385386ec-22a4-4533-8520-987207235cbd" width="30%" alt="Restore Device Data"/>
 </div>
 
 </details>
@@ -243,7 +243,7 @@
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/5ad3c8a8-97ca-4add-acf7-959577c851c0" width="30%" alt="Manage Backups No apps Selected"/>
-  <img src="https://github.com/user-attachments/assets/6734d49d-9290-4537-89c5-e901079c8542" width="30%" alt="Manage Native Data"/>
+  <img src="https://github.com/user-attachments/assets/6734d49d-9290-4537-89c5-e901079c8542" width="30%" alt="Manage Device Data"/>
   <img src="https://github.com/user-attachments/assets/dbbe3616-8647-4a98-83c8-e80b35043f9f" width="30%" alt="Auto Select Apps"/>
 </div>
 

@@ -217,7 +217,8 @@ fun MigratorMenu(viewModel: MainViewModel) {
             shape = MaterialTheme.shapes.large,
             onDismissRequest = { showNativeBackupDialog = false; showNativeRestoreDialog = false },
             icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null, modifier = Modifier.size(28.dp)) },
-            title = { Text(if (isBackup) "Backup Native Data" else "Restore Native Data") },            text = {
+            title = { Text(if (isBackup) "Backup Device Data" else "Restore Device Data") },
+            text = {
                 Column {
                     val options = mutableListOf(
                         "Messages" to doSms,
@@ -334,9 +335,21 @@ fun MigratorMenu(viewModel: MainViewModel) {
             Spacer(modifier = Modifier.height(12.dp))
             MenuCard("Backup Apps", Icons.Default.CloudUpload, "Backup system / user apps") { viewModel.setMigratorMode(MigratorMode.BACKUP_APPS) }
             MenuCard("Restore Apps", Icons.Default.RestorePage, "Restore Apps from Storage") { viewModel.setMigratorMode(MigratorMode.RESTORE_APPS) }
-            MenuCard("Backup Native Data", Icons.Default.Sms, "Backup SMS, Calls, and ROM Data") { showNativeBackupDialog = true }
-            MenuCard("Restore Native Data", Icons.Default.SettingsPhone, "Restore Native Data from Storage") { showNativeRestoreDialog = true }
-            MenuCard("Manage Backups", Icons.Default.Delete, "View and delete existing app backups") { viewModel.setMigratorMode(MigratorMode.MANAGE) }
+            MenuCard(
+                "Backup Device Data",
+                Icons.Default.Sms,
+                "Backup SMS, Calls, and ROM Data"
+            ) { showNativeBackupDialog = true }
+            MenuCard(
+                "Restore Device Data",
+                Icons.Default.SettingsPhone,
+                "Restore Device Data from Storage"
+            ) { showNativeRestoreDialog = true }
+            MenuCard(
+                "Manage Backups",
+                Icons.Default.Delete,
+                "View and delete existing backups"
+            ) { viewModel.setMigratorMode(MigratorMode.MANAGE) }
             Spacer(modifier = Modifier.height(100.dp))
         }
     }

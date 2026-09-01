@@ -1166,7 +1166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         doWallpaper: Boolean,
         doBluetooth: Boolean
     ) {
-        val title = if (isBackup) "Backing up Native Data" else "Restoring Native Data"
+        val title = if (isBackup) "Backing up Device Data" else "Restoring Device Data"
         _uiState.value = _uiState.value.copy(
             isRunning = true,
             currentAction = title,
