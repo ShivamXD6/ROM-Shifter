@@ -340,46 +340,44 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                     }
                 }
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                    Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { viewModel.setDynamicColor(!dynamicColor) }
-                            .padding(vertical = 12.dp, horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                "Dynamic Colors",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            val subText =
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) "Use Monet colors based on wallpaper" else "Auto-detect accent colors from wallpaper"
-                            Text(
-                                subText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = dynamicColor,
-                            onCheckedChange = { viewModel.setDynamicColor(it) },
-                            thumbContent = {
-                                Icon(
-                                    imageVector = if (dynamicColor) Icons.Filled.Check else Icons.Filled.Close,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { viewModel.setDynamicColor(!dynamicColor) }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            "Dynamic Colors",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val subText =
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) "Use Monet colors based on wallpaper" else "Auto-detect accent colors from wallpaper"
+                        Text(
+                            subText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Switch(
+                        checked = dynamicColor,
+                        onCheckedChange = { viewModel.setDynamicColor(it) },
+                        thumbContent = {
+                            Icon(
+                                imageVector = if (dynamicColor) Icons.Filled.Check else Icons.Filled.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(SwitchDefaults.IconSize)
+                            )
+                        }
+                    )
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -757,8 +755,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                         val themeText = when (currentTheme) {
                             1 -> "Light"; 2 -> "Dark"; 3, 4 -> "Amoled"; else -> "System Default"
                         }
-                        val dynamicText =
-                            if (dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) " (Dynamic)" else ""
+                        val dynamicText = if (dynamicColor) " (Dynamic)" else ""
                         Text(
                             "Theme: $themeText$dynamicText",
                             style = MaterialTheme.typography.bodyMedium,

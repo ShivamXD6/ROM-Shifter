@@ -31,16 +31,14 @@ fun ROMShifterTheme(
     val context = LocalContext.current
 
     fun getLegacySeedColor(): Color? {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            try {
-                val wallpaperManager = WallpaperManager.getInstance(context)
-                val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
-                if (colors != null) {
-                    return Color(colors.primaryColor.toArgb())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+        try {
+            val wallpaperManager = WallpaperManager.getInstance(context)
+            val colors = wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            if (colors != null) {
+                return Color(colors.primaryColor.toArgb())
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         return null
     }

@@ -281,7 +281,7 @@ INSTALL_APP_FILE() {
     local T_PKG="$AM_TMP/install_$PKG"
     rm -rf "$T_PKG"; mkdir -p "$T_PKG"; chmod 777 "$T_PKG"
 
-    echo "INFO:STEP|MSG:INSTALLING|PKG:$PKG|LABEL:$LABEL|JOBS:$(jobs | wc -l)"
+    echo "INFO:STEP|MSG:INSTALLING|PKG:$PKG|LABEL:$LABEL"
 
     case "$EXT" in
         apk|APK)
@@ -537,34 +537,6 @@ do_systemize() {
     fi
 }
 
-do_backup_msgs() {
-    local DEST="$1/Advanced_Msgs"
-    mkdir -p "$DEST/Telephony" "$DEST/Messages"
-    cp -a /data/user_de/0/com.android.providers.telephony/databases/mmssms* "$DEST/Telephony/" 2>/dev/null
-    cp -a /data/data/com.google.android.apps.messaging/databases/* "$DEST/Messages/" 2>/dev/null
-}
-
-do_restore_msgs() {
-    local SRC="$1/Advanced_Msgs"
-    if [ -d "$SRC/Telephony" ]; then
-        am force-stop com.android.providers.telephony 2>/dev/null
-        am force-stop com.google.android.apps.messaging 2>/dev/null
-        rm -f /data/user_de/0/com.android.providers.telephony/databases/mmssms* 2>/dev/null
-        rm -f /data/data/com.google.android.apps.messaging/databases/* 2>/dev/null
-
-        cp -a "$SRC/Telephony/"mmssms* /data/user_de/0/com.android.providers.telephony/databases/ 2>/dev/null
-        chown -R radio:radio /data/user_de/0/com.android.providers.telephony/databases/ 2>/dev/null
-        restorecon -R /data/user_de/0/com.android.providers.telephony/ 2>/dev/null
-
-        local MSG_UID=$($STAT_BIN -c "%u" /data/data/com.google.android.apps.messaging 2>/dev/null)
-        if [ -n "$MSG_UID" ]; then
-            cp -a "$SRC/Messages/"* /data/data/com.google.android.apps.messaging/databases/ 2>/dev/null
-            chown -R "$MSG_UID:$MSG_UID" /data/data/com.google.android.apps.messaging/databases/ 2>/dev/null
-            restorecon -R /data/data/com.google.android.apps.messaging/ 2>/dev/null
-        fi
-    fi
-}
-
 do_backup_wifi() {
     local DEST="$1"
     mkdir -p "$DEST"
@@ -755,8 +727,6 @@ shifter_main() {
         --remove) init_shifter; do_remove "$2" "$3" ;;
         --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
         --systemize) init_shifter; do_systemize "$2" "$3" "$4" "$5" ;;
-        --backup-msgs) init_shifter; do_backup_msgs "$2" ;;
-        --restore-msgs) init_shifter; do_restore_msgs "$2" ;;
         --backup-wifi) init_shifter; do_backup_wifi "$2" ;;
         --restore-wifi) init_shifter; do_restore_wifi "$2" ;;
         --backup-wallpaper) init_shifter; do_backup_wallpaper "$2" ;;

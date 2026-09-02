@@ -1,5 +1,6 @@
+<!--suppress HtmlDeprecatedAttribute -->
 <div align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="128" height="128" alt="ROM Shifter Icon"/>
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" alt="ROM Shifter Icon"/>
   <h1>⚡ROM Shifter App</h1>
   <p><b>A unified, lightweight toolkit for all your ROM shifting and root-related tasks.</b></p>
 
@@ -17,13 +18,17 @@
 
 <br>
 
-* **ROM Shifter** is a an Android app built to make flashing, backing up, and migrating between custom ROMs as painless as possible. As well provides tools for some common things we do after switching to another ROM.
+* **ROM Shifter** is an Android app built to make flashing, backing up, and migrating between custom
+  ROMs as painless as possible. As well provides tools for some common things we do after switching
+  to another ROM.
 
 * *Note: This app is the native frontend successor to my original [ROM-Shifter Shell Script](https://github.com/ShivamXD6/ROM-Shifter-Script), which is archived now*
 
 ## 💡 Why ROM Shifter?
 
-* There are plenty of great backup apps out there, and they all do their best, still i felt they are slow in backup restore. But honestly, I just wanted a single, unified, lightweight app that handles *everything* I actually need when hopping between ROMs without the unnecessary bloat.
+* There are plenty of great backup apps out there, and they all do their best, still I felt they are
+  slow in backup restore. But honestly, I just wanted a single, unified, lightweight app that
+  handles *everything* I actually need when hopping between ROMs without the unnecessary bloat.
 
 * I didn't want three separate apps to back up my data, manage my partitions, and debloat apps etc. ROM Shifter combines a hyper-fast custom Shell backend engine with a clean Kotlin UI to do it all locally and quickly.
 
@@ -31,7 +36,7 @@
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/01847ad1-8c4f-4697-958f-27739db79b86" width="30%" alt="Flash Tab"/>
-  <img src="https://github.com/user-attachments/assets/4419f6ba-5d70-4ce3-a218-54c9705510ee" width="30%" alt="Migrate Tab"/>
+  <img src="https://github.com/user-attachments/assets/f4d33e72-1019-4baf-bd03-f2ab3003f666" width="30%" alt="Migrate Tab"/>
   <img src="https://github.com/user-attachments/assets/61dc61dc-ff84-4979-bceb-d34ae5d6734b" width="30%" alt="Tools Tab"/>
 </div>
 
@@ -74,11 +79,12 @@
   * Tested with 7 Apps Bulk Installed in 5 Seconds
 * No Irritating Play Protect Detection While Installation.
 * Spoofs Installer source as Play Store (no more unknown apps installed detection on root)
-* Batch Installation (parallel up to 3 Apps to avoid throttling and get best Installation speed)
+* Batch Installation (parallel up to 3 Apps to avoid throttling and get the best Installation speed)
 * Good UI to show whether you're installing first time, Reinstalling the same, upgrading or
   downgrading.
 * With support for displaying Target Android, Size, Selected and Current versions.
-* Icons indicator for the batch installations to Determine the Re-install, Downgrade or Upgrade.
+* Icons indicator for the batch installations to Determine the Re-installation, Downgrade or
+  Upgrade.
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/78dffc23-22f3-4e3c-8947-b476d00c7955" width="30%" alt="Reinstall the Same App"/>
@@ -214,21 +220,21 @@
 
 *Back up and restore important Android data that is not tied to individual apps.*
 
-* Supports native backup and restore of:
+* Supports Device backup and restore of:
 
-  * SMS (including RCS)
-  * Call Logs
+  * SMS/MMS (including RCS)
+  * Calls
   * Contacts (vCard)
-  * WiFi (Saved Devices)
+  * Wi-Fi (Saved Devices)
   * Wallpaper (Lock and Home Screen)
   * Bluetooth (Paired Devices and Name)
-* Unlike other solutions, you do not need to set ROM Shifter as the default app to restore SMS, Call
-  Logs, or Contacts.
+* Unlike other solutions, you do not need to manually set ROM Shifter as the default sms app, it
+  automatically does that to restore Messages, Calls or Contacts.
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/ba6a2032-6874-4b2d-8445-521d5b31c6a4" width="30%" alt="Backup Device Data"/>
-  <img src="https://github.com/user-attachments/assets/541b6d45-363a-436a-a6ba-7244bbd767bc" width="30%" alt="Notifications showing the Native Backup"/>
-  <img src="https://github.com/user-attachments/assets/385386ec-22a4-4533-8520-987207235cbd" width="30%" alt="Restore Device Data"/>
+  <img src="https://github.com/user-attachments/assets/e1e8ed48-1963-4ddb-b321-849ae0f5e57c" width="30%" alt="Backup Device Data"/>
+  <img src="https://github.com/user-attachments/assets/cda49e63-d131-4a73-981b-679fa39b6943" width="30%" alt="Notifications showing the Device Backup"/>
+  <img src="https://github.com/user-attachments/assets/9ccc58e2-a707-4833-bffa-b355ca35f56a" width="30%" alt="Restore Device Data"/>
 </div>
 
 </details>
@@ -236,14 +242,14 @@
 <details>
 <summary><b>Manage Backups (Click to Expand)</b></summary>
 
-*Browse, manage, and delete existing app and native backups to keep your storage organized.*
+*Browse, manage, and delete existing app and device backups to keep your storage organized.*
 
 * Use Auto Select to automatically select apps that have already been restored.
 * Toggle System Apps to show or hide them.
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/5ad3c8a8-97ca-4add-acf7-959577c851c0" width="30%" alt="Manage Backups No apps Selected"/>
-  <img src="https://github.com/user-attachments/assets/6734d49d-9290-4537-89c5-e901079c8542" width="30%" alt="Manage Device Data"/>
+  <img src="https://github.com/user-attachments/assets/b60e5e15-2ca8-47f6-b22c-9e8678945fb2" width="30%" alt="Manage Device Data"/>
   <img src="https://github.com/user-attachments/assets/dbbe3616-8647-4a98-83c8-e80b35043f9f" width="30%" alt="Auto Select Apps"/>
 </div>
 
@@ -305,7 +311,7 @@
 <summary><b>All the Settings (Click to Expand)</b></summary>
 
 * Select the Folder by file picker or write a custom one.
-  * Supports SDcard as well.
+  * Supports SD Card as well.
   * Automatically moves the existing Files to another Directory you selected.
 * Change Appearance or Theme to whatever you like,
   * Supports Dynamic Wallpapers based accent colors to Android 9 - 11
@@ -315,7 +321,7 @@
 * Get latest updates directly from the app.
   * Choose between Pre-Releases or Stable Release.
   * View all the changelogs from starting to this version.
-* About and Support, not a setting ofc but it's there incase if you like my work you can donate,
+* About and Support, not a setting ofc, but it's there in case if you like my work you can donate,
   contribute or help :)
 
 <div align="center">

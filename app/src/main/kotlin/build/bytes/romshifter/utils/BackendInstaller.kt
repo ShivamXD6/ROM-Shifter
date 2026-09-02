@@ -68,8 +68,8 @@ object BackendInstaller {
         val zapdosName = "zapdos"
         val cacheDir = context.cacheDir
 
-        val nativeLibFile = File(context.applicationInfo.nativeLibraryDir, "libzapdos.so")
-        if (!nativeLibFile.exists()) return@withContext false
+        val deviceLibFile = File(context.applicationInfo.nativeLibraryDir, "libzapdos.so")
+        if (!deviceLibFile.exists()) return@withContext false
 
         try {
             val currentVersionCode = BuildConfig.VERSION_CODE.toLong()
@@ -86,7 +86,7 @@ object BackendInstaller {
             val diskMd5 = getFileMd5(scriptFile)
             val scriptIntact = assetMd5 != null && assetMd5 == diskMd5
 
-            val zapdosIntact = nativeLibFile.length() == zapdosFile.length()
+            val zapdosIntact = deviceLibFile.length() == zapdosFile.length()
 
             if (filesExist && scriptIntact && zapdosIntact && savedVersionCode == currentVersionCode) {
                 return@withContext true
@@ -100,7 +100,7 @@ object BackendInstaller {
             val commands = arrayOf(
                 "mkdir -p '$targetDir'",
                 "cp '${outScript.absolutePath}' '$scriptFile'",
-                "cp '${nativeLibFile.absolutePath}' '$zapdosFile'",
+                "cp '${deviceLibFile.absolutePath}' '$zapdosFile'",
                 "chmod 755 '$targetDir'",
                 "chmod 755 '$scriptFile'",
                 "chmod 755 '$zapdosFile'",

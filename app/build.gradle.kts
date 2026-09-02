@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "build.bytes.romshifter"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 37
         versionCode = project.findProperty("VERSION_CODE")?.toString()?.toIntOrNull() ?: try {
             project.providers.exec {

@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -143,37 +142,37 @@ fun MigratorTab(appState: AppState, appList: List<AppInfo>, viewModel: MainViewM
 @Composable
 fun MigratorMenu(viewModel: MainViewModel) {
     val context = LocalContext.current
-    val availableBackups by viewModel.availableNativeBackups.collectAsState()
+    val availableBackups by viewModel.availableDeviceBackups.collectAsState()
 
-    var showNativeBackupDialog by remember { mutableStateOf(false) }
-    var showNativeRestoreDialog by remember { mutableStateOf(false) }
+    var showDeviceBackupDialog by remember { mutableStateOf(false) }
+    var showDeviceRestoreDialog by remember { mutableStateOf(false) }
     var showPermissionWarning by remember { mutableStateOf(false) }
-    var pendingNativeAction by remember { mutableStateOf<Pair<Boolean, List<Boolean>>?>(null) }
+    var pendingDeviceAction by remember { mutableStateOf<Pair<Boolean, List<Boolean>>?>(null) }
 
     var doSms by remember { mutableStateOf(true) }
     var doCall by remember { mutableStateOf(true) }
     var doContacts by remember { mutableStateOf(false) }
-    var doWifi by remember { mutableStateOf(false) }
-    var doWallpaper by remember { mutableStateOf(false) }
-    var doBluetooth by remember { mutableStateOf(false) }
+    var doWifi by remember { mutableStateOf(true) }
+    var doWallpaper by remember { mutableStateOf(true) }
+    var doBluetooth by remember { mutableStateOf(true) }
 
-    LaunchedEffect(showNativeRestoreDialog, showNativeBackupDialog) {
-        if (showNativeRestoreDialog) {
-            viewModel.refreshNativeBackups()
+    LaunchedEffect(showDeviceRestoreDialog, showDeviceBackupDialog) {
+        if (showDeviceRestoreDialog) {
+            viewModel.refreshDeviceBackups()
             doSms = false; doCall = false; doContacts = false
             doWifi = false; doWallpaper = false; doBluetooth = false
-        } else if (showNativeBackupDialog) {
+        } else if (showDeviceBackupDialog) {
             doSms = true; doCall = true; doContacts = false
-            doWifi = false; doWallpaper = false; doBluetooth = false
+            doWifi = true; doWallpaper = true; doBluetooth = true
         }
     }
 
-    LaunchedEffect(availableBackups, showNativeRestoreDialog) {
-        if (showNativeRestoreDialog) {
+    LaunchedEffect(availableBackups, showDeviceRestoreDialog) {
+        if (showDeviceRestoreDialog) {
             if (availableBackups.contains("Messages.shift")) doSms = true
             if (availableBackups.contains("CallLogs.shift")) doCall = true
             if (availableBackups.contains("Contacts.shift")) doContacts = true
-            if (availableBackups.contains("Wifi.shift")) doWifi = true
+            if (availableBackups.contains("Wi-Fi.shift")) doWifi = true
             if (availableBackups.contains("Wallpaper.shift")) doWallpaper = true
             if (availableBackups.contains("Bluetooth.shift")) doBluetooth = true
         }
@@ -193,8 +192,8 @@ fun MigratorMenu(viewModel: MainViewModel) {
             },
             confirmButton = {
                 Button(onClick = {
-                    showPermissionWarning = false; pendingNativeAction?.let { (isBackup, flags) ->
-                    viewModel.runNativeDataOperation(
+                    showPermissionWarning = false; pendingDeviceAction?.let { (isBackup, flags) ->
+                    viewModel.runDeviceDataOperation(
                         context,
                         isBackup,
                         flags[0],
@@ -211,20 +210,20 @@ fun MigratorMenu(viewModel: MainViewModel) {
         )
     }
 
-    if (showNativeBackupDialog || showNativeRestoreDialog) {
-        val isBackup = showNativeBackupDialog
+    if (showDeviceBackupDialog || showDeviceRestoreDialog) {
+        val isBackup = showDeviceBackupDialog
         AlertDialog(
             shape = MaterialTheme.shapes.large,
-            onDismissRequest = { showNativeBackupDialog = false; showNativeRestoreDialog = false },
+            onDismissRequest = { showDeviceBackupDialog = false; showDeviceRestoreDialog = false },
             icon = { Icon(if (isBackup) Icons.Default.CloudUpload else Icons.Default.SettingsPhone, null, modifier = Modifier.size(28.dp)) },
             title = { Text(if (isBackup) "Backup Device Data" else "Restore Device Data") },
             text = {
                 Column {
                     val options = mutableListOf(
                         "Messages" to doSms,
-                        "Call Logs" to doCall,
+                        "Calls" to doCall,
                         "Contacts" to doContacts,
-                        "WiFi" to doWifi,
+                        "Wi-Fi" to doWifi,
                         "Wallpaper" to doWallpaper,
                         "Bluetooth" to doBluetooth
                     )
@@ -233,9 +232,9 @@ fun MigratorMenu(viewModel: MainViewModel) {
                         options.retainAll { (label, _) ->
                             val fileName = when (label) {
                                 "Messages" -> "Messages.shift"
-                                "Call Logs" -> "CallLogs.shift"
+                                "Calls" -> "CallLogs.shift"
                                 "Contacts" -> "Contacts.shift"
-                                "WiFi" -> "Wifi.shift"
+                                "Wi-Fi" -> "Wi-Fi.shift"
                                 "Wallpaper" -> "Wallpaper.shift"
                                 "Bluetooth" -> "Bluetooth.shift"
                                 else -> ""
@@ -246,7 +245,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
 
                     if (options.isEmpty()) {
                         Text(
-                            "No native backups found in this folder.",
+                            "No Device backups found in this folder.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -266,9 +265,9 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                 .clickable {
                                     when (label) {
                                         "Messages" -> doSms = !doSms
-                                        "Call Logs" -> doCall = !doCall
+                                        "Calls" -> doCall = !doCall
                                         "Contacts" -> doContacts = !doContacts
-                                        "WiFi" -> doWifi = !doWifi
+                                        "Wi-Fi" -> doWifi = !doWifi
                                         "Wallpaper" -> doWallpaper = !doWallpaper
                                         "Bluetooth" -> doBluetooth = !doBluetooth
                                     }
@@ -296,14 +295,14 @@ fun MigratorMenu(viewModel: MainViewModel) {
                         val needsContacts = doContacts && ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED
 
                         if (needsSms || needsCall || needsContacts) {
-                            pendingNativeAction = Pair(
+                            pendingDeviceAction = Pair(
                                 isBackup,
                                 listOf(doSms, doCall, doContacts, doWifi, doWallpaper, doBluetooth)
                             )
                             showPermissionWarning = true
                         } else {
 
-                            viewModel.runNativeDataOperation(
+                            viewModel.runDeviceDataOperation(
                                 context,
                                 isBackup,
                                 doSms,
@@ -313,16 +312,20 @@ fun MigratorMenu(viewModel: MainViewModel) {
                                 doWallpaper,
                                 doBluetooth
                             )
-                            showNativeBackupDialog = false
-                            showNativeRestoreDialog = false
+                            showDeviceBackupDialog = false
+                            showDeviceRestoreDialog = false
                         }
                     } else {
-                        showNativeBackupDialog = false
-                        showNativeRestoreDialog = false
+                        showDeviceBackupDialog = false
+                        showDeviceRestoreDialog = false
                     }
                 }) { Text(if (isBackup) "Backup" else "Restore") }
             },
-            dismissButton = { TextButton(onClick = { showNativeBackupDialog = false; showNativeRestoreDialog = false }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeviceBackupDialog = false; showDeviceRestoreDialog = false
+                }) { Text("Cancel") }
+            }
         )
     }
     Column(modifier = Modifier
@@ -338,13 +341,13 @@ fun MigratorMenu(viewModel: MainViewModel) {
             MenuCard(
                 "Backup Device Data",
                 Icons.Default.Sms,
-                "Backup SMS, Calls, and ROM Data"
-            ) { showNativeBackupDialog = true }
+                "Backup Messages, Calls, and ROM Data"
+            ) { showDeviceBackupDialog = true }
             MenuCard(
                 "Restore Device Data",
                 Icons.Default.SettingsPhone,
                 "Restore Device Data from Storage"
-            ) { showNativeRestoreDialog = true }
+            ) { showDeviceRestoreDialog = true }
             MenuCard(
                 "Manage Backups",
                 Icons.Default.Delete,
@@ -355,10 +358,25 @@ fun MigratorMenu(viewModel: MainViewModel) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: MainViewModel) {
     val context = LocalContext.current
+
+    val smsLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { viewModel.setDefaultSmsHandled() }
+
+    LaunchedEffect(appState.requestDefaultSms) {
+        if (appState.requestDefaultSms) {
+            val intent =
+                android.content.Intent(android.provider.Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+            intent.putExtra(
+                android.provider.Telephony.Sms.Intents.EXTRA_PACKAGE_NAME,
+                context.packageName
+            )
+            smsLauncher.launch(intent)
+        }
+    }
 
 
     val filteredApps by remember(
@@ -408,7 +426,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         }
     }
 
-    var showNativeDeleteDialog by remember { mutableStateOf(false) }
+    var showDeviceDeleteDialog by remember { mutableStateOf(false) }
     var delSms by remember { mutableStateOf(true) }
     var delCall by remember { mutableStateOf(true) }
     var delContacts by remember { mutableStateOf(true) }
@@ -432,19 +450,19 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
     )
     val compOrder = listOf(1, 2, 3, 4, 5)
 
-    if (showNativeDeleteDialog) {
+    if (showDeviceDeleteDialog) {
         AlertDialog(
             shape = MaterialTheme.shapes.large,
-            onDismissRequest = { showNativeDeleteDialog = false },
+            onDismissRequest = { showDeviceDeleteDialog = false },
             icon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(28.dp)) },
-            title = { Text("Erase Native Backups") },
+            title = { Text("Erase Device Backups") },
             text = {
                 Column {
                     val options = listOf(
                         "Messages" to delSms,
-                        "Call Logs" to delCall,
+                        "Calls" to delCall,
                         "Contacts" to delContacts,
-                        "WiFi" to delWifi,
+                        "Wi-Fi" to delWifi,
                         "Wallpaper" to delWallpaper,
                         "Bluetooth" to delBluetooth
                     )
@@ -457,9 +475,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                                 .clickable {
                                     when (label) {
                                         "Messages" -> delSms = !delSms
-                                        "Call Logs" -> delCall = !delCall
+                                        "Calls" -> delCall = !delCall
                                         "Contacts" -> delContacts = !delContacts
-                                        "WiFi" -> delWifi = !delWifi
+                                        "Wi-Fi" -> delWifi = !delWifi
                                         "Wallpaper" -> delWallpaper = !delWallpaper
                                         "Bluetooth" -> delBluetooth = !delBluetooth
                                     }
@@ -487,7 +505,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             confirmButton = {
                 Button(
                     onClick = {
-                        if (delSms || delCall || delContacts || delWifi || delWallpaper || delBluetooth) viewModel.deleteNativeBackups(
+                        if (delSms || delCall || delContacts || delWifi || delWallpaper || delBluetooth) viewModel.deleteDeviceBackups(
                             context,
                             delSms,
                             delCall,
@@ -495,14 +513,14 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             delWifi,
                             delWallpaper,
                             delBluetooth
-                        ); showNativeDeleteDialog = false
+                        ); showDeviceDeleteDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete Data") }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showNativeDeleteDialog = false
+                    showDeviceDeleteDialog = false
                 }) { Text("Cancel") }
             }
         )
@@ -570,8 +588,8 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 else -> false
             }
 
-            val showEraseNative = appState.migratorMode == MigratorMode.MANAGE
-            val hasButtons = showActionChip || showEraseNative
+            val showEraseDevice = appState.migratorMode == MigratorMode.MANAGE
+            val hasButtons = showActionChip || showEraseDevice
 
             val hasComponents =
                 appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.RESTORE_APPS
@@ -591,15 +609,15 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (showEraseNative) {
+                if (showEraseDevice) {
                     item {
                         AnimatedFilterChip(
                             selected = false,
-                            onClick = { showNativeDeleteDialog = true },
-                            label = "Erase Native",
+                            onClick = { showDeviceDeleteDialog = true },
+                            label = "Erase Device",
                             leadingIcon = Icons.Default.SettingsPhone,
-                            showLabel = expandedChipLabel == "Erase Native",
-                            onExpand = { expandChip("Erase Native") },
+                            showLabel = expandedChipLabel == "Erase Device",
+                            onExpand = { expandChip("Erase Device") },
                             selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
                             selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )

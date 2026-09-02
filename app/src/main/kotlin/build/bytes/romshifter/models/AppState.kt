@@ -92,5 +92,6 @@ data class AppState(
     val isAnalyzingApps: Boolean = false,
     val isInstallerIntent: Boolean = false,
     val installStartTime: Long = 0,
-    val totalInstallTimeSeconds: Long = 0
+    val totalInstallTimeSeconds: Long = 0,
+    val requestDefaultSms: Boolean = false
 )

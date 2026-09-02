@@ -11,6 +11,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -26,9 +27,9 @@ import build.bytes.romshifter.models.AppState
 import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.utils.BackendInstaller
+import build.bytes.romshifter.utils.DeviceManager
 import build.bytes.romshifter.utils.FlashManager
 import build.bytes.romshifter.utils.MigratorManager
-import build.bytes.romshifter.utils.NativeManager
 import build.bytes.romshifter.utils.SettingsManager
 import build.bytes.romshifter.utils.ToolsManager
 import com.topjohnwu.superuser.Shell
@@ -66,13 +67,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     val savedPath: StateFlow<String> = _savedPath.asStateFlow()
 
-    private val _availableNativeBackups = MutableStateFlow<Set<String>>(emptySet())
-    val availableNativeBackups: StateFlow<Set<String>> = _availableNativeBackups.asStateFlow()
+    private val _availableDeviceBackups = MutableStateFlow<Set<String>>(emptySet())
+    val availableDeviceBackups: StateFlow<Set<String>> = _availableDeviceBackups.asStateFlow()
 
-    fun refreshNativeBackups() {
+    fun refreshDeviceBackups() {
         viewModelScope.launch(Dispatchers.IO) {
-            val backups = NativeManager.getAvailableBackups(_savedPath.value)
-            _availableNativeBackups.value = backups
+            val backups = DeviceManager.getAvailableBackups(_savedPath.value)
+            _availableDeviceBackups.value = backups
         }
     }
     val isFirstRun = MutableStateFlow(prefs.getBoolean("is_first_run", true))
@@ -760,7 +761,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun getAndroidVersion(api: Int): String {
         return when (api) {
             37 -> "17"; 36 -> "16"; 35 -> "15"; 34 -> "14"; 33 -> "13"; 32 -> "12.1"; 31 -> "12"
-            30 -> "11"; 29 -> "10"; 28 -> "9.0"; 27 -> "8.1"; 26 -> "8.0"
+            30 -> "11"; 29 -> "10"; 28 -> "9"; 27 -> "8.1"; 26 -> "8"; 25 -> "7.1"; 24 -> "7"
             else -> "API $api"
         }
     }
@@ -1156,7 +1157,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun runNativeDataOperation(
+    fun setDefaultSmsHandled() {
+        _uiState.update { it.copy(requestDefaultSms = false) }
+    }
+
+    fun runDeviceDataOperation(
         context: Context,
         isBackup: Boolean,
         doSms: Boolean,
@@ -1176,8 +1181,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateProgressNotification(title, "Starting Process...", -1)
 
         val selectedItems = mutableListOf<String>()
-        if (doSms) selectedItems.add("SMS")
-        if (doCall) selectedItems.add("Call Logs")
+        if (doSms) selectedItems.add("Messages")
+        if (doCall) selectedItems.add("Calls")
         if (doContacts) selectedItems.add("Contacts")
         if (doWifi) selectedItems.add("WiFi")
         if (doWallpaper) selectedItems.add("Wallpaper")
@@ -1185,8 +1190,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"
 
         viewModelScope.launch(Dispatchers.IO) {
+            var originalDefaultSms: String? = null
+            val pkg = context.packageName
             try {
-                NativeManager.runOperation(
+                if (doSms && !isBackup) {
+                    originalDefaultSms =
+                        android.provider.Telephony.Sms.getDefaultSmsPackage(context)
+                    if (originalDefaultSms != pkg) {
+                        Log.d("MainViewModel", "Setting ROM Shifter as default SMS app...")
+                        val rootSuccess = DeviceManager.setDefaultSmsAppRoot(pkg)
+                        if (!rootSuccess) {
+                            Log.d(
+                                "MainViewModel",
+                                "Root failed, requesting user to set default SMS app"
+                            )
+                            _uiState.update { it.copy(requestDefaultSms = true) }
+                            var timeout = 60
+                            while (android.provider.Telephony.Sms.getDefaultSmsPackage(context) != pkg && timeout > 0) {
+                                kotlinx.coroutines.delay(1000.milliseconds)
+                                timeout--
+                            }
+                            _uiState.update { it.copy(requestDefaultSms = false) }
+                            if (android.provider.Telephony.Sms.getDefaultSmsPackage(context) != pkg) {
+                                throw Exception("User did not set ROM Shifter as default SMS app")
+                            }
+                        }
+                    }
+                }
+
+                DeviceManager.runOperation(
                     context,
                     isBackup,
                     doSms,
@@ -1203,7 +1235,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.Main) {
                     val finalMsg = if (isBackup) "Backup Complete!" else "Restore Complete!"
 
-                    refreshNativeBackups()
+                    refreshDeviceBackups()
                     showCompletionNotification(finalMsg, itemsProcessed)
                     _uiState.value = _uiState.value.copy(
                         isRunning = false,
@@ -1221,11 +1253,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         currentStep = e.message ?: ""
                     )
                 }
+            } finally {
+                if (doSms && !isBackup) {
+                    val restoreTo =
+                        if (originalDefaultSms != null && originalDefaultSms != pkg) originalDefaultSms else "com.google.android.apps.messaging"
+                    Log.d("MainViewModel", "Restoring default SMS app to: $restoreTo")
+                    DeviceManager.setDefaultSmsAppRoot(restoreTo)
+                }
             }
         }
     }
 
-    fun deleteNativeBackups(
+    fun deleteDeviceBackups(
         context: Context,
         doSms: Boolean,
         doCall: Boolean,
@@ -1237,18 +1276,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = _savedPath.value
 
-            if (doSms) Shell.cmd("su -c \"rm -f '$path/Native/Messages.shift'\"").exec()
-            if (doCall) Shell.cmd("su -c \"rm -f '$path/Native/CallLogs.shift'\"").exec()
-            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Native/Contacts.shift'\"").exec()
-            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Native/Wifi.shift'\"").exec()
-            if (doWallpaper) Shell.cmd("su -c \"rm -f '$path/Native/Wallpaper.shift'\"").exec()
-            if (doBluetooth) Shell.cmd("su -c \"rm -f '$path/Native/Bluetooth.shift'\"").exec()
+            if (doSms) Shell.cmd("su -c \"rm -f '$path/Device/Messages.shift'\"").exec()
+            if (doCall) Shell.cmd("su -c \"rm -f '$path/Device/CallLogs.shift'\"").exec()
+            if (doContacts) Shell.cmd("su -c \"rm -f '$path/Device/Contacts.shift'\"").exec()
+            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Device/Wifi.shift'\"").exec()
+            if (doWallpaper) Shell.cmd("su -c \"rm -f '$path/Device/Wallpaper.shift'\"").exec()
+            if (doBluetooth) Shell.cmd("su -c \"rm -f '$path/Device/Bluetooth.shift'\"").exec()
 
-            refreshNativeBackups()
+            refreshDeviceBackups()
             withContext(Dispatchers.Main) {
                 Toast.makeText(
                     context,
-                    "Selected Native Backups Deleted",
+                    "Selected Device Backups Deleted",
                     Toast.LENGTH_SHORT
                 ).show()
             }
