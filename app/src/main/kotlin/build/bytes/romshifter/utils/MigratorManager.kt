@@ -41,7 +41,8 @@ object MigratorManager {
     suspend fun fetchAppsList(
         context: Context, currentPath: String, type: String,
         append: Boolean = false, currentList: List<AppInfo> = emptyList(),
-        isManage: Boolean = false, includeOverhead: Boolean = true
+        isManage: Boolean = false, includeOverhead: Boolean = true,
+        onlyAppSize: Boolean = false
     ): List<AppInfo> = withContext(Dispatchers.IO) {
         if (!append) {
             when (type) {
@@ -148,8 +149,11 @@ object MigratorManager {
                             val dataSizeKb = (stats.second - duMedia).coerceAtLeast(0L)
                             val mediaSizeKb = duMedia + duObb
 
-                            val displaySizeKb =
+                            val displaySizeKb = if (onlyAppSize) {
+                                appSizeKb
+                            } else {
                                 appSizeKb + dataSizeKb + mediaSizeKb + if (includeOverhead) 31 else 0
+                            }
 
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
@@ -258,8 +262,11 @@ object MigratorManager {
                             mediaSizeKb = moSize
                         }
 
-                        val displaySizeKb =
+                        val displaySizeKb = if (onlyAppSize) {
+                            appSizeKb
+                        } else {
                             appSizeKb + dataSizeKb + mediaSizeKb + if (includeOverhead) 31 else 0
+                        }
 
                         if (label.isNotBlank() && pkg.isNotBlank()) {
                             val cacheFile = File(iconCacheDir, "${pkg}_icon.png")

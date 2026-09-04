@@ -1467,7 +1467,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             true,
                             _appList.value,
                             isManage = false,
-                            includeOverhead = false
+                            includeOverhead = false,
+                            onlyAppSize = true
                         )
                         _appList.value = sys
                         _uiState.value = _uiState.value.copy(
@@ -1680,7 +1681,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 append,
                 _appList.value,
                 isManage = _uiState.value.migratorMode == MigratorMode.MANAGE,
-                includeOverhead = _uiState.value.migratorMode == MigratorMode.BACKUP_APPS || _uiState.value.migratorMode == MigratorMode.RESTORE_APPS
+                includeOverhead = _uiState.value.migratorMode == MigratorMode.BACKUP_APPS || _uiState.value.migratorMode == MigratorMode.RESTORE_APPS,
+                onlyAppSize = _uiState.value.migratorMode == MigratorMode.SYSTEMIZE
             )
             withContext(Dispatchers.Main) {
                 _appList.value = apps
