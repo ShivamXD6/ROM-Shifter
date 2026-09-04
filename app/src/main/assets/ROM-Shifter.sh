@@ -500,15 +500,17 @@ do_remove() {
     local PKG="$1"
     local KEEP_DATA="$2"
     COOLDOWN 5
-    local FLAGS=""
-    [ "$KEEP_DATA" = "-k" ] && FLAGS="-k"
-    cmd package uninstall $FLAGS "$PKG" >/dev/null 2>&1 &
-    cmd package uninstall $FLAGS --user 0 "$PKG" >/dev/null 2>&1 &
+    if [ "$KEEP_DATA" = "-k" ]; then
+      cmd package archive "$PKG" >/dev/null 2>&1 || cmd package uninstall -k "$PKG" >/dev/null 2>&1
+    else
+      cmd package uninstall "$PKG" >/dev/null 2>&1
+    fi
 }
 
 do_restore_debloat() {
     COOLDOWN 5
-    cmd package install-existing "$1" >/dev/null 2>&1 &
+    cmd package request-unarchive "$PKG" >/dev/null 2>&1
+    cmd package install-existing "$PKG" >/dev/null 2>&1
 }
 
 do_systemize() {

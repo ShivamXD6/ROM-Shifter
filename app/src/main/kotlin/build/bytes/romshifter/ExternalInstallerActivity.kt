@@ -54,6 +54,15 @@ class ExternalInstallerActivity : ComponentActivity() {
             val appState by viewModel.uiState.collectAsState()
 
             ROMShifterTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
+                androidx.compose.runtime.LaunchedEffect(
+                    appState.showAppInstaller,
+                    appState.batchInstallApps
+                ) {
+                    if (!appState.showAppInstaller && appState.isInstallerIntent) {
+                        finish()
+                    }
+                }
+                
                 Surface(
                     modifier = Modifier
                         .wrapContentWidth()

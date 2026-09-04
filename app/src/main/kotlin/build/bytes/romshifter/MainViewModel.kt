@@ -620,39 +620,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val stagingDir = "/data/local/tmp/shifter_install"
                             Shell.cmd("mkdir -p $stagingDir && chmod 777 $stagingDir").exec()
 
-                            val resolvedPathForExt = FlashManager.getPathFromUri(context, uri) ?: ""
-                            val ext = if (resolvedPathForExt.isNotEmpty()) {
-                                resolvedPathForExt.substringAfterLast(".", "").lowercase()
-                            } else {
-                                uri.toString().substringBefore("?").substringAfterLast(".", "")
-                                    .lowercase()
-                            }
-
-                            val tempStagedFile = File(
-                                analysisDir,
-                                "staged_input.${ext.ifEmpty { "apk" }}"
-                            )
+                            val ext = getExtensionFromUri(context, uri)
+                            val tempInputFile = File(analysisDir, "input_app.$ext")
+                            
                             var success = false
+                            var localAnalysisPath = ""
 
                             if (originalPath.isNotEmpty()) {
-                                Shell.cmd("cp '$originalPath' '${tempStagedFile.absolutePath}' && chmod 666 '${tempStagedFile.absolutePath}'")
-                                    .exec()
-                                if (tempStagedFile.exists() && tempStagedFile.length() > 0) success =
-                                    true
+                                try {
+                                    val source = File(originalPath)
+                                    if (source.exists() && source.canRead()) {
+                                        localAnalysisPath = originalPath
+                                        success = true
+                                    }
+                                } catch (_: Exception) {
+                                }
                             }
 
                             if (!success) {
                                 try {
                                     context.contentResolver.openInputStream(uri)?.use { input ->
-                                        FileOutputStream(tempStagedFile).use { output ->
-                                            input.copyTo(
-                                                output
-                                            )
-                                        }
+                                        tempInputFile.outputStream()
+                                            .use { output -> input.copyTo(output) }
                                     }
-                                    if (tempStagedFile.exists() && tempStagedFile.length() > 0) {
-                                        Shell.cmd("chmod 666 '${tempStagedFile.absolutePath}'")
-                                            .exec()
+                                    if (tempInputFile.exists() && tempInputFile.length() > 0) {
+                                        localAnalysisPath = tempInputFile.absolutePath
                                         success = true
                                     }
                                 } catch (e: Exception) {
@@ -661,7 +653,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
 
                             if (success) {
-                                var analysisPath = tempStagedFile.absolutePath
+                                var analysisApkPath = localAnalysisPath
 
                                 if (ext != "apk" && ext.isNotEmpty() && ext in listOf(
                                         "apks",
@@ -673,9 +665,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     val unzipDir = File(analysisDir, "unzipped")
                                     unzipDir.mkdirs()
 
-                                    var extractedBase: File? = null
+                                    var extractedBaseFile: File? = null
                                     try {
-                                        java.util.zip.ZipFile(tempStagedFile).use { zip ->
+                                        java.util.zip.ZipFile(File(localAnalysisPath)).use { zip ->
                                             val entries = zip.entries().asSequence()
                                             val targetEntry =
                                                 entries.find { it.name.endsWith("base.apk", true) }
@@ -692,7 +684,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                                     targetFile.outputStream()
                                                         .use { output -> input.copyTo(output) }
                                                 }
-                                                extractedBase = targetFile
+                                                extractedBaseFile = targetFile
                                             }
                                         }
                                     } catch (e: Exception) {
@@ -702,44 +694,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                         )
                                     }
 
-                                    if (extractedBase != null) {
-                                        analysisPath = extractedBase!!.absolutePath
+                                    extractedBaseFile?.let {
+                                        analysisApkPath = it.absolutePath
                                     }
                                 }
 
-                                val info = pm.getPackageArchiveInfo(analysisPath, 0)
+                                val info = pm.getPackageArchiveInfo(analysisApkPath, 0)
                                 if (info != null && info.applicationInfo != null) {
                                     val appInfo = info.applicationInfo!!
-                                    appInfo.sourceDir = analysisPath
-                                    appInfo.publicSourceDir = analysisPath
+                                    appInfo.sourceDir = analysisApkPath
+                                    appInfo.publicSourceDir = analysisApkPath
 
                                     val label = appInfo.loadLabel(pm).toString()
                                     val pkgName = info.packageName
-
-                                    val version = info.versionName ?: "Unknown"
                                     val vCode = PackageInfoCompat.getLongVersionCode(info)
-                                    val size = formatPreciseSize(tempStagedFile.length())
 
                                     val targetSdkInt = appInfo.targetSdkVersion
                                     val verName = getAndroidVersion(targetSdkInt)
                                     val targetSdk =
                                         if (verName.startsWith("API")) verName else "Android $verName"
 
-                                    val arch = getArchitecture(analysisPath)
+                                    val arch = getArchitecture(analysisApkPath)
                                     val iconPath = getIconPath(pm, appInfo, pkgName)
 
                                     val finalPath =
-                                        "$stagingDir/${pkgName}_${System.currentTimeMillis()}.${ext.ifEmpty { "apk" }}"
-                                    Shell.cmd("mv '${tempStagedFile.absolutePath}' '$finalPath' && chmod 666 '$finalPath'")
+                                        "$stagingDir/${pkgName}_${System.currentTimeMillis()}.${ext}"
+                                    Shell.cmd("cp '$localAnalysisPath' '$finalPath' && chmod 666 '$finalPath'")
                                         .exec()
 
                                     val updatedApp = initialApp.copy(
                                         label = label,
                                         packageName = pkgName,
                                         path = finalPath,
-                                        version = version,
+                                        version = info.versionName ?: "Unknown",
                                         versionCode = vCode,
-                                        size = size,
+                                        size = formatPreciseSize(File(localAnalysisPath).length()),
                                         installedVersion = try {
                                             pm.getPackageInfo(pkgName, 0).versionName
                                         } catch (_: Exception) {
@@ -821,6 +810,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(isAnalyzingApps = false) }
             }
         }
+    }
+
+    private fun getExtensionFromUri(context: Context, uri: Uri): String {
+        val resolvedPath = FlashManager.getPathFromUri(context, uri)
+        if (!resolvedPath.isNullOrEmpty()) {
+            val ext = resolvedPath.substringAfterLast(".", "").lowercase()
+            if (ext.length in 2..5 && ext.all { it.isLetterOrDigit() }) return ext
+        }
+
+        try {
+            context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val name =
+                        cursor.getString(cursor.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME))
+                    val ext = name.substringAfterLast(".", "").lowercase()
+                    if (ext.length in 2..5 && ext.all { it.isLetterOrDigit() }) return ext
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        val mime = context.contentResolver.getType(uri)
+        if (mime != null) {
+            if (mime.contains("android.package-archive")) return "apk"
+            android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+                ?.let { return it }
+        }
+
+        return "apk"
     }
 
     private fun formatPreciseSize(bytes: Long): String {
@@ -1420,7 +1444,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _appList.value,
                             isManage = false,
                             includeOverhead = false
-                        ).filter { it.isSystem }
+                        )
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
                             actionFilterState = newState,
