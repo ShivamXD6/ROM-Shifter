@@ -70,98 +70,104 @@ fun AppInstallerDialog(
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(contentAlignment = Alignment.Center) {
-                    AsyncImage(
-                        model = app.iconPath,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    )
-                    if (!app.isAnalysisComplete) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(48.dp),
-                            strokeWidth = 3.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text(
-                        if (app.label == "Analyzing...") "Analyzing File..." else app.label,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        if (app.isAnalysisComplete) app.packageName else "Extracting metadata...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (app.isAnalysisComplete) {
-                    Text(
-                        "Install apps with blazing fast speed as play store",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        textAlign = TextAlign.Center
-                    )
+        title = { AppInstallerHeader(app) },
+        text = { AppInstallerBody(app) }
+    )
+}
 
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            DetailHeader("Selected Version")
-                            DetailValue(app.version)
-                        }
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            DetailHeader("Target Android", textAlign = TextAlign.End)
-                            DetailValue(app.targetSdk, textAlign = TextAlign.End)
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            DetailHeader("Current Version")
-                            if (app.isInstalled) {
-                                DetailValue(app.installedVersion ?: "Unknown")
-                            } else {
-                                DetailValue("Not installed", isDimmed = true)
-                            }
-                        }
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            DetailHeader("Size", textAlign = TextAlign.End)
-                            DetailValue(app.size, textAlign = TextAlign.End)
-                        }
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Please wait while the file is being processed...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+@Composable
+fun AppInstallerHeader(app: AppInstallInfo) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = app.iconPath,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+            if (!app.isAnalysisComplete) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    strokeWidth = 3.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
-    )
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(
+                if (app.label == "Analyzing...") "Analyzing File..." else app.label,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                if (app.isAnalysisComplete) app.packageName else "Extracting metadata...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+fun AppInstallerBody(app: AppInstallInfo) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (app.isAnalysisComplete) {
+            Text(
+                "Install apps with blazing fast speed as play store",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                textAlign = TextAlign.Center
+            )
+
+            Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    DetailHeader("Selected Version")
+                    DetailValue(app.version)
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    DetailHeader("Target Android", textAlign = TextAlign.End)
+                    DetailValue(app.targetSdk, textAlign = TextAlign.End)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    DetailHeader("Current Version")
+                    if (app.isInstalled) {
+                        DetailValue(app.installedVersion ?: "Unknown")
+                    } else {
+                        DetailValue("Not installed", isDimmed = true)
+                    }
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    DetailHeader("Size", textAlign = TextAlign.End)
+                    DetailValue(app.size, textAlign = TextAlign.End)
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Please wait while the file is being processed...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -218,20 +224,7 @@ fun BatchInstallerDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isRunning && !isAnalyzing) onCancel() },
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (isRunning) Icons.Default.Update else Icons.Default.Download,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    if (isRunning) "Installing..." else if (isAnalyzing) "Analyzing Apps..." else if (totalTime > 0) "Installation Complete" else "Batch Installer",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-        },
+        title = { BatchInstallerHeader(isRunning, isAnalyzing, totalTime) },
         confirmButton = {
             if (!isRunning && !isAnalyzing && totalTime == 0L) {
                 Button(onClick = onInstall, enabled = selectedCount > 0) {
@@ -247,156 +240,189 @@ fun BatchInstallerDialog(
             }
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (isRunning) {
-                    val installingApps =
-                        apps.filter { it.status == "Installing" || it.status == "Pending" }.take(3)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        installingApps.forEach { app ->
-                            Box(modifier = Modifier.padding(horizontal = 8.dp)) {
-                                AsyncImage(
-                                    model = app.iconPath,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                )
-                                if (app.status == "Installing") {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(56.dp),
-                                        strokeWidth = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(20.dp))
+            BatchInstallerBody(
+                apps,
+                isRunning,
+                currentStep,
+                totalTime,
+                onToggleSelect
+            )
+        }
+    )
+}
 
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+@Composable
+fun BatchInstallerHeader(isRunning: Boolean, isAnalyzing: Boolean, totalTime: Long) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (isRunning) Icons.Default.Update else Icons.Default.Download,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            if (isRunning) "Installing..." else if (isAnalyzing) "Analyzing Apps..." else if (totalTime > 0) "Installation Complete" else "Batch Installer",
+            style = MaterialTheme.typography.titleLarge
+        )
+    }
+}
 
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        currentStep,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else if (totalTime > 0L) {
-                    val finalApps = apps.filter { it.isSelected && it.isAnalysisComplete }
-                    val errorCount = finalApps.count { it.status == "Error" }
-                    val successCount = finalApps.count { it.status == "Done" }
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (errorCount > 0) {
-                            Icon(
-                                Icons.Default.Error,
-                                null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                "Installation finished with errors",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                "Succeeded: $successCount, Failed: $errorCount",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                null,
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                "Successfully installed $successCount apps",
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Text(
-                            "Total time taken: ${totalTime}s",
-                            style = MaterialTheme.typography.bodySmall
+@Composable
+fun BatchInstallerBody(
+    apps: List<AppInstallInfo>,
+    isRunning: Boolean,
+    currentStep: String,
+    totalTime: Long,
+    onToggleSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (isRunning) {
+            val installingApps =
+                apps.filter { it.status == "Installing" || it.status == "Pending" }.take(3)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                installingApps.forEach { app ->
+                    Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+                        AsyncImage(
+                            model = app.iconPath,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         )
-
-                        if (errorCount > 0) {
-                            Spacer(Modifier.height(16.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Failed Apps:",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.fillMaxWidth()
+                        if (app.status == "Installing") {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(56.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
-                                items(finalApps.filter { it.status == "Error" }) { app ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Error,
-                                            null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            app.label,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                    }
-                } else {
-                    Text(
-                        "Install apps with blazing fast speed as play store",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        textAlign = TextAlign.Center
-                    )
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 400.dp)
-                    ) {
-                        items(apps) { app ->
-                            AppInstallItem(app, onToggleSelect = { onToggleSelect(app.path) })
-                            Spacer(Modifier.height(8.dp))
                         }
                     }
                 }
             }
+            Spacer(Modifier.height(20.dp))
+
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(CircleShape),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                currentStep,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else if (totalTime > 0L) {
+            val finalApps = apps.filter { it.isSelected && it.isAnalysisComplete }
+            val errorCount = finalApps.count { it.status == "Error" }
+            val successCount = finalApps.count { it.status == "Done" }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (errorCount > 0) {
+                    Icon(
+                        Icons.Default.Error,
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Installation finished with errors",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        "Succeeded: $successCount, Failed: $errorCount",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Successfully installed $successCount apps",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    "Total time taken: ${totalTime}s",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                if (errorCount > 0) {
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Failed Apps:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
+                        items(finalApps.filter { it.status == "Error" }) { app ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Error,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    app.label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        } else {
+            Text(
+                "Install apps with blazing fast speed as play store",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                textAlign = TextAlign.Center
+            )
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                items(apps) { app ->
+                    AppInstallItem(app, onToggleSelect = { onToggleSelect(app.path) })
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
         }
-    )
+    }
 }
 
 @Composable

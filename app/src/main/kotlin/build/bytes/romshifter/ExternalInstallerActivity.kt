@@ -7,19 +7,44 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import build.bytes.romshifter.ui.components.AppInstallerDialog
-import build.bytes.romshifter.ui.components.BatchInstallerDialog
+import androidx.compose.ui.unit.dp
+import build.bytes.romshifter.models.AppInstallInfo
+import build.bytes.romshifter.ui.components.AppInstallerBody
+import build.bytes.romshifter.ui.components.AppInstallerHeader
+import build.bytes.romshifter.ui.components.BatchInstallerBody
+import build.bytes.romshifter.ui.components.BatchInstallerHeader
 import build.bytes.romshifter.ui.theme.ROMShifterTheme
 
 class ExternalInstallerActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -29,25 +54,82 @@ class ExternalInstallerActivity : ComponentActivity() {
             val appState by viewModel.uiState.collectAsState()
 
             ROMShifterTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier
+                        .wrapContentWidth()
+                        .wrapContentHeight()
+                        .width(340.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp
+                ) {
                     if (appState.showAppInstaller && appState.batchInstallApps.isNotEmpty()) {
                         if (appState.batchInstallApps.size == 1 && !appState.isRunning && appState.totalInstallTimeSeconds == 0L) {
-                            AppInstallerDialog(
-                                app = appState.batchInstallApps[0],
-                                onDismiss = { viewModel.closeAppInstaller { finish() } },
-                                onInstall = { viewModel.executeBatchInstall() }
-                            )
+                            val app = appState.batchInstallApps[0]
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                AppInstallerHeader(app)
+                                Spacer(Modifier.height(16.dp))
+                                AppInstallerBody(app)
+                                Spacer(Modifier.height(24.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    if (!app.status.startsWith("Analyzing")) {
+                                        TextButton(onClick = { viewModel.closeAppInstaller { finish() } }) {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                    if (app.isAnalysisComplete) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Button(onClick = { viewModel.executeBatchInstall() }) {
+                                            Text(getButtonText(app))
+                                        }
+                                    }
+                                }
+                            }
                         } else {
-                            BatchInstallerDialog(
-                                apps = appState.batchInstallApps,
-                                isRunning = appState.isRunning,
-                                isAnalyzing = appState.isAnalyzingApps,
-                                currentStep = appState.currentStep,
-                                totalTime = appState.totalInstallTimeSeconds,
-                                onInstall = { viewModel.executeBatchInstall() },
-                                onCancel = { viewModel.closeAppInstaller { finish() } },
-                                onToggleSelect = { viewModel.toggleAppInstallSelection(it) }
-                            )
+                            val apps = appState.batchInstallApps
+                            val selectedCount =
+                                apps.count { it.isSelected && it.isAnalysisComplete }
+
+                            Column(modifier = Modifier.padding(24.dp)) {
+                                BatchInstallerHeader(
+                                    appState.isRunning,
+                                    appState.isAnalyzingApps,
+                                    appState.totalInstallTimeSeconds
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                BatchInstallerBody(
+                                    apps = apps,
+                                    isRunning = appState.isRunning,
+                                    currentStep = appState.currentStep,
+                                    totalTime = appState.totalInstallTimeSeconds,
+                                    onToggleSelect = { viewModel.toggleAppInstallSelection(it) }
+                                )
+                                Spacer(Modifier.height(24.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    if (!appState.isRunning && !appState.isAnalyzingApps && appState.totalInstallTimeSeconds == 0L) {
+                                        TextButton(onClick = { viewModel.closeAppInstaller { finish() } }) {
+                                            Text("Cancel")
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Button(
+                                            onClick = { viewModel.executeBatchInstall() },
+                                            enabled = selectedCount > 0
+                                        ) {
+                                            Text("Install Selected ($selectedCount)")
+                                        }
+                                    } else if (appState.totalInstallTimeSeconds > 0L) {
+                                        Button(onClick = { viewModel.closeAppInstaller { finish() } }) {
+                                            Text("Close")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -98,9 +180,14 @@ class ExternalInstallerActivity : ComponentActivity() {
 
         val supportedExtensions = setOf("apk", "apks", "xapk", "apkm")
         val uris = allUris.filter { uri ->
-            val path = uri.path?.lowercase() ?: ""
-            supportedExtensions.any { path.endsWith(".$it") } ||
-                    contentResolver.getType(uri)?.contains("android.package-archive") == true ||
+            val mimeType = contentResolver.getType(uri)?.lowercase() ?: ""
+            val displayName = getDisplayName(uri)?.lowercase() ?: ""
+            val uriPath = uri.path?.lowercase() ?: ""
+
+            supportedExtensions.any { displayName.endsWith(".$it") } ||
+                    supportedExtensions.any { uriPath.endsWith(".$it") } ||
+                    mimeType.contains("android.package-archive") ||
+                    (mimeType.contains("zip") && supportedExtensions.any { displayName.endsWith(".$it") }) ||
                     intent.dataString?.lowercase()
                         ?.let { ds -> supportedExtensions.any { ds.endsWith(".$it") } } == true
         }
@@ -132,5 +219,35 @@ class ExternalInstallerActivity : ComponentActivity() {
         }
 
         viewModel.analyzeApps(uris, showInstaller = true, isIntent = true)
+    }
+
+    private fun getDisplayName(uri: android.net.Uri): String? {
+        if (uri.scheme == "content") {
+            try {
+                contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        return cursor.getString(cursor.getColumnIndexOrThrow(android.provider.OpenableColumns.DISPLAY_NAME))
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return uri.path?.substringAfterLast('/')
+    }
+
+    private fun getButtonText(app: AppInstallInfo): String {
+        if (!app.isInstalled) return "Install"
+        return when {
+            app.installedVersionCode != null && app.versionCode > app.installedVersionCode -> "Update"
+            app.installedVersionCode != null && app.versionCode < app.installedVersionCode -> "Downgrade"
+            app.installedVersionCode == app.versionCode -> "Reinstall"
+            else -> "Install"
+        }
     }
 }

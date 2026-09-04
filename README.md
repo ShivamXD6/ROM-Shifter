@@ -75,16 +75,17 @@
 
 * Supports Apk, Apks, XApk and Apkm for Installation (Single or Batch)
 * Much Faster than traditional apps installers.
-  * Tested on Instagram 30 seconds on normal installer V/S 9 seconds with ROM Shifter Installer
-  * Tested with 7 Apps Bulk Installed in 5 Seconds
+  * Tested on Instagram 30 seconds on normal installer V/S 9 seconds with ROM Shifter Installer.
+  * Tested with 7 Apps Bulks Installed in 5 Seconds.
 * No Irritating Play Protect Detection While Installation.
 * Spoofs Installer source as Play Store (no more unknown apps installed detection on root)
 * Batch Installation (parallel up to 3 Apps to avoid throttling and get the best Installation speed)
 * Good UI to show whether you're installing first time, Reinstalling the same, upgrading or
   downgrading.
-* With support for displaying Target Android, Size, Selected and Current versions.
-* Icons indicator for the batch installations to Determine the Re-installation, Downgrade or
+* With the support for displaying Target Android, Size, Selected and Current versions.
+* Icons indicator for the batch installations to Determine the Re-installation , Downgrade or
   Upgrade.
+* External apps supported you can even share any app to ROM Shifter to install it.
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/78dffc23-22f3-4e3c-8947-b476d00c7955" width="30%" alt="Reinstall the Same App"/>

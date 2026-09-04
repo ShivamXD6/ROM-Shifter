@@ -579,6 +579,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val context = getApplication<Application>()
         val initialApps = uris.mapIndexed { index, uri ->
             val resolvedPath = FlashManager.getPathFromUri(context, uri) ?: ""
+
             AppInstallInfo(
                 path = resolvedPath,
                 uriString = uri.toString(),
@@ -605,6 +606,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             coroutineScope {
                 initialApps.forEach { initialApp ->
                     launch(Dispatchers.IO) {
+                        val startTime = System.currentTimeMillis()
                         val uri = Uri.parse(initialApp.uriString)
                         val originalPath = initialApp.path
 
@@ -614,36 +616,95 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         analysisDir.mkdirs()
 
-                        val inputFile = File(analysisDir, "input_app")
-                        var success = false
-
                         try {
+                            val stagingDir = "/data/local/tmp/shifter_install"
+                            Shell.cmd("mkdir -p $stagingDir && chmod 777 $stagingDir").exec()
+
+                            val resolvedPathForExt = FlashManager.getPathFromUri(context, uri) ?: ""
+                            val ext = if (resolvedPathForExt.isNotEmpty()) {
+                                resolvedPathForExt.substringAfterLast(".", "").lowercase()
+                            } else {
+                                uri.toString().substringBefore("?").substringAfterLast(".", "")
+                                    .lowercase()
+                            }
+
+                            val tempStagedFile = File(
+                                analysisDir,
+                                "staged_input.${ext.ifEmpty { "apk" }}"
+                            )
+                            var success = false
+
                             if (originalPath.isNotEmpty()) {
-                                Shell.cmd("cp '$originalPath' '${inputFile.absolutePath}'").exec()
-                                if (inputFile.exists() && inputFile.length() > 0) success = true
+                                Shell.cmd("cp '$originalPath' '${tempStagedFile.absolutePath}' && chmod 666 '${tempStagedFile.absolutePath}'")
+                                    .exec()
+                                if (tempStagedFile.exists() && tempStagedFile.length() > 0) success =
+                                    true
                             }
 
                             if (!success) {
-                                context.contentResolver.openInputStream(uri)?.use { input ->
-                                    FileOutputStream(inputFile).use { output -> input.copyTo(output) }
+                                try {
+                                    context.contentResolver.openInputStream(uri)?.use { input ->
+                                        FileOutputStream(tempStagedFile).use { output ->
+                                            input.copyTo(
+                                                output
+                                            )
+                                        }
+                                    }
+                                    if (tempStagedFile.exists() && tempStagedFile.length() > 0) {
+                                        Shell.cmd("chmod 666 '${tempStagedFile.absolutePath}'")
+                                            .exec()
+                                        success = true
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("ROMShifter_Batch", "Staging Error: ${e.message}")
                                 }
-                                if (inputFile.exists() && inputFile.length() > 0) success = true
                             }
 
                             if (success) {
-                                var analysisPath = inputFile.absolutePath
-                                val ext = FlashManager.getPathFromUri(context, uri)
-                                    ?.substringAfterLast(".", "")?.lowercase() ?: ""
+                                var analysisPath = tempStagedFile.absolutePath
 
-                                if (ext != "apk" && ext.isNotEmpty()) {
+                                if (ext != "apk" && ext.isNotEmpty() && ext in listOf(
+                                        "apks",
+                                        "xapk",
+                                        "apkm",
+                                        "zip"
+                                    )
+                                ) {
                                     val unzipDir = File(analysisDir, "unzipped")
                                     unzipDir.mkdirs()
-                                    Shell.cmd("unzip -q '${inputFile.absolutePath}' *.apk -d '${unzipDir.absolutePath}'")
-                                        .exec()
-                                    val bestApk =
-                                        unzipDir.walk().filter { it.name.endsWith(".apk") }
-                                            .maxByOrNull { it.length() }
-                                    if (bestApk != null) analysisPath = bestApk.absolutePath
+
+                                    var extractedBase: File? = null
+                                    try {
+                                        java.util.zip.ZipFile(tempStagedFile).use { zip ->
+                                            val entries = zip.entries().asSequence()
+                                            val targetEntry =
+                                                entries.find { it.name.endsWith("base.apk", true) }
+                                                    ?: zip.entries().asSequence()
+                                                        .filter { it.name.endsWith(".apk", true) }
+                                                        .maxByOrNull { it.size }
+
+                                            if (targetEntry != null) {
+                                                val targetFile = File(
+                                                    unzipDir,
+                                                    targetEntry.name.substringAfterLast("/")
+                                                )
+                                                zip.getInputStream(targetEntry).use { input ->
+                                                    targetFile.outputStream()
+                                                        .use { output -> input.copyTo(output) }
+                                                }
+                                                extractedBase = targetFile
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e(
+                                            "ROMShifter_Batch",
+                                            "Fast extraction failed: ${e.message}"
+                                        )
+                                    }
+
+                                    if (extractedBase != null) {
+                                        analysisPath = extractedBase!!.absolutePath
+                                    }
                                 }
 
                                 val info = pm.getPackageArchiveInfo(analysisPath, 0)
@@ -654,9 +715,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                                     val label = appInfo.loadLabel(pm).toString()
                                     val pkgName = info.packageName
+
                                     val version = info.versionName ?: "Unknown"
                                     val vCode = PackageInfoCompat.getLongVersionCode(info)
-                                    val size = formatPreciseSize(inputFile.length())
+                                    val size = formatPreciseSize(tempStagedFile.length())
 
                                     val targetSdkInt = appInfo.targetSdkVersion
                                     val verName = getAndroidVersion(targetSdkInt)
@@ -664,30 +726,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                         if (verName.startsWith("API")) verName else "Android $verName"
 
                                     val arch = getArchitecture(analysisPath)
-
-                                    var installedVer: String? = null
-                                    var installedVCode: Long? = null
-                                    var isInst = false
-                                    try {
-                                        val instInfo = pm.getPackageInfo(pkgName, 0)
-                                        installedVer = instInfo.versionName
-                                        installedVCode =
-                                            PackageInfoCompat.getLongVersionCode(instInfo)
-                                        isInst = true
-                                    } catch (_: PackageManager.NameNotFoundException) {
-                                    }
-
                                     val iconPath = getIconPath(pm, appInfo, pkgName)
+
+                                    val finalPath =
+                                        "$stagingDir/${pkgName}_${System.currentTimeMillis()}.${ext.ifEmpty { "apk" }}"
+                                    Shell.cmd("mv '${tempStagedFile.absolutePath}' '$finalPath' && chmod 666 '$finalPath'")
+                                        .exec()
 
                                     val updatedApp = initialApp.copy(
                                         label = label,
                                         packageName = pkgName,
+                                        path = finalPath,
                                         version = version,
                                         versionCode = vCode,
                                         size = size,
-                                        installedVersion = installedVer,
-                                        installedVersionCode = installedVCode,
-                                        isInstalled = isInst,
+                                        installedVersion = try {
+                                            pm.getPackageInfo(pkgName, 0).versionName
+                                        } catch (_: Exception) {
+                                            null
+                                        },
+                                        installedVersionCode = try {
+                                            PackageInfoCompat.getLongVersionCode(
+                                                pm.getPackageInfo(
+                                                    pkgName,
+                                                    0
+                                                )
+                                            )
+                                        } catch (_: Exception) {
+                                            null
+                                        },
+                                        isInstalled = try {
+                                            pm.getPackageInfo(pkgName, 0); true
+                                        } catch (_: Exception) {
+                                            false
+                                        },
                                         iconPath = iconPath,
                                         status = "Pending",
                                         isAnalysisComplete = true,
@@ -702,19 +774,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                             if (existing != null) {
                                                 if (vCode > existing.versionCode) {
                                                     state.copy(batchInstallApps = state.batchInstallApps.filterNot { it.path == existing.path }
-                                                        .map {
-                                                            if (it.uriString == initialApp.uriString) updatedApp else it
-                                                        })
+                                                        .map { if (it.uriString == initialApp.uriString) updatedApp else it })
                                                 } else {
                                                     state.copy(batchInstallApps = state.batchInstallApps.filterNot { it.uriString == initialApp.uriString })
                                                 }
                                             } else {
-                                                state.copy(batchInstallApps = state.batchInstallApps.map {
-                                                    if (it.uriString == initialApp.uriString) updatedApp else it
-                                                })
+                                                state.copy(batchInstallApps = state.batchInstallApps.map { if (it.uriString == initialApp.uriString) updatedApp else it })
                                             }
                                         }
                                     }
+                                    Log.d(
+                                        "ROMShifter_Batch",
+                                        "Total Analysis Time: ${System.currentTimeMillis() - startTime}ms"
+                                    )
                                 } else {
                                     throw Exception("Failed to parse package info")
                                 }
@@ -722,15 +794,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 throw Exception("Failed to access file data")
                             }
                         } catch (e: Exception) {
+                            Log.e("ROMShifter_Batch", "Analysis CRASHED: ${e.message}")
                             withContext(Dispatchers.Main) {
+                                Toast.makeText(
+                                    context,
+                                    "Skipping invalid file: ${e.message}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                                 _uiState.update { state ->
-                                    state.copy(batchInstallApps = state.batchInstallApps.map {
-                                        if (it.uriString == initialApp.uriString) it.copy(
-                                            status = "Error",
-                                            label = "Error: ${e.message}",
-                                            isAnalysisComplete = true
-                                        ) else it
-                                    })
+                                    val newList =
+                                        state.batchInstallApps.filterNot { it.uriString == initialApp.uriString }
+                                    state.copy(
+                                        batchInstallApps = newList,
+                                        showAppInstaller = if (newList.isEmpty()) false else state.showAppInstaller
+                                    )
                                 }
                             }
                         } finally {
@@ -767,8 +844,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun getArchitecture(path: String): String {
+        if (path.isEmpty()) return "Universal"
         return try {
-            val out = Shell.cmd("su -mm -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
+            val out = Shell.cmd("su -c \"unzip -l '$path'\"").exec().out.joinToString("\n")
             when {
                 out.contains("lib/arm64-v8a/") -> "arm64-v8a"
                 out.contains("lib/armeabi-v7a/") -> "armeabi-v7a"
@@ -833,7 +911,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val context = getApplication<Application>()
             val targetFile = File(context.cacheDir, "install_targets.txt")
-            targetFile.writeText(apps.joinToString("\n") { "${it.path}|${it.packageName}|${it.label}" })
+            val targetsContent =
+                apps.joinToString("\n") { "${it.path}|${it.packageName}|${it.label}" }
+            Log.d("ROMShifter_Batch", "--- App Installation Hand-off ---")
+            Log.d("ROMShifter_Batch", "Targets Content:\n$targetsContent")
+            targetFile.writeText(targetsContent)
 
             Shell.cmd("chmod 666 ${targetFile.absolutePath}").exec()
 
@@ -932,11 +1014,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 targetFile.delete()
+                Shell.cmd("rm -rf /data/local/tmp/shifter_install").exec()
             }
         }
     }
 
     fun closeAppInstaller(onFinish: (() -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            Shell.cmd("rm -rf /data/local/tmp/shifter_install").exec()
+        }
+        
         val wasIntent = _uiState.value.isInstallerIntent
         _uiState.update {
             it.copy(
@@ -1184,7 +1271,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (doSms) selectedItems.add("Messages")
         if (doCall) selectedItems.add("Calls")
         if (doContacts) selectedItems.add("Contacts")
-        if (doWifi) selectedItems.add("WiFi")
+        if (doWifi) selectedItems.add("Wi-Fi")
         if (doWallpaper) selectedItems.add("Wallpaper")
         if (doBluetooth) selectedItems.add("Bluetooth")
         val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"
@@ -1279,7 +1366,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (doSms) Shell.cmd("su -c \"rm -f '$path/Device/Messages.shift'\"").exec()
             if (doCall) Shell.cmd("su -c \"rm -f '$path/Device/CallLogs.shift'\"").exec()
             if (doContacts) Shell.cmd("su -c \"rm -f '$path/Device/Contacts.shift'\"").exec()
-            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Device/Wifi.shift'\"").exec()
+            if (doWifi) Shell.cmd("su -c \"rm -f '$path/Device/Wi-Fi.shift'\"").exec()
             if (doWallpaper) Shell.cmd("su -c \"rm -f '$path/Device/Wallpaper.shift'\"").exec()
             if (doBluetooth) Shell.cmd("su -c \"rm -f '$path/Device/Bluetooth.shift'\"").exec()
 

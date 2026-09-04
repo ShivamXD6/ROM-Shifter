@@ -296,9 +296,7 @@ INSTALL_APP_FILE() {
     local apks=$(find "$T_PKG" -type f -name "*.apk" | sort)
 
     if [ -n "$apks" ]; then
-        local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d 2>/dev/null" | tr -dc '0-9')
-        [ -z "$SID" ] && SID=$(cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d 2>/dev/null | tr -dc '0-9')
-
+        local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d -t --bypass-low-target-sdk-block 2>/dev/null" | tr -dc '0-9')
         if [ -n "$SID" ]; then
             local c=0
             for a in $apks; do
@@ -330,7 +328,7 @@ do_install_apps() {
     local TARGET_FILE="$1"
     [ ! -f "$TARGET_FILE" ] && return
 
-    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0; setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
+    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0; settings put global package_verifier_enable 0;  setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
 
     while IFS='|' read -r file pkg label || [ -n "$file" ]; do
         [ -z "$file" ] && continue
@@ -339,7 +337,7 @@ do_install_apps() {
     done < "$TARGET_FILE"
     wait
 
-    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1; setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
+    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1;  settings put global package_verifier_enable 1;  setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
     echo "ACTION:GLOBAL_DONE"
 }
 
@@ -425,7 +423,7 @@ do_restore() {
 
     START=$(date +%s); TOTAL_APPS=$(wc -l < "$AM_TMP/selected_restores_sorted.txt"); CURRENT_APP=0
 
-    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0; setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
+    cmd package disable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 0;  settings put global package_verifier_enable 0;  setprop pm.dexopt.install assume-verified; setprop pm.dexopt.install-bulk assume-verified; setprop pm.dexopt.install-bulk-downgraded skip
 
     while IFS='|' read -r size label pkg ver vcode type apath s_app s_data s_med app_comps || [ -n "$size" ]; do
         [ -z "$pkg" ] && continue
@@ -440,7 +438,7 @@ do_restore() {
                  chmod -R 777 "$T_PKG" 2>/dev/null
                  local apks=$(find "$T_PKG" -type f -name "*.apk" | sort)
                  if [ -n "$apks" ]; then
-                     local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 2>/dev/null" | tr -dc '0-9')
+                     local SID=$(su 1000 -c "cmd package install-create --user 0 -i com.android.vending --install-reason 4 -r -d 2>/dev/null" | tr -dc '0-9')
                      if [ -n "$SID" ]; then
                          local c=0
                          for a in $apks; do
@@ -494,7 +492,7 @@ do_restore() {
     fi
     wait
 
-    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1; setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
+    cmd package enable com.android.vending >/dev/null 2>&1; settings put global verifier_verify_adb_installs 1;  settings put global package_verifier_enable 1;  setprop pm.dexopt.install speed-profile; setprop pm.dexopt.install-bulk speed-profile; setprop pm.dexopt.install-bulk-downgraded verify
     echo "ACTION:GLOBAL_DONE|TOTAL:$TOTAL_KB_JOB|TIME:$((( $(date +%s) - START )))"
 }
 

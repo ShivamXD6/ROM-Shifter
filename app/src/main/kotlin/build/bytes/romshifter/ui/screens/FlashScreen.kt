@@ -906,9 +906,7 @@ fun FlashTab(
                         appLauncher.launch(
                             arrayOf(
                                 "application/vnd.android.package-archive",
-                                "application/octet-stream",
-                                "application/zip",
-                                "application/x-zip-compressed"
+                                "application/octet-stream"
                             )
                         )
                     }
