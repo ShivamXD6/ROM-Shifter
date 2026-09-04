@@ -26,7 +26,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -45,6 +44,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -404,6 +405,21 @@ fun AppScaffold(
     val isBackEnabled =
         !appState.isRunning && (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0)
 
+    val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { 3 })
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage != selectedTab) {
+            onTabSelect(pagerState.settledPage)
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (pagerState.currentPage != selectedTab && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(selectedTab)
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
     val logoAlpha by infiniteTransition.animateFloat(
         initialValue = 0.2f,
@@ -503,14 +519,11 @@ fun AppScaffold(
             .fillMaxSize()) {
 
             AnimatedContent(
-                targetState = showSettings to selectedTab,
+                targetState = showSettings,
                 transitionSpec = {
-                    val (initialSettings, initialTab) = initialState
-                    val (targetSettings, targetTab) = targetState
-
-                    if (initialSettings && !targetSettings) {
+                    if (initialState && !targetState) {
                         EnterTransition.None togetherWith ExitTransition.None
-                    } else if (!initialSettings && targetSettings) {
+                    } else if (!initialState && targetState) {
                         slideInHorizontally(
                             tween(
                                 250,
@@ -518,31 +531,26 @@ fun AppScaffold(
                             )
                         ) { it } togetherWith fadeOut(tween(250))
                     } else {
-                        val direction = if (initialTab < targetTab) 1 else -1
-                        (slideInHorizontally(
-                            tween(
-                                300,
-                                easing = FastOutSlowInEasing
-                            )
-                        ) { (it * 0.2f * direction).toInt() } + fadeIn(tween(300))) togetherWith
-                                (slideOutHorizontally(
-                                    tween(
-                                        300,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                ) { (it * -0.2f * direction).toInt() } + fadeOut(tween(300)))
+                        fadeIn(tween(300)) togetherWith fadeOut(tween(300))
                     }
                 },
                 label = "AppContentTransition",
                 modifier = Modifier.fillMaxSize()
-            ) { (isSettingsOpen, currentTab) ->
+            ) { isSettingsOpen ->
                 if (isSettingsOpen) {
                     SettingsTab(LocalContext.current, viewModel)
                 } else {
-                    when (currentTab) {
-                        0 -> FlashTab(appState, flashActions, LocalContext.current, viewModel)
-                        1 -> MigratorTab(appState, appList, viewModel)
-                        2 -> ToolsTab(appState, appList, viewModel)
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !appState.isRunning && appState.migratorMode == MigratorMode.MENU,
+                        beyondViewportPageCount = 1
+                    ) { page ->
+                        when (page) {
+                            0 -> FlashTab(appState, flashActions, LocalContext.current, viewModel)
+                            1 -> MigratorTab(appState, appList, viewModel)
+                            2 -> ToolsTab(appState, appList, viewModel)
+                        }
                     }
                 }
             }
@@ -594,6 +602,15 @@ fun AppScaffold(
                                         indication = null
                                     ) {
                                         onTabSelect(index)
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(
+                                                page = index,
+                                                animationSpec = tween(
+                                                    durationMillis = 350,
+                                                    easing = FastOutSlowInEasing
+                                                )
+                                            )
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
