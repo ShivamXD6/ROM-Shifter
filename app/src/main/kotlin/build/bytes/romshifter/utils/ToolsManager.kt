@@ -14,6 +14,7 @@ object ToolsManager {
         context: Context,
         selectedApps: List<AppInfo>,
         isRestore: Boolean,
+        keepData: Boolean = false,
         updateLog: (String) -> Unit, updateProgress: (String, String, Int) -> Unit, onComplete: (String, String) -> Unit
     ) = withContext(Dispatchers.IO) {
         var wakeLock: PowerManager.WakeLock? = null
@@ -33,7 +34,8 @@ object ToolsManager {
             } else {
                 selectedApps.forEachIndexed { index, app ->
                     updateProgress("Debloating Apps", "${app.label} (${index + 1}/${selectedApps.size})", ((index + 1) * 100) / selectedApps.size)
-                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --remove '${app.packageName}'\"")
+                    val flag = if (keepData) "-k" else ""
+                    Shell.cmd("su -mm -c \"sh /data/adb/Shifter/ROM-Shifter.sh --remove '${app.packageName}' '$flag'\"")
                         .exec()
                     updateLog("Uninstalled: ${app.label}")
                 }

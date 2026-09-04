@@ -1420,7 +1420,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _appList.value,
                             isManage = false,
                             includeOverhead = false
-                        )
+                        ).filter { it.isSystem }
                         _appList.value = uninstalled
                         _uiState.value = _uiState.value.copy(
                             actionFilterState = newState,
@@ -1477,7 +1477,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showSystemApps = showSysApps,
             systemAppsFetched = false,
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
-            globalComponents = setOf(1, 2, 3, 4, 5)
+            globalComponents = setOf(1, 2, 3, 4, 5),
+            keepDebloatData = false
         )
 
         when (mode) {
@@ -1599,7 +1600,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (state.migratorMode == MigratorMode.MANAGE) {
                 totalBackupsKb = allApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
             }
-            selectedApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+            if (state.migratorMode == MigratorMode.DEBLOAT && state.keepDebloatData && state.actionFilterState == 1) {
+                selectedApps.sumOf { it.appSizeKb }
+            } else {
+                selectedApps.sumOf { it.appSizeKb + it.dataSizeKb + it.mediaSizeKb }
+            }
         } else {
             var tempKb = 0L
             selectedApps.forEach { app ->
@@ -1747,6 +1752,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         context = getApplication(),
                         selectedApps = selectedApps,
                         isRestore = state.actionFilterState == 2,
+                        keepData = state.keepDebloatData,
                         updateLog = {},
                         updateProgress = updateProgress,
                         onComplete = onComplete
@@ -1803,5 +1809,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 MigratorMode.MANAGE -> fetchAppsList("AllBackups")
             }
         }
+    }
+
+    fun toggleKeepDebloatData() {
+        _uiState.update { it.copy(keepDebloatData = !it.keepDebloatData) }
     }
 }

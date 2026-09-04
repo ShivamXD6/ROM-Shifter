@@ -498,9 +498,12 @@ do_restore() {
 
 do_remove() {
     local PKG="$1"
+    local KEEP_DATA="$2"
     COOLDOWN 5
-    cmd package uninstall "$PKG" >/dev/null 2>&1 &
-    cmd package uninstall --user 0 "$PKG" >/dev/null 2>&1 &
+    local FLAGS=""
+    [ "$KEEP_DATA" = "-k" ] && FLAGS="-k"
+    cmd package uninstall $FLAGS "$PKG" >/dev/null 2>&1 &
+    cmd package uninstall $FLAGS --user 0 "$PKG" >/dev/null 2>&1 &
 }
 
 do_restore_debloat() {

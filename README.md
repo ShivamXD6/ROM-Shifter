@@ -272,6 +272,8 @@
 * Use Auto Select to automatically select apps that have already been backed up.
 * Toggle System Apps to show or hide them.
 * Enable Restore to bring back previously debloated system apps.
+* Use the keep data option to keep the app data when uninstalling/archiving them (based on the
+  android version)
 * Useful for removing vendor bloatware and unnecessary system packages after installing a ROM.
 
 <div align="center">

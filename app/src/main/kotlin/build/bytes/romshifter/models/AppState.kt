@@ -93,5 +93,6 @@ data class AppState(
     val isInstallerIntent: Boolean = false,
     val installStartTime: Long = 0,
     val totalInstallTimeSeconds: Long = 0,
-    val requestDefaultSms: Boolean = false
+    val requestDefaultSms: Boolean = false,
+    val keepDebloatData: Boolean = false
 )

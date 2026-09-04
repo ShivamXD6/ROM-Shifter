@@ -731,6 +731,19 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                             onExpand = { expandChip("Auto Select") }
                         )
                     }
+
+                    if (appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 1) {
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.keepDebloatData,
+                                onClick = { viewModel.toggleKeepDebloatData() },
+                                label = "Keep Data",
+                                leadingIcon = Icons.Default.Storage,
+                                showLabel = expandedChipLabel == "Keep Data",
+                                onExpand = { expandChip("Keep Data") }
+                            )
+                        }
+                    }
                 }
 
                 if (showAppFilters) {
