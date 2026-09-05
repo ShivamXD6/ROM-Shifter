@@ -96,6 +96,27 @@
   <img src="https://github.com/user-attachments/assets/4646a055-c345-44bd-a410-ccc28ec3cb63" width="30%" alt="Installation Finished"/>
 </div>
 
+<br>
+
+💡 <b>Tip</b>
+
+To set **ROM Shifter** as the default handler for `.apk` files, follow these steps:
+
+1. Open **Settings → Apps → See all apps**.
+2. Tap the **⋮ (three-dot menu)** in the top-right corner.
+3. Select **Show system apps**.
+4. Search for **Package Installer**.
+5. Open it and tap **Clear defaults**.
+6. Try installing any **APK file**.
+7. When prompted to choose an app, select **ROM Shifter**.
+8. Tap **Always**.
+9. Repeat the same steps for **`.apks`, `.xapk`, and `.apkm`** files.
+
+<div align="center">
+  <img width="30%" alt="Clear Defaults" src="https://github.com/user-attachments/assets/d555abe8-dcf2-4f8b-8149-0115ea6f2d1f" />
+  <img width="30%" alt="Select Always" src="https://github.com/user-attachments/assets/970858d1-4a23-48d2-88d8-a4a6982d514d" />
+</div>
+
 </details>
 
 <details>
