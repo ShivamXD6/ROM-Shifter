@@ -38,19 +38,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.RestorePage
@@ -455,7 +452,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             shape = MaterialTheme.shapes.large,
             onDismissRequest = { showDeviceDeleteDialog = false },
             icon = { Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(28.dp)) },
-            title = { Text("Erase Device Backups") },
+            title = { Text("Erase Native Backups") },
             text = {
                 Column {
                     val options = listOf(
@@ -606,7 +603,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (showEraseDevice) {
@@ -614,10 +611,10 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                         AnimatedFilterChip(
                             selected = false,
                             onClick = { showDeviceDeleteDialog = true },
-                            label = "Erase Device",
+                            label = "Erase Native",
                             leadingIcon = Icons.Default.SettingsPhone,
-                            showLabel = expandedChipLabel == "Erase Device",
-                            onExpand = { expandChip("Erase Device") },
+                            showLabel = expandedChipLabel == "Erase Native",
+                            onExpand = { expandChip("Erase Native") },
                             selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
                             selectedContentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -625,51 +622,48 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 }
 
                 if (showActionChip) {
-                    val actionChipLabel = when (appState.migratorMode) {
-                        MigratorMode.DEBLOAT -> if (appState.actionFilterState == 1) "Debloat" else "Restore"
-                        MigratorMode.SYSTEMIZE -> if (appState.actionFilterState == 1) "Systemize" else "De-Systemize"
-                        else -> ""
-                    }
-                    val actionIcon = when (appState.migratorMode) {
-                        MigratorMode.DEBLOAT -> {
-                            if (appState.actionFilterState == 1) Icons.Default.Delete
-                            else Icons.Default.RestorePage
+                    if (appState.migratorMode == MigratorMode.DEBLOAT) {
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.actionFilterState == 1,
+                                onClick = { viewModel.setActionFilter(1) },
+                                label = "Debloat",
+                                leadingIcon = Icons.Default.Delete,
+                                showLabel = expandedChipLabel == "Debloat",
+                                onExpand = { expandChip("Debloat") }
+                            )
                         }
-
-                        MigratorMode.SYSTEMIZE -> {
-                            if (appState.actionFilterState == 1) Icons.Default.Settings
-                            else Icons.Default.Build
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.actionFilterState == 2,
+                                onClick = { viewModel.setActionFilter(2) },
+                                label = "Restore",
+                                leadingIcon = Icons.Default.RestorePage,
+                                showLabel = expandedChipLabel == "Restore",
+                                onExpand = { expandChip("Restore") }
+                            )
                         }
-
-                        else -> {
-                            when (appState.actionFilterState) {
-                                0 -> Icons.Default.AllInclusive
-                                1 -> Icons.Default.FilterList
-                                else -> Icons.Default.CheckCircle
-                            }
+                    } else if (appState.migratorMode == MigratorMode.SYSTEMIZE) {
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.actionFilterState == 1,
+                                onClick = { viewModel.setActionFilter(1) },
+                                label = "Systemize",
+                                leadingIcon = Icons.Default.Settings,
+                                showLabel = expandedChipLabel == "Systemize",
+                                onExpand = { expandChip("Systemize") }
+                            )
                         }
-                    }
-                    item {
-                        AnimatedFilterChip(
-                            selected = appState.actionFilterState != 0,
-                            onClick = { viewModel.toggleActionFilter() },
-                            label = actionChipLabel,
-                            leadingIcon = actionIcon,
-                            showLabel = expandedChipLabel == "ActionGroup",
-                            onExpand = { expandChip("ActionGroup") }
-                        )
-                    }
-                }
-
-                if (hasButtons && (showSmartSelect || showAppFilters)) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .width(1.dp)
-                                .height(24.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.actionFilterState == 2,
+                                onClick = { viewModel.setActionFilter(2) },
+                                label = "De-Systemize",
+                                leadingIcon = Icons.Default.Build,
+                                showLabel = expandedChipLabel == "De-Systemize",
+                                onExpand = { expandChip("De-Systemize") }
+                            )
+                        }
                     }
                 }
 
@@ -687,7 +681,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                     }
                 }
 
-                if (hasComponents) {
+                if ((hasButtons || hasComponents) && (showSmartSelect || showAppFilters)) {
                     item {
                         Box(
                             modifier = Modifier

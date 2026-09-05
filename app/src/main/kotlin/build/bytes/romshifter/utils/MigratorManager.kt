@@ -59,7 +59,7 @@ object MigratorManager {
         when (type) {
             "User", "System", "AllInstalled", "Uninstalled" -> {
                 val sysModCmd =
-                    "ls -1 /data/adb/modules/ROM-Shifter/system/product/app /data/adb/modules_update/ROM-Shifter/system/product/app 2>/dev/null"
+                    "ls -1 /data/adb/modules/ROM-Shifter/system/product/priv-app /data/adb/modules_update/ROM-Shifter/system/product/priv-app 2>/dev/null"
                 val systemizedLabels = Shell.cmd(sysModCmd).exec().out.toSet()
 
                 val iconCacheDir = File(context.cacheDir, "shifter_icons").apply { mkdirs() }

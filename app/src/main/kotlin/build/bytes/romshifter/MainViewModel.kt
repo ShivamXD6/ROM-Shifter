@@ -1421,15 +1421,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
     }
 
-    fun toggleActionFilter() {
+    fun setActionFilter(newState: Int) {
         val mode = _uiState.value.migratorMode
         val currentState = _uiState.value.actionFilterState
-
-        val newState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS) {
-            (currentState + 1) % 3
-        } else {
-            if (currentState == 1) 2 else 1
-        }
+        if (currentState == newState) return
 
         when (mode) {
             MigratorMode.DEBLOAT -> {
@@ -1789,7 +1784,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (state.actionFilterState == 2) {
                         val appPaths = selectedApps.joinToString(" ") {
                             val safeLabel = it.label.replace(Regex("[^a-zA-Z0-9_]"), "")
-                            "'/data/adb/modules/ROM-Shifter/system/product/app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/app/$safeLabel'"
+                            "'/data/adb/modules/ROM-Shifter/system/product/priv-app/$safeLabel' '/data/adb/modules_update/ROM-Shifter/system/product/priv-app/$safeLabel'"
                         }
                         Shell.cmd("su -c \"rm -rf $appPaths\"").exec()
                         updateProgress("De-Systemizing", "Removed from module folder", 100)

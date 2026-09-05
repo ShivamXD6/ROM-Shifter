@@ -499,18 +499,17 @@ do_restore() {
 do_remove() {
     local PKG="$1"
     local KEEP_DATA="$2"
-    COOLDOWN 5
     if [ "$KEEP_DATA" = "-k" ]; then
-      cmd package archive "$PKG" >/dev/null 2>&1 || cmd package uninstall -k "$PKG" >/dev/null 2>&1
+      cmd package archive "$PKG" >/dev/null 2>&1 || cmd package uninstall --user 0 -k "$PKG" >/dev/null 2>&1
     else
       cmd package uninstall "$PKG" >/dev/null 2>&1
+      cmd package uninstall --user 0 "$PKG" >/dev/null 2>&1
     fi
 }
 
 do_restore_debloat() {
-    COOLDOWN 5
-    cmd package request-unarchive "$PKG" >/dev/null 2>&1
-    cmd package install-existing "$PKG" >/dev/null 2>&1
+    local PKG="$1"
+    cmd package install-existing "$PKG" >/dev/null 2>&1 || cmd package request-unarchive "$PKG" >/dev/null 2>&1
 }
 
 do_systemize() {
@@ -530,7 +529,7 @@ do_systemize() {
 
     if [ -n "$APK_PATH" ]; then
         local SAFE_LABEL=$(echo "$LABEL" | tr -cd 'a-zA-Z0-9_')
-        TARGET_DIR="$UP_DIR/system/product/app/$SAFE_LABEL"
+        TARGET_DIR="$UP_DIR/system/product/priv-app/$SAFE_LABEL"
         local SOURCE_DIR=$(dirname "$APK_PATH")
 
         mkdir -p "$TARGET_DIR"
