@@ -157,6 +157,7 @@ object MigratorManager {
 
                             val safeLabel = label.replace(Regex("[^a-zA-Z0-9_]"), "")
                             val isSystemizedApp = systemizedLabels.contains(safeLabel)
+                            val isLaunchable = pm.getLaunchIntentForPackage(pkg) != null
 
                             AppInfo(
                                 label = label,
@@ -173,6 +174,7 @@ object MigratorManager {
                                 isInstalled = isInst,
                                 versionCode = vCode,
                                 apkPath = aPath,
+                                isLaunchable = isLaunchable,
                                 availableInBackup = availInBackup
                             )
                         } else {

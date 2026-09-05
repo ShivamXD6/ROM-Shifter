@@ -22,6 +22,7 @@ data class AppInfo(
     val diskSizeKb: Long = 0,
     val versionCode: Long = 0,
     val apkPath: String? = null,
+    val isLaunchable: Boolean = false,
     val availableInBackup: Set<Int> = emptySet(),
     val activeComponents: Set<Int>? = null
 )
@@ -94,5 +95,6 @@ data class AppState(
     val installStartTime: Long = 0,
     val totalInstallTimeSeconds: Long = 0,
     val requestDefaultSms: Boolean = false,
-    val keepDebloatData: Boolean = false
+    val keepDebloatData: Boolean = false,
+    val showPartialSystemApps: Boolean = false
 )

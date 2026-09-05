@@ -62,6 +62,9 @@ android {
         buildConfig = true
     }
     packaging {
+        dex {
+            useLegacyPackaging = true
+        }
         jniLibs {
             useLegacyPackaging = true
             keepDebugSymbols.add("**/libzapdos.so")

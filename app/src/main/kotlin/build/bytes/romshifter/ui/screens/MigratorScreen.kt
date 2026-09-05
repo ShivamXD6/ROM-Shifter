@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.RestorePage
@@ -380,6 +381,7 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
         appList,
         appState.searchQuery,
         appState.showSystemApps,
+        appState.showPartialSystemApps,
         appState.actionFilterState
     ) {
         derivedStateOf {
@@ -391,8 +393,11 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
 
                 val isDebloatedMode =
                     appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2
-                val matchesType =
-                    isDebloatedMode || (app.isSystem && appState.showSystemApps) || !app.isSystem
+
+                val matchesType = isDebloatedMode || if (app.isSystem) {
+                    appState.showSystemApps || (appState.showPartialSystemApps && app.isLaunchable)
+                } else true
+
                 val matchesAction = when (appState.migratorMode) {
                     MigratorMode.SYSTEMIZE -> {
                         if (appState.actionFilterState == 1) !app.isSystem && !app.isSystemized else app.isSystemized
@@ -594,6 +599,9 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
             val showAppFilters =
                 appState.migratorMode != MigratorMode.SYSTEMIZE && !(appState.migratorMode == MigratorMode.DEBLOAT && appState.actionFilterState == 2)
 
+            val showPartialSystemFilter =
+                appState.migratorMode == MigratorMode.BACKUP_APPS || appState.migratorMode == MigratorMode.DEBLOAT
+
             val showSmartSelect = when (appState.migratorMode) {
                 MigratorMode.BACKUP_APPS, MigratorMode.RESTORE_APPS, MigratorMode.MANAGE -> true
                 MigratorMode.DEBLOAT -> appState.actionFilterState == 1
@@ -741,14 +749,27 @@ fun MigratorActionScreen(appState: AppState, appList: List<AppInfo>, viewModel: 
                 }
 
                 if (showAppFilters) {
+                    if (showPartialSystemFilter) {
+                        item {
+                            AnimatedFilterChip(
+                                selected = appState.showPartialSystemApps,
+                                onClick = { viewModel.togglePartialSystemApps() },
+                                label = "System Apps",
+                                leadingIcon = Icons.Default.Layers,
+                                showLabel = expandedChipLabel == "System Apps",
+                                onExpand = { expandChip("System Apps") }
+                            )
+                        }
+                    }
+
                     item {
                         AnimatedFilterChip(
                             selected = appState.showSystemApps,
                             onClick = { viewModel.toggleSystemApps() },
-                            label = "System Apps",
+                            label = "All System Apps",
                             leadingIcon = Icons.Default.Settings,
-                            showLabel = expandedChipLabel == "System Apps",
-                            onExpand = { expandChip("System Apps") }
+                            showLabel = expandedChipLabel == "All System Apps",
+                            onExpand = { expandChip("All System Apps") }
                         )
                     }
                 }

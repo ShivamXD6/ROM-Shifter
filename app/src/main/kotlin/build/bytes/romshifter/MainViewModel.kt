@@ -1418,7 +1418,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleSystemApps() {
-        _uiState.value = _uiState.value.copy(showSystemApps = !_uiState.value.showSystemApps)
+        _uiState.update { it.copy(showSystemApps = !it.showSystemApps) }
+    }
+
+    fun togglePartialSystemApps() {
+        _uiState.update { it.copy(showPartialSystemApps = !it.showPartialSystemApps) }
     }
 
     fun setActionFilter(newState: Int) {
@@ -1494,7 +1498,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             searchQuery = "",
             currentStep = "",
             showUserApps = true,
-            showSystemApps = showSysApps,
+            showSystemApps = if (mode == MigratorMode.DEBLOAT) false else showSysApps,
+            showPartialSystemApps = (mode == MigratorMode.DEBLOAT),
             systemAppsFetched = false,
             actionFilterState = if (mode == MigratorMode.BACKUP_APPS || mode == MigratorMode.RESTORE_APPS || mode == MigratorMode.MANAGE) 0 else 1,
             globalComponents = setOf(1, 2, 3, 4, 5),

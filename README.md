@@ -157,13 +157,14 @@
   * This results in backup sizes around 3% smaller for a single app and 15%+ smaller for bulk
     backups.
 * Use Auto Select to automatically select apps that have already backup.
-* Toggle System Apps to show or hide them.
+* Toggle System Apps (launchable) or All System Apps (everything) to show or hide them.
 * Useful before a clean ROM installation or when moving to another ROM.
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/5516dfb4-c73c-4fcf-a106-5227b098cc39" width="30%" alt="App Size with Icon, Meta, Permissions and AndroidID"/>
   <img src="https://github.com/user-attachments/assets/7e147476-e5a0-48a1-b927-833cf93db5fa" width="30%" alt="App Size with Selected all components"/>
-  <img src="https://github.com/user-attachments/assets/29568332-42a4-45f6-8bc5-4239acfdf1c3" width="30%" alt="System Apps"/>
+  <img src="https://github.com/user-attachments/assets/c66dee17-e5d6-4383-baa4-022d6d4dcdb1" width="30%" alt="System Apps"/>
+  <img src="https://github.com/user-attachments/assets/5cb3fbcc-915f-4038-9d15-0510fe480a28" width="30%" alt="All System Apps"/>
   <img src="https://github.com/user-attachments/assets/234d2a5b-2dfc-454c-bbcf-784c4f7d19a2" width="30%" alt="Auto Select Apps"/>
   <img src="https://github.com/user-attachments/assets/5acf57a8-ec2a-4ba0-81e6-6ac92b8b8b85" width="30%" alt="Backup Completed (Updated Benchmarks)"/>
 </div>
@@ -270,15 +271,17 @@
 * Select individual apps or multiple apps at once.
 * Choose between User Apps and System Apps.
 * Use Auto Select to automatically select apps that have already been backed up.
-* Toggle System Apps to show or hide them.
+* Toggle System Apps (launchable) or All System Apps (everything) to show or hide them.
 * Enable Restore to bring back previously debloated system apps.
-* Use the keep data option to keep the app data when uninstalling/archiving them (based on the
-  android version)
+* Use the keep data option to keep the app data when uninstalling.
 * Useful for removing vendor bloatware and unnecessary system packages after installing a ROM.
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/c5cc6a90-b1d7-4b6d-a914-ffdaf98b7eb9" width="30%" alt="Debloat Apps"/>
-  <img src="https://github.com/user-attachments/assets/c4800dfb-efab-4973-87fe-b2765e6960cb" width="30%" alt="Restore Apps"/>
+  <img src="https://github.com/user-attachments/assets/40bdb5e2-67a1-4980-95af-77bc01deea03" width="30%" alt="Debloat Apps"/>
+  <img src="https://github.com/user-attachments/assets/0e2e2436-0c5a-4004-be2b-da093dd8360e" width="30%" alt="Restore Apps"/>
+  <img src="https://github.com/user-attachments/assets/bf2a63c4-d597-4fe6-a0e5-ec8db10af75d" width="30%" alt="Keep Data"/>
+  <img src="https://github.com/user-attachments/assets/731184eb-fdb3-4b17-acd4-4625cfa6a47e" width="30%" alt="System Apps"/>
+  <img src="https://github.com/user-attachments/assets/971940ad-3025-440f-b757-19a4736bcb4c" width="30%" alt="All System Apps"/>
   <img src="https://github.com/user-attachments/assets/4007ad26-da9d-448d-8b5d-bb16db109868" width="30%" alt="Auto Select Apps"/>
 </div>
 
@@ -298,8 +301,8 @@
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/bb58b786-2cb6-410b-a7e8-4988e0458d42" width="30%" alt="Mountify Required"/>
-  <img src="https://github.com/user-attachments/assets/7eba401b-c6cd-479a-94ef-94302ba8abc6" width="30%" alt="Systemize Apps"/>
-  <img src="https://github.com/user-attachments/assets/b36534f6-887c-4da8-b79b-b1b667ccc605" width="30%" alt="De-Systemize Apps"/>
+  <img src="https://github.com/user-attachments/assets/43ccf8a8-02f3-4b21-a33c-e0a661462bc5" width="30%" alt="Systemize Apps"/>
+  <img src="https://github.com/user-attachments/assets/42607e0d-7c1a-405b-bf61-6d83eb7b3751" width="30%" alt="De-Systemize Apps"/>
 </div>
 
 </details>
