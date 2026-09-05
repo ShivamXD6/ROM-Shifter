@@ -320,8 +320,8 @@
   * Supports SD Card as well.
   * Automatically moves the existing Files to another Directory you selected.
 * Change Appearance or Theme to whatever you like,
-  * Supports Dynamic Wallpapers based accent colors to Android 9 - 11
-  * Supports Dynamic Wallpapers based Monet colors to Android 12+
+  * Supports Dynamic Wallpapers based accent colors on Android 10 & 11
+  * Supports Dynamic Wallpapers based Monet colors on Android 12+
   * Supports Light, Dark, AMOLED (Black) theme as well to save some battery.
   * Disable Dynamic colors to use the default accents colors.
 * Get latest updates directly from the app.
