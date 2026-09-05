@@ -32,23 +32,8 @@ init_shifter() {
 }
 
 COOLDOWN() { while [ $(jobs | wc -l) -ge "$1" ] 2>/dev/null; do sleep 0.1; done; }
-SANITIZE() { echo "$1" | $SED_BIN 's/[^a-zA-Z0-9]/_/g'; }
-
 CHK() { case " $APP_COMPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac }
 
-RAW_SIZE() {
-    du -sk "$@" 2>/dev/null | $AWK_BIN '{sum+=$1} END{print sum+0}'
-}
-
-FORMAT_SIZE() {
-    local raw=$(echo "$1" | tr -d '\r\n ')
-    $AWK_BIN -v n="${raw:-0}" 'BEGIN{
-        n = n + 0
-        if(n >= 1048576) printf "%.2f GB", n/1048576
-        else if(n >= 1024) printf "%.2f MB", n/1024
-        else printf "%d KB", n
-    }'
-}
 READID() { $SED_BIN -n "/package=\"$1\"/s/.*value=\"\([^\"]*\)\".*/\1/p" "/data/system/users/0/settings_ssaid.xml" 2>/dev/null; }
 CHANID() { $SED_BIN -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
 GETPERM() {
