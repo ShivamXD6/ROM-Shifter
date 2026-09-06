@@ -526,7 +526,7 @@ do_systemize() {
 
 do_backup_wifi() {
     local DEST="$1"
-    mkdir -p "$DEST"
+    rm -rf "$DEST" && mkdir -p "$DEST"
     local WIFI_DIR=""
     [ -d /data/misc/apexdata/com.android.wifi ] && WIFI_DIR="/data/misc/apexdata/com.android.wifi"
     [ -z "$WIFI_DIR" ] && [ -d /data/misc/wifi ] && WIFI_DIR="/data/misc/wifi"
@@ -596,7 +596,7 @@ do_restore_wifi() {
 
 do_backup_wallpaper() {
     local DEST="$1"
-    mkdir -p "$DEST"
+    rm -rf "$DEST" && mkdir -p "$DEST"
     cp -a /data/system/users/0/wallpaper* "$DEST/" 2>/dev/null
 }
 
@@ -610,36 +610,27 @@ do_restore_wallpaper() {
 
 do_backup_bt() {
     local DEST="$1"
-    mkdir -p "$DEST"
-    local BT_PATH=""
-    [ -f /data/misc/bluedroid/bt_config.conf ] && BT_PATH="/data/misc/bluedroid/bt_config.conf"
-    [ -z "$BT_PATH" ] && [ -f /data/misc/bluetooth/bt_config.conf ] && BT_PATH="/data/misc/bluetooth/bt_config.conf"
-
-    if [ -n "$BT_PATH" ]; then
-        cp -a "$BT_PATH" "$DEST/" 2>/dev/null
-    fi
+    rm -rf "$DEST" && mkdir -p "$DEST"
+    BT_DIR="/data/misc/bluedroid"
+    cp -a "$BT_DIR"/*.conf "$DEST/" 2>/dev/null
 }
 
 do_restore_bt() {
     local SRC="$1"
-    [ -f "$SRC/bt_config.conf" ] || return
-    local TARGET=""
-    [ -d /data/misc/bluedroid ] && TARGET="/data/misc/bluedroid/bt_config.conf"
-    [ -z "$TARGET" ] && [ -d /data/misc/bluetooth ] && TARGET="/data/misc/bluetooth/bt_config.conf"
+    BT_DIR="/data/misc/bluedroid"
 
-    if [ -n "$TARGET" ]; then
+    if [ -n "$BT_DIR" ] && [ "$(ls -A "$SRC" 2>/dev/null)" ]; then
         echo "INFO:STEP|MSG:Stopping Bluetooth..."
         svc bluetooth disable 2>/dev/null
-        cmd bluetooth_manager disable >/dev/null 2>&1
         sleep 1
-        cp -f "$SRC/bt_config.conf" "$TARGET"
-        chown bluetooth:bluetooth "$TARGET" 2>/dev/null
-        chmod 660 "$TARGET" 2>/dev/null
-        restorecon "$TARGET" 2>/dev/null
+        cp -af "$SRC"/* "$BT_DIR/"
+        chown -R bluetooth:bluetooth "$BT_DIR" 2>/dev/null
+        chmod -R 660 "$BT_DIR"/* 2>/dev/null
+        chmod 770 "$BT_DIR"
+        restorecon -R "$BT_DIR" 2>/dev/null
         sleep 1
         echo "INFO:STEP|MSG:Starting Bluetooth..."
         svc bluetooth enable 2>/dev/null
-        cmd bluetooth_manager enable >/dev/null 2>&1
     fi
 }
 

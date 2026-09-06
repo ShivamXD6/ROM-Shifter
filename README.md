@@ -243,7 +243,7 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 
 *Back up and restore important Android data that is not tied to individual apps.*
 
-* Supports Device backup and restore of:
+* Supports Device backup and restore at good speed (with batch processing):
 
   * SMS/MMS (including RCS)
   * Calls
@@ -253,6 +253,7 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
   * Bluetooth (Paired Devices and Name)
 * Unlike other solutions, you do not need to manually set ROM Shifter as the default sms app, it
   automatically does that to restore Messages, Calls or Contacts.
+* Also, it grants and revoke the permissions as well as soon it back up/restores the Device Data.
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/e1e8ed48-1963-4ddb-b321-849ae0f5e57c" width="30%" alt="Backup Device Data"/>

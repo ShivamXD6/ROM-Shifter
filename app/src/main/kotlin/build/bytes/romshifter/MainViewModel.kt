@@ -1352,7 +1352,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isRunning = false,
                         currentAction = finalMsg,
                         currentStep = itemsProcessed,
-                        progress = 100
+                        progress = 100,
+                        showSecurityResetDialog = (doSms || doCall || doContacts)
                     )
                 }
             } catch (e: Exception) {
@@ -1372,6 +1373,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     DeviceManager.setDefaultSmsAppRoot(restoreTo)
                 }
             }
+        }
+    }
+
+    fun finalizeSecurityReset(context: Context) {
+        _uiState.update { it.copy(showSecurityResetDialog = false) }
+        viewModelScope.launch(Dispatchers.IO) {
+            cancelNotification()
+            DeviceManager.revokePermissionsAndExit(context)
         }
     }
 

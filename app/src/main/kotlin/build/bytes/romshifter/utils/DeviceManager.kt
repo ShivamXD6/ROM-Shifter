@@ -119,17 +119,19 @@ object DeviceManager {
         }
     }
 
-    private fun importVcf(context: Context, vcfFile: File, updateProgress: (Int) -> Unit) {
+    private fun importVcf(
+        context: Context,
+        vcfFile: File,
+        totalContacts: Int,
+        updateProgress: (Int) -> Unit
+    ) {
         try {
             val ops = ArrayList<ContentProviderOperation>()
             val unfoldedLines = mutableListOf<String>()
             var cur: StringBuilder? = null
             vcfFile.forEachLine { line ->
-                if (line.startsWith(" ") || line.startsWith("\t")) cur?.append(
-                    line.substring(
-                        1
-                    )
-                ) else {
+                if (line.startsWith(" ") || line.startsWith("\t")) cur?.append(line.substring(1))
+                else {
                     cur?.let { unfoldedLines.add(it.toString()) }; cur = StringBuilder(line)
                 }
             }
@@ -137,15 +139,16 @@ object DeviceManager {
             var name: String? = null
             val phones = mutableListOf<String>()
             var photo: ByteArray? = null
-            val total = unfoldedLines.size
-            unfoldedLines.forEachIndexed { i, line ->
+            var processedContacts = 0
+            val notifyInterval = (totalContacts * 0.05).toInt().coerceAtLeast(1)
+            unfoldedLines.forEach { line ->
                 when {
                     line.startsWith("BEGIN:VCARD", true) -> {
                         name = null; phones.clear(); photo = null
                     }
-
                     line.startsWith("FN:", true) || line.startsWith("FN;", true) -> {
-                        val v = line.substringAfter(":").trim(); name = if (line.contains(
+                        val v = line.substringAfter(":").trim()
+                        name = if (line.contains(
                                 "ENCODING=QUOTED-PRINTABLE",
                                 true
                             )
@@ -161,14 +164,12 @@ object DeviceManager {
                                 "ENCODING=QUOTED-PRINTABLE",
                                 true
                             )
-                        ) decodeQuotedPrintable(v) else v; name =
-                            d.split(";").filter { it.isNotBlank() }.joinToString(" ")
+                        ) decodeQuotedPrintable(v) else v
+                        name = d.split(";").filter { it.isNotBlank() }.joinToString(" ")
                     }
-
                     line.startsWith("TEL", true) -> {
                         val n = line.substringAfter(":").trim(); if (n.isNotEmpty()) phones.add(n)
                     }
-
                     line.startsWith("PHOTO", true) -> {
                         try {
                             photo = android.util.Base64.decode(
@@ -178,7 +179,6 @@ object DeviceManager {
                         } catch (_: Exception) {
                         }
                     }
-
                     line.startsWith("END:VCARD", true) -> {
                         if (!name.isNullOrEmpty() || phones.isNotEmpty()) {
                             val rIdx = ops.size
@@ -203,12 +203,11 @@ object DeviceManager {
                             )
                             phones.forEach {
                                 ops.add(
-                                    ContentProviderOperation.newInsert(
-                                        ContactsContract.Data.CONTENT_URI
-                                    ).withValueBackReference(
-                                        ContactsContract.Data.RAW_CONTACT_ID,
-                                        rIdx
-                                    ).withValue(
+                                    ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                                        .withValueBackReference(
+                                            ContactsContract.Data.RAW_CONTACT_ID,
+                                            rIdx
+                                        ).withValue(
                                         ContactsContract.Data.MIMETYPE,
                                         ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE
                                     ).withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, it)
@@ -233,15 +232,16 @@ object DeviceManager {
                                 )
                             }
                         }
+                        processedContacts++
+                        if (totalContacts > 0 && processedContacts % notifyInterval == 0) updateProgress(
+                            processedContacts * 100 / totalContacts
+                        )
                         if (ops.size > 100) {
-                            context.contentResolver.applyBatch(
-                                ContactsContract.AUTHORITY,
-                                ops
-                            ); ops.clear()
+                            context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+                            ops.clear()
                         }
                     }
                 }
-                if (i % 50 == 0 && total > 0) updateProgress(i * 100 / total)
             }
             if (ops.isNotEmpty()) context.contentResolver.applyBatch(
                 ContactsContract.AUTHORITY,
@@ -274,10 +274,53 @@ object DeviceManager {
             }
     }
 
-    private fun restoreSms(context: Context, reader: JsonReader, onProgress: (String) -> Unit) {
+    private fun countJsonArray(file: File, arrayName: String): Int {
+        if (!file.exists()) return 0
+        return try {
+            file.inputStream().use { fis ->
+                val reader = JsonReader(InputStreamReader(fis, "UTF-8"))
+                var count = 0
+                if (arrayName.isEmpty()) {
+                    reader.beginArray()
+                    while (reader.hasNext()) {
+                        reader.skipValue(); count++
+                    }
+                    reader.endArray()
+                } else {
+                    reader.beginObject()
+                    while (reader.hasNext()) {
+                        if (reader.nextName() == arrayName) {
+                            reader.beginArray()
+                            while (reader.hasNext()) {
+                                reader.skipValue(); count++
+                            }
+                            reader.endArray()
+                        } else {
+                            reader.skipValue()
+                        }
+                    }
+                    reader.endObject()
+                }
+                count
+            }
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    private fun restoreSms(
+        context: Context,
+        reader: JsonReader,
+        total: Int,
+        onProgress: (String, Int) -> Unit
+    ) {
         Log.d("DeviceManager", "Starting SMS restoration...")
         val validCols = getValidColumns(context, Telephony.Sms.CONTENT_URI)
-        var count = 0
+        var restoredCount = 0
+        var processedCount = 0
+        var lastNotifyTime = 0L
+        val notifyInterval = (total * 0.05).toInt().coerceAtLeast(1)
+        val batchSize = 500
         try {
             reader.beginArray()
             val batch = mutableListOf<ContentValues>()
@@ -305,19 +348,41 @@ object DeviceManager {
                 reader.endObject()
                 if (validCols.contains("sub_id")) values.put("sub_id", -1)
                 batch.add(values)
-                if (batch.size >= 50) {
-                    count += flushBatch(context, Telephony.Sms.CONTENT_URI, batch)
-                    onProgress("Restoring Messages ($count)...")
+                processedCount++
+
+                if (batch.size >= batchSize) {
+                    restoredCount += flushBulk(context, Telephony.Sms.CONTENT_URI, batch)
                     batch.clear()
+                }
+
+                if (processedCount % notifyInterval == 0) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastNotifyTime >= 1000) {
+                        onProgress(
+                            "Restoring Messages ($processedCount)...",
+                            (processedCount * 100 / total).coerceIn(0, 100)
+                        )
+                        lastNotifyTime = now
+                    }
                 }
             }
             reader.endArray()
-            if (batch.isNotEmpty()) count += flushBatch(context, Telephony.Sms.CONTENT_URI, batch)
-            Log.d("DeviceManager", "SMS restoration completed. Restored $count SMS.")
-            onProgress("Restored $count Messages.")
+            if (batch.isNotEmpty()) restoredCount += flushBulk(
+                context,
+                Telephony.Sms.CONTENT_URI,
+                batch
+            )
+            onProgress("Restored $restoredCount Messages.", 100)
         } catch (e: Exception) {
-            Log.e("DeviceManager", "Failed to restore SMS", e)
-            onProgress("Error: ${e.message}")
+            onProgress("Error: ${e.message}", 0)
+        }
+    }
+
+    private fun flushBulk(context: Context, uri: Uri, batch: List<ContentValues>): Int {
+        return try {
+            context.contentResolver.bulkInsert(uri, batch.toTypedArray())
+        } catch (_: Exception) {
+            flushBatch(context, uri, batch)
         }
     }
 
@@ -697,13 +762,16 @@ object DeviceManager {
     private fun restoreMms(
         context: Context,
         reader: JsonReader,
+        total: Int,
         partsDir: File,
-        onProgress: (String) -> Unit
+        onProgress: (String, Int) -> Unit
     ) {
         Log.d("DeviceManager", "Starting MMS restoration...")
         val selfSuffixes = getSelfNumbers(context).toMutableSet()
         val activeSubId = getActiveSubId(context)
         var count = 0
+        var lastNotifyTime = 0L
+        val notifyInterval = (total * 0.05).toInt().coerceAtLeast(1)
         reader.beginArray()
         while (reader.hasNext()) {
             val mmsValues = ContentValues()
@@ -821,23 +889,35 @@ object DeviceManager {
             }
 
             val targetUri =
-                if (msgBox == 1) "content://mms/inbox" else "content://mms/sent".toUri()
+                if (msgBox == 1) Telephony.Mms.Inbox.CONTENT_URI else Telephony.Mms.Sent.CONTENT_URI
             try {
                 var mmsUri = try {
-                    context.contentResolver.insert(targetUri as Uri, mmsValues)
+                    context.contentResolver.insert(targetUri, mmsValues)
                 } catch (e: Exception) {
                     Log.e("DeviceManager", "Standard insert failed for MMS", e); null
                 }
                 if (mmsUri == null) {
                     Log.d("DeviceManager", "Attempting force insert for MMS header")
-                    mmsUri = forceInsertHeader(targetUri as Uri, mmsValues)
+                    mmsUri = forceInsertHeader(targetUri, mmsValues)
                 }
                 if (mmsUri == null) {
                     Log.e("DeviceManager", "Failed to insert MMS header")
                     continue
                 }
                 val mmsId = mmsUri.lastPathSegment?.toLongOrNull() ?: continue
-                count++; onProgress("Restoring Messages ($count)...")
+                count++
+
+                if (count % notifyInterval == 0) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastNotifyTime >= 1000) {
+                        onProgress(
+                            "Restoring Messages ($count)...",
+                            (count * 100 / total).coerceIn(0, 100)
+                        )
+                        lastNotifyTime = now
+                    }
+                }
+
                 Log.d(
                     "DeviceManager",
                     "Restored MMS header ID: $mmsId, now restoring ${parts.size} parts and ${addrs.size} addresses"
@@ -869,20 +949,9 @@ object DeviceManager {
                             try {
                                 context.contentResolver.openOutputStream(pUri)
                                     ?.use { o -> file.inputStream().use { i -> i.copyTo(o) } }
-                                Log.d(
-                                    "DeviceManager",
-                                    "Restored attachment for part $index from ${file.name}"
-                                )
-                            } catch (e: Exception) {
-                                Log.e(
-                                    "DeviceManager",
-                                    "Failed to restore attachment for part $index via ContentResolver",
-                                    e
-                                )
+                            } catch (_: Exception) {
                             }
                         }
-                    } else {
-                        Log.e("DeviceManager", "Failed to insert part $index")
                     }
                 }
                 addrs.forEach { aValues ->
@@ -893,17 +962,14 @@ object DeviceManager {
                             "content://mms/$mmsId/addr".toUri(),
                             aValues
                         )
-                    } catch (e: Exception) {
-                        Log.e("DeviceManager", "Failed to insert address", e)
+                    } catch (_: Exception) {
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("DeviceManager", "Critical failure restoring MMS object", e)
+            } catch (_: Exception) {
             }
         }
         reader.endArray()
-        Log.d("DeviceManager", "MMS restoration completed. Restored $count MMS.")
-        onProgress("Restored $count Messages.")
+        onProgress("Restored $count Messages.", 100)
     }
 
     private fun backupCallLogs(context: Context, jsonFile: File) {
@@ -932,10 +998,20 @@ object DeviceManager {
         cursor.close()
     }
 
-    private fun restoreCallLogs(context: Context, jsonFile: File, onProgress: (String) -> Unit) {
+    private fun restoreCallLogs(
+        context: Context,
+        jsonFile: File,
+        total: Int,
+        onProgress: (String, Int) -> Unit
+    ) {
         if (!jsonFile.exists()) return
+        Log.d("DeviceManager", "Starting Call Log restoration...")
         val validCols = getValidColumns(context, CallLog.Calls.CONTENT_URI)
-        var count = 0
+        var restoredCount = 0
+        var processedCount = 0
+        var lastNotifyTime = 0L
+        val batchSize = (total * 0.05).toInt().coerceAtLeast(50)
+        val notifyInterval = (total * 0.05).toInt().coerceAtLeast(1)
         try {
             jsonFile.inputStream().use { fis ->
                 val reader = JsonReader(InputStreamReader(fis, "UTF-8")).apply { beginArray() }
@@ -958,25 +1034,38 @@ object DeviceManager {
                             else -> reader.skipValue()
                         }
                     }
-                    reader.endObject(); batch.add(values)
-                    if (batch.size >= 50) {
-                        count += flushBatch(
-                            context,
-                            CallLog.Calls.CONTENT_URI,
-                            batch
-                        ); onProgress("Restoring Calls ($count)..."); batch.clear()
+                    reader.endObject()
+                    if (values.size() > 0) {
+                        batch.add(values)
+                        processedCount++
+                    }
+
+                    if (batch.size >= batchSize) {
+                        restoredCount += flushBulk(context, CallLog.Calls.CONTENT_URI, batch)
+                        batch.clear()
+                    }
+
+                    if (processedCount % notifyInterval == 0) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastNotifyTime >= 1000) {
+                            onProgress(
+                                "Restoring Calls ($processedCount)...",
+                                (processedCount * 100 / total).coerceIn(0, 100)
+                            )
+                            lastNotifyTime = now
+                        }
                     }
                 }
                 reader.endArray()
-                if (batch.isNotEmpty()) count += flushBatch(
+                if (batch.isNotEmpty()) restoredCount += flushBulk(
                     context,
                     CallLog.Calls.CONTENT_URI,
                     batch
                 )
+                onProgress("Restored $restoredCount Calls.", 100)
             }
-            onProgress("Restored $count Calls.")
         } catch (e: Exception) {
-            onProgress("Error: ${e.message}")
+            onProgress("Error: ${e.message}", 0)
         }
     }
 
@@ -1001,10 +1090,14 @@ object DeviceManager {
         val backupDir = "$savedPath/Device"
         val cacheDir = context.cacheDir.absolutePath
         val zapdosPath = "/data/adb/Shifter/zapdos"
-        updateState(
-            "Initializing...",
-            -1
-        ); threadIdCache.clear(); Shell.cmd("mkdir -p \"$backupDir\"").exec()
+        updateState("Initializing...", -1)
+        threadIdCache.clear()
+        Shell.cmd("rm -rf \"$cacheDir/Wi-Fi\" \"$cacheDir/Wallpaper\" \"$cacheDir/Bluetooth\" \"$cacheDir/mms_parts\"")
+            .exec()
+        Shell.cmd("rm -f \"$cacheDir/messages.json\" \"$cacheDir/calls.json\" \"$cacheDir/Contacts.vcf\"")
+            .exec()
+        Shell.cmd("mkdir -p \"$backupDir\"").exec()
+
         val selectedItems = mutableListOf<String>()
         if (doSms) selectedItems.add("Messages")
         if (doCall) selectedItems.add("Calls")
@@ -1013,14 +1106,23 @@ object DeviceManager {
         if (doWallpaper) selectedItems.add("Wallpaper")
         if (doBluetooth) selectedItems.add("Bluetooth")
         if (selectedItems.isEmpty()) return@withContext
-        var currentItemIndex = 0
-        val slice = 100f / selectedItems.size
+
+        val countableLabels = listOf("Messages", "Calls", "Contacts")
+        val countableItems = selectedItems.filter { it in countableLabels }
+        val slice = if (countableItems.isNotEmpty()) 100f / countableItems.size else 0f
+
+        var currentCountableIndex = 0
+        var currentItem = ""
+
         fun notify(step: String, internalProgress: Int) {
-            updateState(
-                step,
-                ((currentItemIndex * slice) + (internalProgress * slice / 100f)).toInt()
-                    .coerceIn(0, 99)
-            )
+            val isCountable = currentItem in countableLabels
+            val displayProgress = if (isCountable && internalProgress != -1) {
+                ((currentCountableIndex * slice) + (internalProgress * slice / 100f)).toInt()
+                    .coerceIn(0, 100)
+            } else {
+                -1
+            }
+            updateState(step, displayProgress)
         }
 
         val perms = mutableListOf<String>()
@@ -1038,12 +1140,15 @@ object DeviceManager {
         perms.forEach { Shell.cmd("pm grant $pkg android.permission.$it").exec() }
         if (doSms) Shell.cmd("appops set $pkg WRITE_SMS allow").exec()
         if (doCall) Shell.cmd("appops set $pkg WRITE_CALL_LOG allow").exec()
+
         try {
             if (isBackup) {
                 if (doSms) {
+                    currentItem = "Messages"
                     notify("Backing up Messages...", 0)
                     val msgJ = File(context.cacheDir, "messages.json")
                     val partsD = File(context.cacheDir, "mms_parts")
+                    Shell.cmd("rm -rf \"${partsD.absolutePath}\"").exec()
                     partsD.mkdirs()
                     msgJ.outputStream().use { fos ->
                         val writer = JsonWriter(
@@ -1056,24 +1161,25 @@ object DeviceManager {
                         backupMms(context, writer, partsD)
                         writer.endObject(); writer.close()
                     }
-                    notify(
-                        "Compressing Messages...",
-                        80
-                    ); Shell.cmd("cd \"$cacheDir\" && tar -cf - messages.json mms_parts 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"")
+                    notify("Compressing Messages...", 90)
+                    Shell.cmd("sync && cd \"$cacheDir\" && tar -cf - messages.json mms_parts 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Messages.shift\"")
                         .exec()
-                    msgJ.delete(); partsD.deleteRecursively(); currentItemIndex++
+                    msgJ.delete(); partsD.deleteRecursively()
+                    currentCountableIndex++
                 }
                 if (doCall) {
+                    currentItem = "Calls"
                     notify("Backing up Calls...", 0)
                     val callsJ = File(context.cacheDir, "calls.json")
-                    backupCallLogs(context, callsJ); notify(
-                        "Compressing Calls...",
-                        80
-                    ); Shell.cmd("cd \"$cacheDir\" && tar -cf - calls.json 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/CallLogs.shift\"")
+                    backupCallLogs(context, callsJ)
+                    notify("Compressing Calls...", 90)
+                    Shell.cmd("cd \"$cacheDir\" && tar -cf - calls.json 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/CallLogs.shift\"")
                         .exec()
-                    callsJ.delete(); currentItemIndex++
+                    callsJ.delete()
+                    currentCountableIndex++
                 }
                 if (doContacts) {
+                    currentItem = "Contacts"
                     notify("Backing up Contacts...", 0)
                     val vcf = File(context.cacheDir, "Contacts.vcf")
                     context.contentResolver.query(
@@ -1084,13 +1190,15 @@ object DeviceManager {
                         null
                     )?.use {
                         if (it.count > 0) {
-                            val keys = StringBuilder(); while (it.moveToNext()) keys.append(
+                            val keys = StringBuilder()
+                            while (it.moveToNext()) keys.append(
                                 it.getString(
                                     it.getColumnIndexOrThrow(
                                         ContactsContract.Contacts.LOOKUP_KEY
                                     )
                                 )
-                            ).append(":"); context.contentResolver.openInputStream(
+                            ).append(":")
+                            context.contentResolver.openInputStream(
                                 Uri.withAppendedPath(
                                     ContactsContract.Contacts.CONTENT_MULTI_VCARD_URI,
                                     Uri.encode(keys.toString())
@@ -1099,139 +1207,141 @@ object DeviceManager {
                         }
                     }
                     if (vcf.exists()) {
-                        notify(
-                            "Compressing Contacts...",
-                            80
-                        ); Shell.cmd("cd \"$cacheDir\" && tar -cf - Contacts.vcf 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Contacts.shift\"")
-                            .exec(); vcf.delete()
+                        notify("Compressing Contacts...", 90)
+                        Shell.cmd("cd \"$cacheDir\" && tar -cf - Contacts.vcf 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Contacts.shift\"")
+                            .exec()
+                        vcf.delete()
                     }
-                    currentItemIndex++
+                    currentCountableIndex++
                 }
                 if (doWifi) {
-                    notify(
-                        "Backing up Wi-Fi...",
-                        0
-                    ); Shell.cmd("mkdir -p \"$cacheDir/Wi-Fi\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wifi \"$cacheDir/Wi-Fi\"")
-                        .exec(); notify(
-                        "Compressing Wi-Fi...",
-                        80
-                    ); Shell.cmd("cd \"$cacheDir\" && tar -cf - Wi-Fi 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wi-Fi.shift\"")
-                        .exec(); Shell.cmd("rm -rf \"$cacheDir/Wi-Fi\""); currentItemIndex++
+                    notify("Backing up Wi-Fi...", -1)
+                    val wifiDir = "$cacheDir/Wi-Fi"
+                    Shell.cmd("rm -rf \"$wifiDir\" && mkdir -p \"$wifiDir\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wifi \"$wifiDir\"")
+                        .exec()
+                    Shell.cmd("cd \"$cacheDir\" && tar -cf - Wi-Fi 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wi-Fi.shift\"")
+                        .exec()
+                    Shell.cmd("rm -rf \"$wifiDir\"").exec()
                 }
                 if (doWallpaper) {
-                    notify(
-                        "Backing up Wallpaper...",
-                        0
-                    ); Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --backup-wallpaper \"$cacheDir/Wallpaper\"")
-                        .exec(); notify(
-                        "Compressing Wallpaper...",
-                        80
-                    ); Shell.cmd("cd \"$cacheDir\" && tar -cf - Wallpaper 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wallpaper.shift\"")
-                        .exec(); Shell.cmd("rm -rf \"$cacheDir/Wallpaper\""); currentItemIndex++
+                    notify("Backing up Wallpaper...", -1)
+                    val wallDir = "$cacheDir/Wallpaper"
+                    Shell.cmd("rm -rf \"$wallDir\" && mkdir -p \"$wallDir\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-wallpaper \"$wallDir\"")
+                        .exec()
+                    Shell.cmd("cd \"$cacheDir\" && tar -cf - Wallpaper 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Wallpaper.shift\"")
+                        .exec()
+                    Shell.cmd("rm -rf \"$wallDir\"").exec()
                 }
                 if (doBluetooth) {
-                    notify(
-                        "Backing up Bluetooth...",
-                        0
-                    ); Shell.cmd("mkdir -p \"$cacheDir/Bluetooth\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-bt \"$cacheDir/Bluetooth\"")
-                        .exec(); notify(
-                        "Compressing Bluetooth...",
-                        80
-                    ); Shell.cmd("cd \"$cacheDir\" && tar -cf - Bluetooth 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Bluetooth.shift\"")
-                        .exec(); Shell.cmd("rm -rf \"$cacheDir/Bluetooth\""); currentItemIndex++
+                    notify("Backing up Bluetooth...", -1)
+                    val btDir = "$cacheDir/Bluetooth"
+                    Shell.cmd("rm -rf \"$btDir\" && mkdir -p \"$btDir\" && sh /data/adb/Shifter/ROM-Shifter.sh --backup-bt \"$btDir\"")
+                        .exec()
+                    Shell.cmd("cd \"$cacheDir\" && tar -cf - Bluetooth 2>/dev/null | \"$zapdosPath\" -1 -f -q -o \"$backupDir/Bluetooth.shift\"")
+                        .exec()
+                    Shell.cmd("rm -rf \"$btDir\"").exec()
                 }
             } else {
                 if (doSms) {
+                    currentItem = "Messages"
                     if (!Shell.cmd("[ -d /data/user/0/com.android.providers.telephony/databases ]")
                             .exec().isSuccess
                     ) ensureTelephonyDirs(context)
-                    notify(
-                        "Extracting Messages...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Messages.shift\" | tar -xf - -C \"$cacheDir\"")
-                        .exec(); Shell.cmd("""chmod -R 777 "$cacheDir"""").exec()
+                    notify("Extracting Messages...", 0)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Messages.shift\" | tar -xf - -C \"$cacheDir\"")
+                        .exec()
+                    Shell.cmd("""chmod -R 777 "$cacheDir"""").exec()
                     val msgJ = File(context.cacheDir, "messages.json")
                     if (msgJ.exists()) {
+                        val totalSms = countJsonArray(msgJ, "sms")
+                        val totalMms = countJsonArray(msgJ, "mms")
                         msgJ.inputStream().use { fis ->
                             val reader =
                                 JsonReader(InputStreamReader(fis, "UTF-8")).apply { beginObject() }
                             while (reader.hasNext()) {
                                 when (reader.nextName()) {
-                                    "sms" -> restoreSms(context, reader) { msg -> notify(msg, 10) }
+                                    "sms" -> restoreSms(
+                                        context,
+                                        reader,
+                                        totalSms
+                                    ) { msg, p -> notify(msg, p) }
+
                                     "mms" -> restoreMms(
                                         context,
                                         reader,
+                                        totalMms,
                                         File(context.cacheDir, "mms_parts")
-                                    ) { msg -> notify(msg, 40) }
-
+                                    ) { msg, p -> notify(msg, p) }
                                     else -> reader.skipValue()
                                 }
                             }
-                            reader.endObject(); reader.close()
+                            reader.endObject()
                         }
                     }
                     triggerRescan("com.google.android.apps.messaging")
-                    msgJ.delete(); File(
-                        context.cacheDir,
-                        "mms_parts"
-                    ).deleteRecursively(); currentItemIndex++
+                    msgJ.delete(); File(context.cacheDir, "mms_parts").deleteRecursively()
+                    currentCountableIndex++
                 }
                 if (doCall) {
-                    notify(
-                        "Extracting Calls...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/CallLogs.shift\" | tar -xf - -C \"$cacheDir\"")
-                        .exec(); Shell.cmd("chmod -R 777 \"$cacheDir\"").exec()
-                    val callsJ =
-                        File(context.cacheDir, "calls.json"); if (callsJ.exists()) restoreCallLogs(
-                        context,
-                        callsJ
-                    ) { msg -> notify(msg, 50) }
-                    callsJ.delete(); currentItemIndex++
+                    currentItem = "Calls"
+                    notify("Extracting Calls...", 0)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/CallLogs.shift\" | tar -xf - -C \"$cacheDir\"")
+                        .exec()
+                    Shell.cmd("chmod 666 \"$cacheDir/calls.json\"").exec()
+                    val callsJ = File(context.cacheDir, "calls.json")
+                    if (callsJ.exists()) {
+                        val totalCalls = countJsonArray(callsJ, "")
+                        restoreCallLogs(context, callsJ, totalCalls) { msg, p -> notify(msg, p) }
+                    }
+                    callsJ.delete()
+                    currentCountableIndex++
                 }
                 if (doContacts) {
-                    notify(
-                        "Extracting Contacts...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Contacts.shift\" | tar -xf - -C \"$cacheDir\"")
+                    currentItem = "Contacts"
+                    notify("Extracting Contacts...", 0)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Contacts.shift\" | tar -xf - -C \"$cacheDir\"")
                         .exec()
                     val vcf = File(context.cacheDir, "Contacts.vcf")
-                    Shell.cmd("chmod 666 \"${vcf.absolutePath}\"").exec(); if (vcf.exists()) {
-                        importVcf(context, vcf) { prog ->
-                            notify(
-                                "Importing Contacts...",
-                                prog
-                            )
-                        }; vcf.delete()
+                    Shell.cmd("chmod 666 \"${vcf.absolutePath}\"").exec()
+                    if (vcf.exists()) {
+                        val totalContacts = try {
+                            vcf.useLines { it.count { l -> l.startsWith("BEGIN:VCARD", true) } }
+                        } catch (_: Exception) {
+                            0
+                        }
+                        importVcf(
+                            context,
+                            vcf,
+                            totalContacts
+                        ) { prog -> notify("Importing Contacts...", prog) }
+                        vcf.delete()
                     }
-                    currentItemIndex++
+                    currentCountableIndex++
                 }
                 if (doWifi) {
-                    notify(
-                        "Extracting Wi-Fi...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wi-Fi.shift\" | tar -xf - -C \"$cacheDir\"")
-                        .exec(); notify(
-                        "Applying Wi-Fi...",
-                        50
-                    ); Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wifi \"$cacheDir/Wi-Fi\"")
-                        .exec(); Shell.cmd("rm -rf \"$cacheDir/Wi-Fi\""); currentItemIndex++
+                    currentItem = "Wi-Fi"
+                    notify("Extracting Wi-Fi...", -1)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wi-Fi.shift\" | tar -xf - -C \"$cacheDir\"")
+                        .exec()
+                    notify("Applying Wi-Fi...", -1)
+                    Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wifi \"$cacheDir/Wi-Fi\"")
+                        .exec()
+                    Shell.cmd("rm -rf \"$cacheDir/Wi-Fi\"")
                 }
                 if (doWallpaper) {
-                    notify(
-                        "Extracting Wallpaper...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wallpaper.shift\" | tar -xf - -C \"$cacheDir\"")
-                        .exec(); notify(
-                        "Applying Wallpaper...",
-                        50
-                    ); Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wallpaper \"$cacheDir/Wallpaper\"")
+                    currentItem = "Wallpaper"
+                    notify("Extracting Wallpaper...", -1)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Wallpaper.shift\" | tar -xf - -C \"$cacheDir\"")
+                        .exec()
+                    notify("Applying Wallpaper...", -1)
+                    Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-wallpaper \"$cacheDir/Wallpaper\"")
                         .exec()
                     try {
                         val wm = WallpaperManager.getInstance(context)
-                        val wp = File(cacheDir, "Wallpaper/wallpaper"); if (wp.exists()) {
-                            Shell.cmd("chmod 666 \"${wp.absolutePath}\"")
-                                .exec(); FileInputStream(wp).use {
+                        val wp = File(cacheDir, "Wallpaper/wallpaper")
+                        if (wp.exists()) {
+                            Shell.cmd("chmod 666 \"${wp.absolutePath}\"").exec()
+                            FileInputStream(wp).use {
                                 wm.setStream(
                                     it,
                                     null,
@@ -1241,11 +1351,11 @@ object DeviceManager {
                             }
                         }
                         val lk = File(cacheDir, "Wallpaper/wallpaper_lock")
-                        val lko = File(cacheDir, "Wallpaper/wallpaper_lock_orig")
                         val fl =
-                            if (lk.exists()) lk else if (lko.exists()) lko else null; if (fl != null) {
-                            Shell.cmd("chmod 666 \"${fl.absolutePath}\"")
-                                .exec(); FileInputStream(fl).use {
+                            if (lk.exists()) lk else File(cacheDir, "Wallpaper/wallpaper_lock_orig")
+                        if (fl.exists()) {
+                            Shell.cmd("chmod 666 \"${fl.absolutePath}\"").exec()
+                            FileInputStream(fl).use {
                                 wm.setStream(
                                     it,
                                     null,
@@ -1256,21 +1366,35 @@ object DeviceManager {
                         }
                     } catch (_: Exception) {
                     }
-                    Shell.cmd("rm -rf \"$cacheDir/Wallpaper\""); currentItemIndex++
+                    Shell.cmd("rm -rf \"$cacheDir/Wallpaper\"")
                 }
                 if (doBluetooth) {
-                    notify(
-                        "Extracting Bluetooth...",
-                        0
-                    ); Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Bluetooth.shift\" | tar -xf - -C \"$cacheDir\"")
-                        .exec(); notify(
-                        "Applying Bluetooth...",
-                        50
-                    ); Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-bt \"$cacheDir/Bluetooth\"")
-                        .exec(); Shell.cmd("rm -rf \"$cacheDir/Bluetooth\""); currentItemIndex++
+                    currentItem = "Bluetooth"
+                    notify("Extracting Bluetooth...", -1)
+                    Shell.cmd("\"$zapdosPath\" -d -q -c \"$backupDir/Bluetooth.shift\" | tar -xf - -C \"$cacheDir\"")
+                        .exec()
+                    notify("Applying Bluetooth...", -1)
+                    Shell.cmd("sh /data/adb/Shifter/ROM-Shifter.sh --restore-bt \"$cacheDir/Bluetooth\"")
+                        .exec()
+                    Shell.cmd("rm -rf \"$cacheDir/Bluetooth\"")
                 }
             }
         } finally {
         }
+    }
+
+    fun revokePermissionsAndExit(context: Context) {
+        val pkg = context.packageName
+        val cmds = mutableListOf<String>()
+        val perms = listOf(
+            "READ_SMS", "WRITE_SMS", "RECEIVE_SMS", "RECEIVE_MMS", "READ_PHONE_STATE",
+            "READ_CALL_LOG", "WRITE_CALL_LOG",
+            "READ_CONTACTS", "WRITE_CONTACTS"
+        )
+        perms.forEach { cmds.add("pm revoke $pkg android.permission.$it") }
+        cmds.add("appops set $pkg WRITE_SMS default")
+        cmds.add("appops set $pkg WRITE_CALL_LOG default")
+        cmds.add("am force-stop $pkg")
+        Shell.cmd(*cmds.toTypedArray()).exec()
     }
 }

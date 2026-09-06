@@ -96,5 +96,6 @@ data class AppState(
     val totalInstallTimeSeconds: Long = 0,
     val requestDefaultSms: Boolean = false,
     val keepDebloatData: Boolean = false,
-    val showPartialSystemApps: Boolean = false
+    val showPartialSystemApps: Boolean = false,
+    val showSecurityResetDialog: Boolean = false
 )

@@ -161,6 +161,33 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
+    if (appState.showSecurityResetDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            icon = {
+                Icon(
+                    Icons.Default.Build,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Privacy Cleanup") },
+            text = {
+                Text(
+                    "Operation completed! To maintain your privacy, ROM Shifter will now revoke temporary permissions and stop the app.\n\nYour backup/restore device data is safe and already committed.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.finalizeSecurityReset(context) }
+                ) {
+                    Text("Clear Permissions")
+                }
+            }
+        )
+    }
+
     if (showUpdateDialog && updateInfo != null) {
         AlertDialog(
             onDismissRequest = { viewModel.showUpdateDialog.value = false },

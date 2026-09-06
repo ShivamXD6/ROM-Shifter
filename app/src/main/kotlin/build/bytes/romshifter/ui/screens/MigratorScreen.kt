@@ -184,7 +184,7 @@ fun MigratorMenu(viewModel: MainViewModel) {
             title = { Text("Permissions Required") },
             text = {
                 Text(
-                    "ROM Shifter will automatically grant required native Android permissions via root to backup/restore SMS, Call Logs, or Contacts. Do you want to continue?",
+                    "ROM Shifter will automatically grant required permissions temporarily via root to backup/restore Messages, Calls, or Contacts. Do you want to continue?",
                     style = MaterialTheme.typography.bodyLarge
                 )
             },
