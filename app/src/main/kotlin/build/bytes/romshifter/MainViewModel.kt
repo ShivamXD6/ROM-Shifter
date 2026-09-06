@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -989,6 +990,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         } else if (element.startsWith("ACTION:INSTALL_ERROR|PKG:")) {
                             val pkg = element.substringAfter("PKG:").substringBefore("|")
+                            val errorMsg =
+                                if (element.contains("|MSG:")) element.substringAfter("|MSG:") else "Installation failed"
                             viewModelScope.launch(Dispatchers.Main) {
                                 _uiState.update { state ->
                                     val labelToRemove =
@@ -1002,7 +1005,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                     state.copy(
                                         currentStep = if (currentText.isNotEmpty()) "Installing $currentText..." else "Error occurred during some installs.",
                                         batchInstallApps = state.batchInstallApps.map {
-                                            if (it.packageName == pkg) it.copy(status = "Error") else it
+                                            if (it.packageName == pkg) it.copy(
+                                                status = "Error",
+                                                errorMessage = errorMsg
+                                            ) else it
                                         }
                                     )
                                 }
@@ -1070,6 +1076,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             state.copy(batchInstallApps = state.batchInstallApps.map {
                 if (it.path == path) it.copy(isSelected = !it.isSelected) else it
             })
+        }
+    }
+
+    fun launchApp(packageName: String) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            } else {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "App cannot be opened directly", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }
         }
     }
 

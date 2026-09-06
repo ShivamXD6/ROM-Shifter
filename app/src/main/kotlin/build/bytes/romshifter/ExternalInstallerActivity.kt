@@ -133,8 +133,23 @@ class ExternalInstallerActivity : ComponentActivity() {
                                             Text("Install Selected ($selectedCount)")
                                         }
                                     } else if (appState.totalInstallTimeSeconds > 0L) {
-                                        Button(onClick = { viewModel.closeAppInstaller { finish() } }) {
-                                            Text("Close")
+                                        val singleDoneApp =
+                                            if (apps.size == 1 && apps[0].status == "Done") apps[0] else null
+                                        if (singleDoneApp != null) {
+                                            TextButton(onClick = { viewModel.closeAppInstaller { finish() } }) {
+                                                Text("Close")
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            Button(onClick = {
+                                                viewModel.launchApp(singleDoneApp.packageName)
+                                                viewModel.closeAppInstaller { finish() }
+                                            }) {
+                                                Text("Open")
+                                            }
+                                        } else {
+                                            Button(onClick = { viewModel.closeAppInstaller { finish() } }) {
+                                                Text("Close")
+                                            }
                                         }
                                     }
                                 }

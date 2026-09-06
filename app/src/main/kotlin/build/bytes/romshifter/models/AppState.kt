@@ -46,7 +46,8 @@ data class AppInstallInfo(
     val minSdk: String = "",
     val targetSdk: String = "",
     val architecture: String = "",
-    val signature: String = ""
+    val signature: String = "",
+    val errorMessage: String? = null
 )
 
 data class FlashZip(val name: String, val path: String, val category: String)

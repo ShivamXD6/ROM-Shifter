@@ -297,11 +297,20 @@ INSTALL_APP_FILE() {
             fi
          else
             local err=0
+            local RES=""
             for a in $apks; do
-                pm install -r -d "$a" >/dev/null 2>&1 || err=1
+                RES=$(pm install -r -d "$a" 2>&1)
+                if ! echo "$RES" | grep -iq "Success"; then
+                    err=1
+                    break
+                fi
             done
             rm -rf "$T_PKG"
-            [ "$err" -eq 0 ] && echo "ACTION:INSTALL_DONE|PKG:$PKG" || echo "ACTION:INSTALL_ERROR|PKG:$PKG"
+            if [ "$err" -eq 0 ]; then
+                echo "ACTION:INSTALL_DONE|PKG:$PKG"
+            else
+                echo "ACTION:INSTALL_ERROR|PKG:$PKG|MSG:$RES"
+            fi
         fi
     else
         rm -rf "$T_PKG"

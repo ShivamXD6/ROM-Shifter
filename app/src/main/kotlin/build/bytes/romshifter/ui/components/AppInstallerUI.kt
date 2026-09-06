@@ -380,23 +380,36 @@ fun BatchInstallerBody(
                     )
                     LazyColumn(modifier = Modifier.heightIn(max = 150.dp)) {
                         items(finalApps.filter { it.status == "Error" }) { app ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Error,
-                                    null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    app.label,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        Icons.Default.Error,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        app.label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                app.errorMessage?.let { msg ->
+                                    Text(
+                                        msg,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(start = 24.dp),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
