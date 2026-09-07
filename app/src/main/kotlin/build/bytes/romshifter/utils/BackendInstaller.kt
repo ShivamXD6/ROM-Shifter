@@ -36,18 +36,31 @@ object BackendInstaller {
             val sourceApk = File(context.applicationInfo.sourceDir)
             if (!sourceApk.exists()) return@withContext
 
+            val splits = context.applicationInfo.splitSourceDirs ?: emptyArray()
+            val isSplit = splits.isNotEmpty()
+
             val prefs = context.getSharedPreferences("shifter_backup_prefs", Context.MODE_PRIVATE)
             val savedHash = prefs.getString("self_apk_hash", "")
             val currentHash = getFileMd5(sourceApk) ?: ""
 
             if (currentHash.isNotEmpty() && currentHash != savedHash) {
                 val targetDir = File(shifterPath).apply { mkdirs() }
-                val targetApk = File(targetDir, "ROM-Shifter.apk")
+                val targetName = if (isSplit) "ROM-Shifter.apks" else "ROM-Shifter.apk"
+                val targetFile = File(targetDir, targetName)
 
-                Shell.cmd("cp \"${sourceApk.absolutePath}\" \"${targetApk.absolutePath}\" && chmod 644 \"${targetApk.absolutePath}\"")
-                    .exec()
+                val cmd = if (isSplit) {
+                    val paths = mutableListOf(sourceApk.absolutePath)
+                    paths.addAll(splits)
+                    val pathsString = paths.joinToString(" ") { "'$it'" }
+                    "tar -cf - $pathsString | cat > '${targetFile.absolutePath}'"
+                } else {
+                    "cat '${sourceApk.absolutePath}' > '${targetFile.absolutePath}'"
+                }
 
-                prefs.edit { putString("self_apk_hash", currentHash) }
+                val result = Shell.cmd("$cmd && chmod 644 '${targetFile.absolutePath}'").exec()
+                if (result.isSuccess) {
+                    prefs.edit { putString("self_apk_hash", currentHash) }
+                }
             }
         } catch (_: Exception) {
         }
