@@ -7,18 +7,20 @@ import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.security.MessageDigest
 
 object BackendInstaller {
 
-    private fun java.io.InputStream.md5(): String? {
+    private fun getFileMd5(file: File): String? {
+        if (!file.exists()) return null
         return try {
-            val md = MessageDigest.getInstance("MD5")
-            val buffer = ByteArray(8192)
-            var bytesRead = this.read(buffer)
-            while (bytesRead != -1) {
-                md.update(buffer, 0, bytesRead)
-                bytesRead = this.read(buffer)
+            val md = java.security.MessageDigest.getInstance("MD5")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead = input.read(buffer)
+                while (bytesRead != -1) {
+                    md.update(buffer, 0, bytesRead)
+                    bytesRead = input.read(buffer)
+                }
             }
             md.digest().joinToString("") { "%02x".format(it) }
         } catch (_: Exception) {
@@ -26,37 +28,19 @@ object BackendInstaller {
         }
     }
 
-    private fun getFileMd5(file: File): String? {
-        if (!file.exists()) return null
-        return file.inputStream().use { it.md5() }
-    }
-
-    suspend fun backupSelf(context: Context, shifterPath: String) = withContext(Dispatchers.IO) {
-        try {
-            val sourceApk = File(context.applicationInfo.sourceDir)
-            if (!sourceApk.exists()) return@withContext
-
-            val prefs = context.getSharedPreferences("shifter_backup_prefs", Context.MODE_PRIVATE)
-            val savedHash = prefs.getString("self_apk_hash", "")
-            val currentHash = getFileMd5(sourceApk) ?: ""
-
-            if (currentHash.isNotEmpty() && currentHash != savedHash) {
-                val targetDir = File(shifterPath).apply { mkdirs() }
-                val targetApk = File(targetDir, "ROM-Shifter.apk")
-
-                Shell.cmd("cp \"${sourceApk.absolutePath}\" \"${targetApk.absolutePath}\" && chmod 644 \"${targetApk.absolutePath}\"")
-                    .exec()
-
-                prefs.edit { putString("self_apk_hash", currentHash) }
-            }
-        } catch (_: Exception) {
-        }
-    }
-
     @Suppress("SameParameterValue")
     private fun getAssetMd5(context: Context, assetName: String): String? {
         return try {
-            context.assets.open(assetName).use { it.md5() }
+            val md = java.security.MessageDigest.getInstance("MD5")
+            context.assets.open(assetName).use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead = input.read(buffer)
+                while (bytesRead != -1) {
+                    md.update(buffer, 0, bytesRead)
+                    bytesRead = input.read(buffer)
+                }
+            }
+            md.digest().joinToString("") { "%02x".format(it) }
         } catch (_: Exception) {
             null
         }
