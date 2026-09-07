@@ -98,8 +98,6 @@ data class AppState(
     val requestDefaultSms: Boolean = false,
     val keepDebloatData: Boolean = false,
     val showPartialSystemApps: Boolean = false,
-    val showSecurityResetDialog: Boolean = false
-    val showSecurityResetDialog: Boolean = false,
     val originalDefaultSmsApp: String? = null,
     val showSecurityResetDialog: Boolean = false,
 )
