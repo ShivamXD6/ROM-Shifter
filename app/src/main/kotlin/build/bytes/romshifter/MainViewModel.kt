@@ -1323,12 +1323,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val itemsProcessed = if (selectedItems.isNotEmpty()) selectedItems.joinToString(", ") else "No data selected"
 
         viewModelScope.launch(Dispatchers.IO) {
-            var originalDefaultSms: String? = null
             val pkg = context.packageName
             try {
                 if (doSms && !isBackup) {
-                    originalDefaultSms =
+                    val originalDefaultSms =
                         android.provider.Telephony.Sms.getDefaultSmsPackage(context)
+                    _uiState.update { it.copy(originalDefaultSmsApp = originalDefaultSms) }
                     if (originalDefaultSms != pkg) {
                         Log.d("MainViewModel", "Setting ROM Shifter as default SMS app...")
                         val rootSuccess = DeviceManager.setDefaultSmsAppRoot(pkg)
@@ -1388,20 +1388,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } finally {
-                if (doSms && !isBackup) {
-                    val restoreTo =
-                        if (originalDefaultSms != null && originalDefaultSms != pkg) originalDefaultSms else "com.google.android.apps.messaging"
-                    Log.d("MainViewModel", "Restoring default SMS app to: $restoreTo")
-                    DeviceManager.setDefaultSmsAppRoot(restoreTo)
-                }
             }
         }
     }
 
     fun finalizeSecurityReset(context: Context) {
         _uiState.update { it.copy(showSecurityResetDialog = false) }
+        val state = _uiState.value
+        _uiState.update { it.copy(showSecurityResetDialog = false, originalDefaultSmsApp = null) }
         viewModelScope.launch(Dispatchers.IO) {
             cancelNotification()
+            val pkg = context.packageName
+            val restoreTo = state.originalDefaultSmsApp ?: "com.google.android.apps.messaging"
+            if (restoreTo != pkg) {
+                Log.d("MainViewModel", "Restoring default SMS app to: $restoreTo")
+                DeviceManager.setDefaultSmsAppRoot(restoreTo)
+            }
             DeviceManager.revokePermissionsAndExit(context)
         }
     }
@@ -1731,8 +1733,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun runDynamicOperation() {
         val state = _uiState.value
         val apps = _appList.value
-        val selectedApps =
-            apps.filter { it.isSelected && (it.isSystem && state.showSystemApps || !it.isSystem && state.showUserApps || state.actionFilterState == 2) }
+        val selectedApps = apps.filter {
+            it.isSelected && (
+                    (!it.isSystem && state.showUserApps) ||
+                            (it.isSystem && (state.showSystemApps || (state.showPartialSystemApps && it.isLaunchable))) ||
+                            state.actionFilterState == 2 ||
+                            state.migratorMode == MigratorMode.RESTORE_APPS ||
+                            state.migratorMode == MigratorMode.MANAGE
+                    )
+        }
         if (selectedApps.isEmpty()) return
 
         val initText = when (state.migratorMode) {
