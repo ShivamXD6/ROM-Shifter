@@ -28,6 +28,4 @@ This policy may be updated when ROM Shifter's functionality or data handling cha
 
 ## Contact
 
-For questions or concerns, open an issue or discussion in the official repository:
-
-https://github.com/ShivamXD6/ROM-Shifter
+For questions or concerns, join the [Telegram Group](https://telegram.me/buildbytesdiscussion)
