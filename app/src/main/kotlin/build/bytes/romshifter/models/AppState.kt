@@ -101,4 +101,5 @@ data class AppState(
     val showSecurityResetDialog: Boolean = false
     val showSecurityResetDialog: Boolean = false,
     val originalDefaultSmsApp: String? = null,
+    val showSecurityResetDialog: Boolean = false,
 )
