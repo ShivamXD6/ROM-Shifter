@@ -9,7 +9,6 @@ ZAPDOS="$BIN_DIR/zapdos"
 AM_TMP="/data/local/tmp/shifter_apps"
 TARGETS="/data/local/tmp/shifter_targets.txt"
 TOTAL_KB_JOB=0; TOTAL_KB_DONE=0
-AWK_BIN="awk"; TAR_BIN="tar"; SED_BIN="sed"; GREP_BIN="grep"; STAT_BIN="stat"
 
 find_tool() {
     local tool="$1"
@@ -38,23 +37,38 @@ READID() { $SED_BIN -n "/package=\"$1\"/s/.*value=\"\([^\"]*\)\".*/\1/p" "/data/
 CHANID() { $SED_BIN -i "/package=\"$1\"/s/\(value=\"\)[^\"]*\(.*defaultValue=\"\)[^\"]*/\1$2\2$2/" "/data/system/users/0/settings_ssaid.xml"; }
 GETPERM() {
     local pkg="$1" out="$2"
+    local run_filter="POST_NOTIFICATIONS|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|ACCESS_BACKGROUND_LOCATION|CAMERA|RECORD_AUDIO|READ_CONTACTS|WRITE_CONTACTS|READ_CALENDAR|WRITE_CALENDAR|READ_CALL_LOG|WRITE_CALL_LOG|READ_PHONE_STATE|READ_PHONE_NUMBERS|CALL_PHONE|READ_SMS|RECEIVE_SMS|RECEIVE_MMS|RECEIVE_WAP_PUSH|SEND_SMS|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|ACCESS_MEDIA_LOCATION|BLUETOOTH_SCAN|BLUETOOTH_CONNECT|BLUETOOTH_ADVERTISE|UWB_RANGING|NEARBY_WIFI_DEVICES|READ_MEDIA_AUDIO|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED|BODY_SENSORS|BODY_SENSORS_BACKGROUND|ACTIVITY_RECOGNITION|ACCESS_LOCAL_NETWORK"
+    local op_filter="SYSTEM_ALERT_WINDOW|WRITE_SETTINGS|REQUEST_INSTALL_PACKAGES|MANAGE_EXTERNAL_STORAGE|PICTURE_IN_PICTURE|RUN_IN_BACKGROUND|RUN_ANY_IN_BACKGROUND|AUTO_REVOKE_PERMISSIONS_IF_UNUSED|USE_FULL_SCREEN_INTENT|SCHEDULE_EXACT_ALARM|GET_USAGE_STATS|LEGACY_STORAGE"
     {
-        dumpsys package "$pkg" 2>/dev/null | $AWK_BIN '
+        dumpsys package "$pkg" 2>/dev/null | $AWK_BIN -v f="^android\\.permission\\.($run_filter)$" '
             /runtime permissions:/,/(requested|install) permissions:/ {
                 if ($0 ~ /granted=true/) {
                     split($1, a, ":")
-                    print "PERM:" a[1] "=true"
-                } else if ($0 ~ /granted=false/) {
-                    split($1, a, ":")
-                    print "PERM:" a[1] "=false"
+                    if (a[1] ~ f) print "PERM:" a[1] "=true"
                 }
             }
         '
-        cmd appops get "$pkg" 2>/dev/null | $AWK_BIN -F': ' '
-            /:/ && !/Uid mode/ {
-                op = $1; sub(/^[ \t]+/, "", op)
-                val = $2; sub(/; .*/, "", val)
-                print "APPOP:" op "=" val
+        cmd appops get "$pkg" 2>/dev/null | $AWK_BIN -v f="^($run_filter|$op_filter)$" '
+            /^Uid mode:|^[ \t]+[^:]+: [^;]+$/ {
+                line = $0; sub(/^Uid mode: /, "", line); sub(/^[ \t]+/, "", line)
+                if (line ~ /:/) {
+                    split(line, a, ": ")
+                    if (a[1] ~ f) {
+                        seen[a[1]] = 1
+                        if (a[2] ~ /allow|foreground/) print "APPOP:" a[1] "=" a[2]
+                    }
+                }
+                next
+            }
+            /:/ {
+                split($0, a, ": ")
+                op = a[1]; sub(/^[ \t]+/, "", op)
+                if (op ~ f && !seen[op]) {
+                    seen[op] = 1
+                    split(a[2], b, ";")
+                    val = b[1]; sub(/[ \t]+$/, "", val)
+                    if (val ~ /allow|foreground/) print "APPOP:" op "=" val
+                }
             }
         '
     } > "$out" &
@@ -62,9 +76,16 @@ GETPERM() {
 
 SETPERM() {
     [ -f "$2" ] || return
-    $AWK_BIN -v pkg="$1" -F'[:=]' '
-        /^PERM:/ { print "cmd package " ($3=="true"?"grant ":"revoke ") pkg " " $2 " >/dev/null 2>&1" }
-        /^APPOP:/ { print "cmd appops set " pkg " " $2 " " $3 " >/dev/null 2>&1" }
+    local uid="$3"
+    $AWK_BIN -v pkg="$1" -v uid="$uid" -F'[:=]' '
+        /^PERM:/ { print "cmd package grant " pkg " " $2 " >/dev/null 2>&1" }
+        /^APPOP:/ {
+            if (uid != "") {
+                print "cmd appops set --uid " uid " " $2 " " $3 " >/dev/null 2>&1"
+            } else {
+                print "cmd appops set " pkg " " $2 " " $3 " >/dev/null 2>&1"
+            }
+        }
     ' "$2" | sh &
 }
 
@@ -244,7 +265,7 @@ DO_RESTORE() {
     fi
 
     if CHK 3 && [ -f "$APP_DIR/Permissions.txt" ]; then
-        SETPERM "$PKG" "$APP_DIR/Permissions.txt"
+        SETPERM "$PKG" "$APP_DIR/Permissions.txt" "$UID"
     fi
 
     CHK 1 && TOTAL_KB_DONE=$((TOTAL_KB_DONE + S_APP))
