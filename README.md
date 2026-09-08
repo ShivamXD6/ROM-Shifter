@@ -24,13 +24,35 @@
 
 * *Note: This app is the native frontend successor to my original [ROM-Shifter Shell Script](https://github.com/ShivamXD6/ROM-Shifter-Script), which is archived now*
 
+---
+
+## 📑 Table of Contents
+
+- [💡 Why ROM Shifter?](#-why-rom-shifter)
+- [✨ Features](#-features)
+  - [⚡ Flash](#-flash)
+  - [🔄 Migrate](#-migrate)
+  - [🛠️ Tools](#️-tools)
+  - [⚙️ Settings](#️-settings)
+- [📊 Real-World Benchmarks & Comparison](#-real-world-benchmarks--comparison)
+- [🚀 Future Plans](#-future-plans)
+- [📥 Installation & Requirements](#-installation--requirements)
+- [💖 Support the Project](#-support-the-project)
+- [🙏 Testers](#-testers)
+
+---
+
 ## 💡 Why ROM Shifter?
+
+<img width="1942" height="809" alt="image" src="https://github.com/user-attachments/assets/a648ee87-c0f5-473c-80b8-6ceee21eece7" />
 
 * There are plenty of great backup apps out there, and they all do their best, still I felt they are
   slow in backup restore. But honestly, I just wanted a single, unified, lightweight app that
   handles *everything* I actually need when hopping between ROMs without the unnecessary bloat.
 
 * I didn't want three separate apps to back up my data, manage my partitions, and debloat apps etc. ROM Shifter combines a hyper-fast custom Shell backend engine with a clean Kotlin UI to do it all locally and quickly.
+
+---
 
 ## ✨ Features
 
@@ -141,8 +163,6 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 </div>
 
 </details>
-
----
 
 ### 🔄 Migrate
 
@@ -279,8 +299,6 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 
 </details>
 
----
-
 ### 🛠️ Tools
 
 *Utilities for managing, customizing, and maintaining your rooted Android system.*
@@ -329,8 +347,6 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 
 </details>
 
----
-
 ### ⚙️ Settings
 
 *Settings to customize your experience with the app*
@@ -365,14 +381,16 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 
   <h3> Rest Features explore it by yourself ;') </h3>
 
-## 📊 Real-World Benchmarks Comparison
+---
+
+## 📊 Real-World Benchmarks & Comparison
 
 <div align="center">
-  <h3>Compression Size (Lower is Better)</h3>
+
+<h3>Large-Scale Backup & Restore Test (~68 GB / 335 Apps) </h3>
   <p>
-    <img src="https://github.com/user-attachments/assets/0a45f371-0328-4111-86c3-c137ec92357d" width="30%" alt="Data Backup" />
-    <img src="https://github.com/user-attachments/assets/11a72465-4592-424d-a7d1-df9ee9140aab" width="30%" alt="Neo Backup" />
-    <img src="https://github.com/user-attachments/assets/30e061ba-869d-4abe-9570-fd94668eb9ca" width="30%" alt="Swift Backup" />
+    <img src="https://github.com/user-attachments/assets/137fe941-51aa-4717-b46d-2c4dbd885c54" width="30%" alt="Heavy Backup ROM Shifter" />
+    <img src="https://github.com/user-attachments/assets/1b77cc89-4e1d-4ebb-bb1b-c431ee422d2b" width="30%" alt="Heavy Restore ROM Shifter" />
   </p>
 
 <h3>Backup/Restore Speed Benchmarks (Lower is Better)</h3>
@@ -381,7 +399,40 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
     <img src="https://github.com/user-attachments/assets/2a98f5ab-0c10-4f09-87d1-037e859724ed" width="30%" alt="Restore Swift Backup" />
     <img src="https://github.com/user-attachments/assets/efa445c0-c934-4115-8c4a-51cb73e489e4" width="30%" alt="Restore ROM Shifter" />
   </p>
+
+<h3>Compression Size (Lower is Better)</h3>
+  <p>
+    <img src="https://github.com/user-attachments/assets/0a45f371-0328-4111-86c3-c137ec92357d" width="30%" alt="Data Backup" />
+    <img src="https://github.com/user-attachments/assets/11a72465-4592-424d-a7d1-df9ee9140aab" width="30%" alt="Neo Backup" />
+    <img src="https://github.com/user-attachments/assets/30e061ba-869d-4abe-9570-fd94668eb9ca" width="30%" alt="Swift Backup" />
+  </p>
+
 </div>
+
+---
+
+## 🚀 Future Plans
+
+Some of the features and improvements planned for future releases:
+
+- [ ] **Keystore Backup & Restore** — Support for migrating apps that rely on Android Keystore, such
+  as UPI, Banking and Signal
+- [ ] **Multiple Users Backup & Restore** — Backup and restore, cloned apps or multiple Android user
+  profile apps
+- [ ] **Live Flash** — Flash ROMs, Kernels on Dynamic Partitions directly from Android without
+  rebooting to recovery or bootloader
+- [ ] **Magisk Module Backup & Restore** — Preserve installed modules and restore them to a new ROM
+  with a single click
+- [ ] **Cloud & Local Backup** — Support for Google Drive, OneDrive, Telegram, and FTP-based local
+  backups
+- [ ] **Shifter Cleaner & Compressor** — Remove redundant and unnecessary files and quickly compress
+  files directly on Android
+
+> Some advanced features may be available as part of ROM Shifter Premium.
+>
+> This list is not exhaustive and may change as development progresses.
+
+---
 
 ## 📥 Installation & Requirements
 
@@ -389,6 +440,8 @@ To set **ROM Shifter** as the default handler for `.apk` files, follow these ste
 2. Download the latest APK from the [Releases Tab](../../releases).
 3. Open the app, grant Root permissions, and complete the setup wizard to pick your `Shifter`
    storage directory.
+
+---
 
 ## 💖 Support the Project
 
@@ -402,7 +455,21 @@ ROM Shifter is open-source and entirely free. If this app saves your time, heada
 Every contribution helps keep the project alive and improved! Thank you! 😊
 
 ---
+
+## 🙏 Testers
+
+Thanks to the following testers for helping test ROM Shifter across different devices, scenarios and
+setups:
+
+- @NaoUsemDrogas
+- [@Black_luciferS](https://github.com/Blacklucifer82)
+- @stfubtech
+- @Spoidermon2
+- [@Vikrant_R_Rajput](https://telegram.me/DeskAestheticx)
+
+---
+
 <div align="center">
   Developed by <b>@ShivamXD6</b> and the <b>Build Bytes</b> Team.<br>
-  <a href="https://t.me/buildbytes">Join Telegram Community</a> • <a href="https://www.youtube.com/@BuildBytesX">Subscribe on YouTube</a>
+  <a href="https://telegram.me/buildbytes">Join Telegram Community</a> • <a href="https://www.youtube.com/@BuildBytesX">Subscribe on YouTube</a>
 </div>
