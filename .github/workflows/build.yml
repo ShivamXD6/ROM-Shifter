@@ -63,7 +63,8 @@ jobs:
           body: |
             Automated pre-release build for **${{ env.VERSION_NAME }}** (Build ${{ env.COMMIT_COUNT }}).
             
-            ### 🔄 Changes in this build:
+            ## 🔄 Changes:
+            
             ${{ env.CHANGELOG }}
           prerelease: true
           files: app/build/outputs/apk/release/*.apk

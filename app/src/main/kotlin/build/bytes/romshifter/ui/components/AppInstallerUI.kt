@@ -31,6 +31,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -218,7 +219,8 @@ fun BatchInstallerDialog(
     totalTime: Long,
     onInstall: () -> Unit,
     onCancel: () -> Unit,
-    onToggleSelect: (String) -> Unit
+    onToggleSelect: (String) -> Unit,
+    onRunInBackground: () -> Unit = {}
 ) {
     val selectedCount = apps.count { it.isSelected && it.isAnalysisComplete }
 
@@ -229,6 +231,10 @@ fun BatchInstallerDialog(
             if (!isRunning && !isAnalyzing && totalTime == 0L) {
                 Button(onClick = onInstall, enabled = selectedCount > 0) {
                     Text("Install Selected ($selectedCount)")
+                }
+            } else if (isRunning) {
+                OutlinedButton(onClick = onRunInBackground) {
+                    Text("Run in Background")
                 }
             } else if (totalTime > 0L) {
                 Button(onClick = onCancel) { Text("Close") }
