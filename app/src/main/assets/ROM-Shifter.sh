@@ -25,8 +25,6 @@ find_tool() {
 init_shifter() {
      AWK_BIN=$(find_tool awk); TAR_BIN=$(find_tool tar); SED_BIN=$(find_tool sed); GREP_BIN=$(find_tool grep); STAT_BIN=$(find_tool stat)
      mkdir -p "$BIN_DIR" "$AM_TMP"
-     [ -n "$BACKUP_BASE" ] && mkdir -p "$BACKUP_BASE"
-     [ -n "$LP_DIR" ] && mkdir -p "$LP_DIR"
      chmod +x "$ZAPDOS" 2>/dev/null
 }
 
@@ -705,43 +703,40 @@ delete_image() {
     rm -f "$1/Partitions/$2"
 }
 
+PREPARE_PATH() {
+    MAIN_DIR=$(echo "${1:-/sdcard/Shifter}" | tr -d '\r')
+    case "$2" in
+        apps) BACKUP_BASE="$MAIN_DIR/Apps"; mkdir -p "$BACKUP_BASE" ;;
+        parts) LP_DIR="$MAIN_DIR/Partitions"; mkdir -p "$LP_DIR" ;;
+    esac
+}
+
 shifter_main() {
+    init_shifter
     case "$1" in
         --backup)
-            MAIN_DIR="${3:-/sdcard/Shifter}"
-            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
-            BACKUP_BASE="$MAIN_DIR/Apps"
-            init_shifter
+            PREPARE_PATH "$3" apps
             do_backup "$2"
             ;;
         --restore)
-            MAIN_DIR="${3:-/sdcard/Shifter}"
-            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
-            BACKUP_BASE="$MAIN_DIR/Apps"
-            init_shifter
+            PREPARE_PATH "$3" apps
             do_restore "$2"
             ;;
         --live-backup)
-            MAIN_DIR="${3:-/sdcard/Shifter}"
-            MAIN_DIR=$(echo "$MAIN_DIR" | tr -d '\r')
-            LP_DIR="$MAIN_DIR/Partitions"
-            init_shifter
+            PREPARE_PATH "$3" parts
             do_live_backup "$2"
             ;;
-        --live-restore)
-            init_shifter
-            do_live_restore "$2" "$3"
-            ;;
-        --remove) init_shifter; do_remove "$2" "$3" ;;
-        --restore-debloat) init_shifter; do_restore_debloat "$2" ;;
-        --systemize) init_shifter; do_systemize "$2" "$3" "$4" "$5" ;;
-        --backup-wifi) init_shifter; do_backup_wifi "$2" ;;
-        --restore-wifi) init_shifter; do_restore_wifi "$2" ;;
-        --backup-wallpaper) init_shifter; do_backup_wallpaper "$2" ;;
-        --restore-wallpaper) init_shifter; do_restore_wallpaper "$2" ;;
-        --backup-bt) init_shifter; do_backup_bt "$2" ;;
-        --restore-bt) init_shifter; do_restore_bt "$2" ;;
-        --install-apps) init_shifter; do_install_apps "$2" ;;
+        --live-restore) do_live_restore "$2" "$3" ;;
+        --remove) do_remove "$2" "$3" ;;
+        --restore-debloat) do_restore_debloat "$2" ;;
+        --systemize) do_systemize "$2" "$3" "$4" "$5" ;;
+        --backup-wifi) do_backup_wifi "$2" ;;
+        --restore-wifi) do_restore_wifi "$2" ;;
+        --backup-wallpaper) do_backup_wallpaper "$2" ;;
+        --restore-wallpaper) do_restore_wallpaper "$2" ;;
+        --backup-bt) do_backup_bt "$2" ;;
+        --restore-bt) do_restore_bt "$2" ;;
+        --install-apps) do_install_apps "$2" ;;
         --ors) do_ors "$2" "$3" ;;
         --get-partitions) get_partitions ;;
         --get-images) get_images "$2" ;;

@@ -75,6 +75,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import build.bytes.romshifter.MainViewModel
+import build.bytes.romshifter.utils.SettingsManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,17 +103,13 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
-            val split = docId.split(":")
-            val basePath = android.os.Environment.getExternalStorageDirectory().absolutePath
-            val path = if ("primary".equals(split[0], true)) "$basePath/${split.getOrNull(1) ?: ""}" else "/storage/${split[0]}/${split.getOrNull(1) ?: ""}"
-            val finalPath = if (path.endsWith("Shifter")) path else "$path/Shifter"
+            val finalPath = SettingsManager.resolveDocumentPath(docId)
             inputPath = finalPath
 
-            val oldIsInternal =
-                savedPath.startsWith(basePath) || savedPath.startsWith("/storage/emulated")
-            val newIsInternal = "primary".equals(split[0], true)
+            val oldRoot = SettingsManager.getStorageRoot(savedPath)
+            val newRoot = SettingsManager.getStorageRoot(finalPath)
 
-            if (oldIsInternal != newIsInternal) {
+            if (oldRoot != newRoot) {
                 showMoveWarning = finalPath
             } else {
                 isMoving = true
@@ -142,7 +139,7 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                 }
             },
             title = { Text("Moving Backups") },
-            text = { Text("Moving your existing Shifter files between Internal Storage and MicroSD will take time. Please don't close the app or don't go back during this process.") },
+            text = { Text("Moving your existing Shifter files between different storage locations will take time. Please don't close the app or go back during this process.") },
             shape = RoundedCornerShape(28.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
@@ -699,14 +696,10 @@ fun SettingsTab(context: Context, viewModel: MainViewModel) {
                             } else {
                                 Button(
                                     onClick = {
-                                        val basePath =
-                                            android.os.Environment.getExternalStorageDirectory().absolutePath
-                                        val oldIsInternal =
-                                            savedPath.startsWith(basePath) || savedPath.startsWith("/storage/emulated")
-                                        val newIsInternal =
-                                            inputPath.startsWith(basePath) || inputPath.startsWith("/storage/emulated")
+                                        val oldRoot = SettingsManager.getStorageRoot(savedPath)
+                                        val newRoot = SettingsManager.getStorageRoot(inputPath)
 
-                                        if (oldIsInternal != newIsInternal) {
+                                        if (oldRoot != newRoot) {
                                             showMoveWarning = inputPath
                                         } else {
                                             isMoving = true

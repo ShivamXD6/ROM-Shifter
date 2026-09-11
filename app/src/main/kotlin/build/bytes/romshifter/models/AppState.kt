@@ -100,4 +100,5 @@ data class AppState(
     val showPartialSystemApps: Boolean = false,
     val originalDefaultSmsApp: String? = null,
     val showSecurityResetDialog: Boolean = false,
+    val installInBackground: Boolean = false,
 )

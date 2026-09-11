@@ -28,4 +28,45 @@ object SettingsManager {
         }
         return null
     }
+
+    fun resolveDocumentPath(docId: String): String {
+        val parts = docId.split(":")
+        val volumeId = parts[0]
+        val basePath = Environment.getExternalStorageDirectory().absolutePath
+
+        val resolved = when {
+            "primary".equals(volumeId, true) -> {
+                val relativePath = parts.getOrNull(1) ?: ""
+                "$basePath/$relativePath"
+            }
+
+            volumeId.matches(Regex("[0-9A-F]{4}-[0-9A-F]{4}")) -> {
+                val relativePath = parts.getOrNull(1) ?: ""
+                "/storage/$volumeId/$relativePath"
+            }
+
+            parts.any { it.startsWith("/") } -> {
+                parts.find { it.startsWith("/") }!!
+            }
+
+            else -> {
+                if (parts.size > 1) "/storage/$volumeId/${parts[1]}" else "/storage/$volumeId"
+            }
+        }
+
+        val cleanPath = resolved.replace("//", "/")
+        return if (cleanPath.endsWith("Shifter")) cleanPath
+        else if (cleanPath.endsWith("/")) "${cleanPath}Shifter"
+        else "$cleanPath/Shifter"
+    }
+
+    fun getStorageRoot(path: String): String {
+        val basePath = Environment.getExternalStorageDirectory().absolutePath
+        return when {
+            path.startsWith(basePath) || path.startsWith("/storage/emulated") -> "internal"
+            path.startsWith("/data") -> "data"
+            path.startsWith("/storage/") -> path.split("/").getOrNull(2) ?: "other"
+            else -> "other"
+        }
+    }
 }

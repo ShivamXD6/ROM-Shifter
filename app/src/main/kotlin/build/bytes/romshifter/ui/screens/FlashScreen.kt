@@ -122,6 +122,7 @@ fun FlashTab(
     var restoreMode by remember { mutableStateOf("backup") }
     var customImgPath by remember { mutableStateOf("") }
     var allPartitions by remember { mutableStateOf(listOf<String>()) }
+    var isLoadingPartitions by remember { mutableStateOf(false) }
     var backedUpImages by remember { mutableStateOf(listOf<String>()) }
     var isAppending by remember { mutableStateOf(false) }
     var partitionSearchQuery by remember { mutableStateOf("") }
@@ -149,7 +150,9 @@ fun FlashTab(
         LaunchedEffect(Unit) {
             partitionSearchQuery = ""
             selectedBackupPartitions = emptySet()
+            isLoadingPartitions = true
             withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions() }
+            isLoadingPartitions = false
         }
 
         val filteredPartitions = allPartitions.filter { it.contains(partitionSearchQuery, ignoreCase = true) }
@@ -205,10 +208,19 @@ fun FlashTab(
                         }
                     }
 
-                    if (allPartitions.isEmpty()) {
+                    if (isLoadingPartitions) {
                         CircularProgressIndicator(modifier = Modifier
                             .align(Alignment.CenterHorizontally)
                             .padding(24.dp))
+                    } else if (allPartitions.isEmpty()) {
+                        Text(
+                            "No partitions found. Please check root access.",
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(24.dp),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
                     } else if (filteredPartitions.isEmpty()) {
                         Text("No partitions found.", modifier = Modifier
                             .align(Alignment.CenterHorizontally)
@@ -270,7 +282,12 @@ fun FlashTab(
     if (showRestoreDialog) {
         LaunchedEffect(Unit) {
             partitionSearchQuery = ""
-            withContext(Dispatchers.IO) { allPartitions = viewModel.getAllPartitions(); backedUpImages = viewModel.getBackedUpImages() }
+            isLoadingPartitions = true
+            withContext(Dispatchers.IO) {
+                allPartitions = viewModel.getAllPartitions()
+                backedUpImages = viewModel.getBackedUpImages()
+            }
+            isLoadingPartitions = false
         }
 
         AlertDialog(

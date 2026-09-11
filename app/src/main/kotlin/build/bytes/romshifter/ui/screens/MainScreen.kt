@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -116,6 +117,7 @@ import build.bytes.romshifter.models.FlashAction
 import build.bytes.romshifter.models.MigratorMode
 import build.bytes.romshifter.ui.components.AppInstallerDialog
 import build.bytes.romshifter.ui.components.BatchInstallerDialog
+import build.bytes.romshifter.utils.SettingsManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -156,7 +158,8 @@ fun MainScreen(viewModel: MainViewModel) {
                 totalTime = appState.totalInstallTimeSeconds,
                 onInstall = { viewModel.executeBatchInstall() },
                 onCancel = { viewModel.closeAppInstaller { (context as? android.app.Activity)?.finish() } },
-                onToggleSelect = { viewModel.toggleAppInstallSelection(it) }
+                onToggleSelect = { viewModel.toggleAppInstallSelection(it) },
+                onRunInBackground = { viewModel.runInstallInBackground() }
             )
         }
     }
@@ -187,6 +190,17 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         )
     }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
+    val logoAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logoAlpha"
+    )
 
     if (showUpdateDialog && updateInfo != null) {
         AlertDialog(
@@ -269,9 +283,12 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     if (isFirstRun) {
-        OnboardingWizard(viewModel)
+        BackHandler(enabled = appState.isRunning) { }
+        OnboardingWizard(viewModel, logoAlpha)
         return
     }
+
+    BackHandler(enabled = appState.isRunning) { }
 
     val isBackEnabled = !appState.isRunning && (appState.migratorMode != MigratorMode.MENU || showSettings || appState.flashWizardStep > 0)
 
@@ -348,6 +365,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     showSettings = false,
                     selectedTab = selectedTab,
                     viewModel = viewModel,
+                    logoAlpha = logoAlpha,
                     onTabSelect = {},
                     onSettingsToggle = {},
                     onBackClick = {},
@@ -381,6 +399,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 showSettings = showSettings,
                 selectedTab = selectedTab,
                 viewModel = viewModel,
+                logoAlpha = logoAlpha,
                 onTabSelect = {
                     viewModel.setTab(it); if (it != 1) viewModel.setMigratorMode(
                     MigratorMode.MENU
@@ -402,6 +421,7 @@ fun AppScaffold(
     showSettings: Boolean,
     selectedTab: Int,
     viewModel: MainViewModel,
+    logoAlpha: Float,
     onTabSelect: (Int) -> Unit,
     onSettingsToggle: (Boolean) -> Unit,
     onBackClick: () -> Unit
@@ -446,17 +466,6 @@ fun AppScaffold(
             pagerState.animateScrollToPage(selectedTab)
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "logoPulse")
-    val logoAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "logoAlpha"
-    )
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -689,8 +698,9 @@ fun AppScaffold(
 }
 
 @Composable
-fun OnboardingWizard(viewModel: MainViewModel) {
+fun OnboardingWizard(viewModel: MainViewModel, logoAlpha: Float) {
     val context = LocalContext.current
+    val appState by viewModel.uiState.collectAsState()
     var step by remember { mutableIntStateOf(1) }
 
     val backProgress = remember { Animatable(0f) }
@@ -743,11 +753,7 @@ fun OnboardingWizard(viewModel: MainViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
             if (uri != null) {
                 val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
-                val split = docId.split(":")
-                val basePath = android.os.Environment.getExternalStorageDirectory().absolutePath
-                val path = if ("primary".equals(split[0], true)) "$basePath/${split.getOrNull(1) ?: ""}"
-                else "/storage/${split[0]}/${split.getOrNull(1) ?: ""}"
-                val finalPath = if (path.endsWith("Shifter")) path else "$path/Shifter"
+                val finalPath = SettingsManager.resolveDocumentPath(docId)
                 viewModel.migrateFolder(finalPath) { step = 3 }
             }
         }
@@ -775,6 +781,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                     step = frozenBgStep,
                     context = context,
                     viewModel = viewModel,
+                    logoAlpha = logoAlpha,
+                    appState = appState,
                     onNext = {},
                     launcher = launcher,
                     notifPermLauncher = notifPermLauncher,
@@ -827,6 +835,8 @@ fun OnboardingWizard(viewModel: MainViewModel) {
                         step = currentStep,
                         context = context,
                         viewModel = viewModel,
+                        logoAlpha = logoAlpha,
+                        appState = appState,
                         onNext = { step = it },
                         launcher = launcher,
                         notifPermLauncher = notifPermLauncher,
@@ -845,6 +855,8 @@ fun OnboardingStepContent(
     step: Int,
     context: Context,
     viewModel: MainViewModel,
+    logoAlpha: Float,
+    appState: AppState,
     onNext: (Int) -> Unit,
     launcher: androidx.activity.compose.ManagedActivityResultLauncher<Uri?, Uri?>,
     notifPermLauncher: androidx.activity.compose.ManagedActivityResultLauncher<String, Boolean>,
@@ -902,7 +914,11 @@ fun OnboardingStepContent(
                         Icon(
                             painter = painterResource(id = R.drawable.ic_home),
                             contentDescription = "ROM Shifter",
-                            modifier = Modifier.size(56.dp),
+                            modifier = Modifier
+                                .size(56.dp)
+                                .graphicsLayer {
+                                    alpha = if (appState.isRunning) logoAlpha else 1f
+                                },
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -1307,17 +1323,19 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
     )
 
+    val strippedText = text.replace(Regex("<[^>]*>"), "")
+
     return buildAnnotatedString {
-        val lines = text.split("\n")
+        val lines = strippedText.split("\n")
 
         lines.forEachIndexed { index, line ->
             var currentLine = line
             var lineStyle: SpanStyle? = null
             var prefix = ""
 
-            if (currentLine.matches(Regex("^-{3,}$|^\\*{3,}$|^_{3,}$"))) {
+            if (currentLine.trim().matches(Regex("^-{3,}$|^\\*{3,}$|^_{3,}$"))) {
                 withStyle(SpanStyle(color = MaterialTheme.colorScheme.outlineVariant)) {
-                    append("────────────────────────────────")
+                    append("──────────────────────────────")
                 }
             } else {
                 if (currentLine.startsWith("### ")) {
@@ -1333,13 +1351,9 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
 
                 if (currentLine.startsWith("> ")) {
                     currentLine = currentLine.removePrefix("> ")
-                    val isImportant = currentLine.contains(
-                        "Note:",
-                        ignoreCase = true
-                    ) || currentLine.contains(
-                        "Warning:",
-                        ignoreCase = true
-                    ) || currentLine.contains("Important:", ignoreCase = true)
+                    val isImportant = currentLine.contains("Note:", ignoreCase = true) ||
+                            currentLine.contains("Warning:", ignoreCase = true) ||
+                            currentLine.contains("Important:", ignoreCase = true)
 
                     lineStyle = if (isImportant) {
                         quoteStyle.copy(color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
@@ -1349,23 +1363,53 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
                     prefix = "┃ "
                 }
 
-                if (currentLine.trimStart().startsWith("- ") || currentLine.trimStart()
-                        .startsWith("* ")
-                ) {
-                    val indent = currentLine.takeWhile { it.isWhitespace() }
-                    currentLine = currentLine.trimStart().substring(2)
-                    prefix = "$indent• "
+                val rawIndent = currentLine.takeWhile { it.isWhitespace() }
+                val trimmed = currentLine.trimStart()
+
+                if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+                    currentLine = trimmed.substring(2)
+                    prefix = if (rawIndent.isEmpty()) "• " else "$rawIndent- "
+                } else if (rawIndent.isNotEmpty() && trimmed.isNotEmpty()) {
+                    currentLine = trimmed
+                    prefix = "$rawIndent- "
                 }
 
                 val lineStart = length
                 append(prefix)
 
-                parseInlineStyles(currentLine, codeStyle).forEach { part ->
-                    val partStart = length
-                    append(part.text)
-                    part.styles.forEach { (style, range) ->
-                        addStyle(style, partStart + range.first, partStart + range.last)
+                val markdownLinkRegex = Regex("\\[([^]]+)]\\(([^)]+)\\)")
+                var lastLinkEnd = 0
+                markdownLinkRegex.findAll(currentLine).forEach { match ->
+                    if (match.range.first > lastLinkEnd) {
+                        appendInlineStyledText(
+                            currentLine.substring(
+                                lastLinkEnd,
+                                match.range.first
+                            ), codeStyle
+                        )
                     }
+
+                    val linkText = match.groupValues[1]
+                    val linkUrl = match.groupValues[2]
+
+                    val start = length
+                    append(linkText)
+                    addStyle(
+                        SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        start,
+                        length
+                    )
+                    addLink(LinkAnnotation.Url(url = linkUrl), start, length)
+
+                    lastLinkEnd = match.range.last + 1
+                }
+
+                if (lastLinkEnd < currentLine.length) {
+                    appendInlineStyledText(currentLine.substring(lastLinkEnd), codeStyle)
                 }
 
                 if (lineStyle != null) {
@@ -1378,7 +1422,7 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
             }
         }
 
-        val urlRegex = Regex("(https?://\\S+)")
+        val urlRegex = Regex("(?<!\\()https?://\\S+(?!\\))")
         urlRegex.findAll(this.toAnnotatedString().text).forEach { match ->
             addLink(
                 LinkAnnotation.Url(
@@ -1393,6 +1437,16 @@ fun formatChangelog(text: String, linkColor: Color): AnnotatedString {
                 match.range.first,
                 match.range.last + 1
             )
+        }
+    }
+}
+
+private fun AnnotatedString.Builder.appendInlineStyledText(text: String, codeStyle: SpanStyle) {
+    parseInlineStyles(text, codeStyle).forEach { part ->
+        val partStart = length
+        append(part.text)
+        part.styles.forEach { (style, range) ->
+            addStyle(style, partStart + range.first, partStart + range.last)
         }
     }
 }

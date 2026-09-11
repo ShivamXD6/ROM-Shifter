@@ -304,7 +304,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val releases = org.json.JSONArray(cachedJson)
                 val changelogs = mutableListOf<Pair<String, String>>()
-                for (i in 0 until releases.length()) {
+                val limit = if (releases.length() > 5) 5 else releases.length()
+                for (i in 0 until limit) {
                     val release = releases.getJSONObject(i)
                     changelogs.add(
                         release.getString("tag_name") to release.optString(
@@ -365,7 +366,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val releases = org.json.JSONArray(responseJson)
                         val changelogs = mutableListOf<Pair<String, String>>()
 
-                        for (i in 0 until releases.length()) {
+                        val limit = if (releases.length() > 5) 5 else releases.length()
+                        for (i in 0 until limit) {
                             val release = releases.getJSONObject(i)
                             val tagName = release.getString("tag_name")
                             val body = release.optString("body", "No release notes provided.")
@@ -928,7 +930,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRunning = true,
                 currentAction = "Installing Apps...",
                 progress = -1,
-                installStartTime = startTime
+                installStartTime = startTime,
+                installInBackground = false
             )
         }
 
@@ -955,36 +958,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 synchronized(activeLabels) {
                                     if (!activeLabels.contains(label)) activeLabels.add(label)
                                 }
+                                val currentText = synchronized(activeLabels) {
+                                    activeLabels.take(3).joinToString(", ")
+                                }
+                                val step =
+                                    if (apps.size == 1) "Installing ${apps[0].label}..." else "Installing $currentText..."
                                 _uiState.update { state ->
-                                    val currentText = synchronized(activeLabels) {
-                                        activeLabels.take(3).joinToString(", ")
-                                    }
                                     state.copy(
-                                        currentStep = "Installing $currentText...",
+                                        currentStep = step,
                                         batchInstallApps = state.batchInstallApps.map {
                                             if (it.packageName == pkg) it.copy(status = "Installing") else it
                                         }
                                     )
                                 }
+                                if (_uiState.value.installInBackground) {
+                                    val notifTitle =
+                                        if (apps.size == 1) "Installing ${apps[0].label}" else "Installing Apps"
+                                    updateProgressNotification(notifTitle, step, -1)
+                                }
                             }
                         } else if (element.startsWith("ACTION:INSTALL_DONE|PKG:")) {
                             val pkg = element.substringAfter("PKG:")
                             viewModelScope.launch(Dispatchers.Main) {
-                                _uiState.update { state ->
-                                    val labelToRemove =
-                                        state.batchInstallApps.find { it.packageName == pkg }?.label
-                                    synchronized(activeLabels) {
-                                        activeLabels.remove(labelToRemove)
-                                    }
-                                    val currentText = synchronized(activeLabels) {
-                                        activeLabels.take(3).joinToString(", ")
-                                    }
-                                    state.copy(
-                                        currentStep = if (currentText.isNotEmpty()) "Installing $currentText..." else "Finishing up...",
-                                        batchInstallApps = state.batchInstallApps.map {
+                                val state = _uiState.value
+                                val labelToRemove =
+                                    state.batchInstallApps.find { it.packageName == pkg }?.label
+                                synchronized(activeLabels) {
+                                    activeLabels.remove(labelToRemove)
+                                }
+                                val currentText = synchronized(activeLabels) {
+                                    activeLabels.take(3).joinToString(", ")
+                                }
+                                val step =
+                                    if (apps.size == 1 && currentText.isEmpty()) "${apps[0].label} installed successfully"
+                                    else if (currentText.isNotEmpty()) "Installing $currentText..."
+                                    else "Finishing up..."
+                                _uiState.update { s ->
+                                    s.copy(
+                                        currentStep = step,
+                                        batchInstallApps = s.batchInstallApps.map {
                                             if (it.packageName == pkg) it.copy(status = "Done") else it
                                         }
                                     )
+                                }
+                                if (_uiState.value.installInBackground) {
+                                    val notifTitle =
+                                        if (apps.size == 1) "Installing ${apps[0].label}" else "Installing Apps"
+                                    updateProgressNotification(notifTitle, step, -1)
                                 }
                             }
                         } else if (element.startsWith("ACTION:INSTALL_ERROR|PKG:")) {
@@ -992,24 +1012,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val errorMsg =
                                 if (element.contains("|MSG:")) element.substringAfter("|MSG:") else "Installation failed"
                             viewModelScope.launch(Dispatchers.Main) {
-                                _uiState.update { state ->
-                                    val labelToRemove =
-                                        state.batchInstallApps.find { it.packageName == pkg }?.label
-                                    synchronized(activeLabels) {
-                                        activeLabels.remove(labelToRemove)
-                                    }
-                                    val currentText = synchronized(activeLabels) {
-                                        activeLabels.take(3).joinToString(", ")
-                                    }
-                                    state.copy(
-                                        currentStep = if (currentText.isNotEmpty()) "Installing $currentText..." else "Error occurred during some installs.",
-                                        batchInstallApps = state.batchInstallApps.map {
+                                val state = _uiState.value
+                                val labelToRemove =
+                                    state.batchInstallApps.find { it.packageName == pkg }?.label
+                                synchronized(activeLabels) {
+                                    activeLabels.remove(labelToRemove)
+                                }
+                                val currentText = synchronized(activeLabels) {
+                                    activeLabels.take(3).joinToString(", ")
+                                }
+                                val step =
+                                    if (apps.size == 1 && currentText.isEmpty()) "Failed to install ${apps[0].label}"
+                                    else if (currentText.isNotEmpty()) "Installing $currentText..."
+                                    else "Error occurred during some installs."
+                                _uiState.update { s ->
+                                    s.copy(
+                                        currentStep = step,
+                                        batchInstallApps = s.batchInstallApps.map {
                                             if (it.packageName == pkg) it.copy(
                                                 status = "Error",
                                                 errorMessage = errorMsg
                                             ) else it
                                         }
                                     )
+                                }
+                                if (_uiState.value.installInBackground) {
+                                    val notifTitle =
+                                        if (apps.size == 1) "Installing ${apps[0].label}" else "Installing Apps"
+                                    updateProgressNotification(notifTitle, step, -1)
                                 }
                             }
                         }
@@ -1026,20 +1056,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val successCount = finalApps.count { it.status == "Done" }
                 val errorCount = finalApps.count { it.status == "Error" }
 
-                val title =
+                val title = if (finalApps.size == 1) {
+                    if (errorCount > 0) "Failed to Install ${finalApps[0].label}" else "Successfully Installed ${finalApps[0].label}"
+                } else {
                     if (errorCount > 0) "Installation Finished with Errors" else "Installation Complete"
-                val content =
+                }
+
+                val content = if (finalApps.size == 1) {
+                    if (errorCount > 0) finalApps[0].errorMessage
+                        ?: "Installation failed." else "${finalApps[0].label} is ready to use."
+                } else {
                     if (errorCount > 0) "Installed $successCount, Failed $errorCount apps in ${totalSeconds}s."
                     else "Installed $successCount apps in ${totalSeconds}s."
+                }
 
-                showCompletionNotification(title, content)
+                if (_uiState.value.installInBackground) {
+                    showCompletionNotification(title, content)
+                }
+
+                val shouldClear = _uiState.value.installInBackground
                 _uiState.update {
                     it.copy(
                         isRunning = false,
                         currentAction = title,
                         currentStep = content,
                         progress = 100,
-                        totalInstallTimeSeconds = totalSeconds
+                        totalInstallTimeSeconds = totalSeconds,
+                        batchInstallApps = if (shouldClear) emptyList() else it.batchInstallApps,
+                        installInBackground = if (shouldClear) false else it.installInBackground
                     )
                 }
                 targetFile.delete()
@@ -1059,15 +1103,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 showAppInstaller = false,
                 batchInstallApps = emptyList(),
                 isInstallerIntent = false,
-                totalInstallTimeSeconds = 0L
+                totalInstallTimeSeconds = 0L,
+                installInBackground = false
             )
         }
+        cancelNotification()
         if (wasIntent) {
             viewModelScope.launch {
                 kotlinx.coroutines.delay(100.milliseconds)
                 onFinish?.invoke()
             }
         }
+    }
+
+    fun runInstallInBackground() {
+        val state = _uiState.value
+        val apps = state.batchInstallApps.filter { it.isSelected && it.isAnalysisComplete }
+        _uiState.update { it.copy(installInBackground = true, showAppInstaller = false) }
+        val notifTitle = if (apps.size == 1) "Installing ${apps[0].label}" else "Installing Apps"
+        updateProgressNotification(notifTitle, state.currentStep, -1)
     }
 
     fun toggleAppInstallSelection(path: String) {
@@ -1234,12 +1288,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun migrateFolder(newPath: String, onSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            SettingsManager.migrateFolder(_savedPath.value.trimEnd('/'), newPath, prefs)
-            Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'")
-                .exec()
-            _savedPath.value = newPath
-            updateStorageInfo()
-            withContext(Dispatchers.Main) { onSuccess() }
+            val oldPath = _savedPath.value.trimEnd('/')
+            if (oldPath == newPath.trimEnd('/')) {
+                withContext(Dispatchers.Main) { onSuccess() }
+                return@launch
+            }
+
+            _uiState.update {
+                it.copy(
+                    isRunning = true,
+                    currentAction = "Moving Backups...",
+                    currentStep = "Moving files to new location...",
+                    progress = -1
+                )
+            }
+            updateProgressNotification("Moving Backups", "Moving files to: $newPath", -1)
+
+            try {
+                SettingsManager.migrateFolder(oldPath, newPath, prefs)
+                Shell.cmd("su -c 'mkdir -p \"$newPath\" && touch \"$newPath/.shifter_dir\"'").exec()
+                _savedPath.value = newPath
+                updateStorageInfo()
+                showCompletionNotification("Migration Complete", "Backups moved to $newPath")
+            } catch (_: Exception) {
+                _uiState.update { it.copy(currentAction = "Migration Failed") }
+                cancelNotification()
+            } finally {
+                _uiState.update { it.copy(isRunning = false) }
+                withContext(Dispatchers.Main) { onSuccess() }
+            }
         }
     }
 
@@ -1264,6 +1341,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) {
                 if (detected.isNotEmpty()) {
                     _savedPath.value = detected
+                    prefs.edit { putString("base_path", detected) }
                     Toast.makeText(
                         getApplication(),
                         "Auto-detected folder at: $detected",
@@ -1385,7 +1463,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun finalizeSecurityReset(context: Context) {
-        _uiState.update { it.copy(showSecurityResetDialog = false) }
         val state = _uiState.value
         _uiState.update { it.copy(showSecurityResetDialog = false, originalDefaultSmsApp = null) }
         viewModelScope.launch(Dispatchers.IO) {
